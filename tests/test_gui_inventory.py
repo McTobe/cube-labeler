@@ -61,8 +61,8 @@ def test_gui_inventory():
     if os.path.isdir(artifact_dir):
         app._current_preview.save(os.path.join(artifact_dir, "test_gui_inventory_b1.png"))
 
-    # Add to Queue via the Inventory tab button
-    app.inventory_tab_widget.btn_queue_add.invoke()
+    # Add to Queue via the action bar button
+    app.btn_add_queue.invoke()
     app.update()
     assert len(app.label_queue) == 2, f"Expected 2 items, got {len(app.label_queue)}"
 

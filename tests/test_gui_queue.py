@@ -55,9 +55,8 @@ def test_gui_queue():
 
     assert len(app.label_queue) == 3, f"Expected 3 items, got {len(app.label_queue)}"
 
-    # Switch to Print Queue tab
-    app.tabview.set("Print Queue")
-    app._on_tab_changed()
+    # Switch to Print Queue view via top bar button
+    app._open_queue_tab()
     app.update()
 
     # Verify metrics

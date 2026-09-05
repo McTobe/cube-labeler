@@ -244,18 +244,21 @@ class PrintLabelApp(ctk.CTk):
         )
         self.btn_mode_queue.pack(side="right", padx=4)
 
-        # Tabview for Custom Designer Mode
+        # Tabview for Custom Designer Mode (Modular layer tabs only)
         self.tabview = ctk.CTkTabview(self.editor_container, command=self._on_tab_changed)
         self.tab_text = self.tabview.add("Text & Typography")
         self.tab_qr = self.tabview.add("QR & Barcode")
         self.tab_image = self.tabview.add("Images & Icons")
         self.tab_tape = self.tabview.add("Tape & Hardware")
         self.tab_templates = self.tabview.add("Templates & Presets")
-        self.tab_queue = self.tabview.add("Print Queue")
 
         # Container for Hardware & Bins Studio Mode
         self.inventory_studio_frame = ctk.CTkFrame(self.editor_container, fg_color="transparent")
         self._build_inventory_studio()
+
+        # Container for Print Queue Mode
+        self.queue_container_frame = ctk.CTkFrame(self.editor_container, fg_color="transparent")
+        self._build_queue_tab()
 
         # Build custom tabs
         self._build_text_tab()
@@ -263,7 +266,6 @@ class PrintLabelApp(ctk.CTk):
         self._build_image_tab()
         self._build_tape_tab()
         self._build_templates_tab()
-        self._build_queue_tab()
 
         # Pack default view
         self.tabview.pack(fill="both", expand=True)
@@ -398,34 +400,87 @@ class PrintLabelApp(ctk.CTk):
         self.outline_val_label.grid(row=1, column=5)
 
     # -------------------------------------------------------------------------
-    # STUDIO MODE & HARDWARE BINS STUDIO
+    # STUDIO MODE & VIEW SWITCHING (CUSTOM DESIGNER / HARDWARE STUDIO / QUEUE)
     # -------------------------------------------------------------------------
-    def _open_queue_tab(self):
-        """Switch to Custom Designer mode and open the Print Queue tab."""
+    def _show_custom_designer(self):
+        """Displays the Custom Designer tabview."""
+        self.inventory_studio_frame.pack_forget()
+        self.queue_container_frame.pack_forget()
+        self.tabview.pack(fill="both", expand=True)
         self.studio_mode_seg.set("🏷️ Custom Designer")
-        self._on_studio_mode_changed("🏷️ Custom Designer")
-        self.tabview.set("Print Queue")
-        self._on_tab_changed()
+        self._update_queue_button_visual(is_active=False)
+        if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
+            self.queue_bar_frame.pack_forget()
+            self.design_bar_frame.pack(side="left")
+        self.config.inventory_config = None
+        if self._preview_mode == "batch":
+            self._preview_mode = "current"
+            if hasattr(self, "btn_preview_mode"):
+                self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
+        self._trigger_render()
+
+    def _show_hardware_studio(self):
+        """Displays the Hardware & Bins Studio."""
+        self.tabview.pack_forget()
+        self.queue_container_frame.pack_forget()
+        self.inventory_studio_frame.pack(fill="both", expand=True)
+        self.studio_mode_seg.set("🔩 Hardware & Bins Studio")
+        self._update_queue_button_visual(is_active=False)
+        if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
+            self.queue_bar_frame.pack_forget()
+            self.design_bar_frame.pack(side="left")
+        if hasattr(self, "inventory_tab_widget"):
+            self.config.inventory_config = self.inventory_tab_widget.get_current_inventory_config()
+        if self._preview_mode == "batch":
+            self._preview_mode = "current"
+            if hasattr(self, "btn_preview_mode"):
+                self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
+        self._trigger_render()
+
+    def _show_queue_view(self):
+        """Displays the Print Queue view."""
+        self.tabview.pack_forget()
+        self.inventory_studio_frame.pack_forget()
+        self.queue_container_frame.pack(fill="both", expand=True)
+        self.studio_mode_seg.set("")
+        self._update_queue_button_visual(is_active=True)
+        if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
+            self.design_bar_frame.pack_forget()
+            self.queue_bar_frame.pack(side="left")
+        self._refresh_queue_display()
+        if self.label_queue:
+            self._preview_mode = "batch"
+            self._render_batch_preview()
+
+    def _update_queue_button_visual(self, is_active: bool = False):
+        """Updates the appearance of the mode bar queue button."""
+        if hasattr(self, "btn_mode_queue"):
+            count = len(self.label_queue)
+            text = f"📋 Print Queue ({count})" if count > 0 else "📋 Print Queue"
+            if is_active:
+                self.btn_mode_queue.configure(text=text, fg_color="#1565C0")
+            elif count > 0:
+                self.btn_mode_queue.configure(text=text, fg_color="#1976D2")
+            else:
+                self.btn_mode_queue.configure(text=text, fg_color="gray30")
+
+    def _is_queue_view_active(self) -> bool:
+        """Returns True if the Print Queue view is currently active."""
+        return (
+            hasattr(self, "queue_container_frame")
+            and self.queue_container_frame.winfo_manager() == "pack"
+        )
+
+    def _open_queue_tab(self):
+        """Handler for mode bar Print Queue button."""
+        self._show_queue_view()
 
     def _on_studio_mode_changed(self, mode: str):
-        """Switches between Custom Designer (tabview) and Hardware & Bins Studio."""
+        """Handler for segmented mode switcher."""
         if mode == "🔩 Hardware & Bins Studio":
-            self.tabview.pack_forget()
-            self.inventory_studio_frame.pack(fill="both", expand=True)
-            if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
-                self.queue_bar_frame.pack_forget()
-                self.design_bar_frame.pack(side="left")
-            if hasattr(self, "inventory_tab_widget"):
-                self.config.inventory_config = self.inventory_tab_widget.get_current_inventory_config()
-            if self._preview_mode == "batch":
-                self._preview_mode = "current"
-                if hasattr(self, "btn_preview_mode"):
-                    self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
-            self._trigger_render()
-        else:
-            self.inventory_studio_frame.pack_forget()
-            self.tabview.pack(fill="both", expand=True)
-            self._on_tab_changed()
+            self._show_hardware_studio()
+        elif mode == "🏷️ Custom Designer":
+            self._show_custom_designer()
 
     def _build_inventory_studio(self):
         """Constructs the dedicated Hardware Inventory Studio."""
@@ -698,13 +753,13 @@ class PrintLabelApp(ctk.CTk):
         self.btn_load_template.pack(side="left", padx=6)
 
     # -------------------------------------------------------------------------
-    # TAB 6: PRINT QUEUE & TAPE SAVER
+    # PRINT QUEUE & TAPE SAVER
     # -------------------------------------------------------------------------
     def _build_queue_tab(self):
-        tab = self.tab_queue
+        container = self.queue_container_frame
 
         # Top summary card for Queue stats
-        self.queue_summary_card = ctk.CTkFrame(tab, corner_radius=8)
+        self.queue_summary_card = ctk.CTkFrame(container, corner_radius=8)
         self.queue_summary_card.pack(fill="x", padx=10, pady=(8, 6))
 
         stats_box = ctk.CTkFrame(self.queue_summary_card, fg_color="transparent")
@@ -738,7 +793,7 @@ class PrintLabelApp(ctk.CTk):
         self.queue_saved_badge.pack(fill="x", pady=(4, 0))
 
         # Scrollable list of queued labels
-        self.queue_scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        self.queue_scroll = ctk.CTkScrollableFrame(container, fg_color="transparent")
         self.queue_scroll.pack(fill="both", expand=True, padx=10, pady=(0, 6))
         self.queue_scroll._parent_canvas.bind("<Configure>", lambda e: self._check_queue_scrollbar(), add="+")
         self.queue_scroll._scrollbar.grid_remove()
@@ -780,24 +835,12 @@ class PrintLabelApp(ctk.CTk):
 
         count = len(self.label_queue)
 
-        # Update tab label with item counter
-        try:
-            tab_btn = self.tabview._segmented_button._buttons_dict.get("Print Queue")
-            if tab_btn:
-                tab_btn.configure(text=f"Print Queue ({count})" if count > 0 else "Print Queue")
-        except Exception:
-            pass
-
         # Update mode bar queue button
-        if hasattr(self, "btn_mode_queue"):
-            self.btn_mode_queue.configure(
-                text=f"📋 Print Queue ({count})" if count > 0 else "📋 Print Queue",
-                fg_color="#1976D2" if count > 0 else "gray30",
-            )
+        self._update_queue_button_visual(is_active=self._is_queue_view_active())
 
         if count == 0:
             if hasattr(self, "btn_print_batch"):
-                self.btn_print_batch.configure(state="disabled", text="🖨  PRINT QUEUE (0)")
+                self.btn_print_batch.configure(state="disabled", text="🖨  PRINT QUEUE (Ctrl+P)")
             if hasattr(self, "btn_clear_queue"):
                 self.btn_clear_queue.configure(state="disabled")
             if hasattr(self, "btn_preview_mode"):
@@ -839,7 +882,7 @@ class PrintLabelApp(ctk.CTk):
 
         # Enabled batch actions
         if hasattr(self, "btn_print_batch"):
-            self.btn_print_batch.configure(state="normal", text=f"🖨  PRINT QUEUE ({count})")
+            self.btn_print_batch.configure(state="normal", text=f"🖨  PRINT QUEUE ({count}) (Ctrl+P)")
         if hasattr(self, "btn_clear_queue"):
             self.btn_clear_queue.configure(state="normal")
         if hasattr(self, "btn_preview_mode"):
@@ -985,25 +1028,15 @@ class PrintLabelApp(ctk.CTk):
 
     def _on_tab_changed(self):
         """Called when switching tabs in Custom Designer."""
-        selected = self.tabview.get()
-        if selected == "Print Queue":
-            if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
-                self.design_bar_frame.pack_forget()
-                self.queue_bar_frame.pack(side="left")
-            self._refresh_queue_display()
-            if self.label_queue:
-                self._preview_mode = "batch"
-                self._render_batch_preview()
-        else:
-            if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
-                self.queue_bar_frame.pack_forget()
-                self.design_bar_frame.pack(side="left")
-            self.config.inventory_config = None
-            if self._preview_mode == "batch":
-                self._preview_mode = "current"
-                if hasattr(self, "btn_preview_mode"):
-                    self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
-            self._trigger_render()
+        if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
+            self.queue_bar_frame.pack_forget()
+            self.design_bar_frame.pack(side="left")
+        self.config.inventory_config = None
+        if self._preview_mode == "batch":
+            self._preview_mode = "current"
+            if hasattr(self, "btn_preview_mode"):
+                self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
+        self._trigger_render()
 
     def _on_add_to_queue(self):
         """Adds current label configuration to the print queue."""
@@ -1041,7 +1074,7 @@ class PrintLabelApp(ctk.CTk):
 
         self.action_status_label.configure(text=msg)
 
-        if self._preview_mode == "batch" or (hasattr(self, "tabview") and self.tabview.get() == "Print Queue"):
+        if self._preview_mode == "batch" or self._is_queue_view_active():
             self._render_batch_preview()
 
     def _render_batch_preview(self):
@@ -1082,14 +1115,14 @@ class PrintLabelApp(ctk.CTk):
                 self.label_queue[index],
             )
             self._refresh_queue_display()
-            if self._preview_mode == "batch" or self.tabview.get() == "Print Queue":
+            if self._preview_mode == "batch" or self._is_queue_view_active():
                 self._render_batch_preview()
 
     def _on_delete_queue_item(self, index: int):
         if 0 <= index < len(self.label_queue):
             del self.label_queue[index]
             self._refresh_queue_display()
-            if self._preview_mode == "batch" or self.tabview.get() == "Print Queue":
+            if self._preview_mode == "batch" or self._is_queue_view_active():
                 if self.label_queue:
                     self._render_batch_preview()
                 else:
@@ -1104,7 +1137,7 @@ class PrintLabelApp(ctk.CTk):
         if messagebox.askyesno("Clear Queue", f"Remove all {len(self.label_queue)} label(s) from the print queue?"):
             self.label_queue.clear()
             self._refresh_queue_display()
-            if self._preview_mode == "batch" or self.tabview.get() == "Print Queue":
+            if self._preview_mode == "batch" or self._is_queue_view_active():
                 self._preview_mode = "current"
                 self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
                 self._trigger_render()
@@ -1113,14 +1146,15 @@ class PrintLabelApp(ctk.CTk):
     def _on_load_queue_item(self, index: int):
         if 0 <= index < len(self.label_queue):
             cfg = copy.deepcopy(self.label_queue[index])
-            self.config = cfg
             if getattr(cfg, "inventory_config", None) is not None and hasattr(self, "inventory_tab_widget"):
                 self.studio_mode_seg.set("🔩 Hardware & Bins Studio")
-                self._on_studio_mode_changed("🔩 Hardware & Bins Studio")
+                self._show_hardware_studio()
+                self.config = cfg
                 self.inventory_tab_widget.load_inventory_config(cfg.inventory_config)
             else:
                 self.studio_mode_seg.set("🏷️ Custom Designer")
-                self._on_studio_mode_changed("🏷️ Custom Designer")
+                self._show_custom_designer()
+                self.config = cfg
                 self._update_ui_from_config(cfg)
                 self.tabview.set("Text & Typography")
                 self._on_tab_changed()
@@ -1209,7 +1243,7 @@ class PrintLabelApp(ctk.CTk):
             text="🖨  PRINT (Ctrl+P)",
             font=ctk.CTkFont(size=13, weight="bold"),
             height=40,
-            width=160,
+            width=180,
             fg_color="#2E7D32",
             hover_color="#1B5E20",
             command=self._on_print_clicked,
@@ -1239,7 +1273,7 @@ class PrintLabelApp(ctk.CTk):
         )
         self.btn_export.pack(side="left", padx=4)
 
-        # 2. Queue Mode Bar Buttons (Packed when viewing Print Queue tab)
+        # 2. Queue Mode Bar Buttons (Packed when viewing Print Queue)
         self.queue_bar_frame = ctk.CTkFrame(inner, fg_color="transparent")
 
         # Print Queue Button (replaces Print)
@@ -1248,7 +1282,7 @@ class PrintLabelApp(ctk.CTk):
             text="🖨  PRINT QUEUE (Ctrl+P)",
             font=ctk.CTkFont(size=13, weight="bold"),
             height=40,
-            width=190,
+            width=210,
             fg_color="#2E7D32",
             hover_color="#1B5E20",
             command=self._on_print_batch_clicked,
@@ -1260,11 +1294,11 @@ class PrintLabelApp(ctk.CTk):
         self.btn_clear_queue = ctk.CTkButton(
             self.queue_bar_frame,
             text="🗑 Clear Queue",
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=13, weight="bold"),
             height=40,
-            width=130,
-            fg_color="gray35",
-            hover_color="gray25",
+            width=140,
+            fg_color="#C62828",
+            hover_color="#8E0000",
             command=self._on_clear_queue,
             state="disabled",
         )
@@ -1274,9 +1308,9 @@ class PrintLabelApp(ctk.CTk):
         self.btn_preview_mode = ctk.CTkButton(
             self.queue_bar_frame,
             text="👁 Preview Chain",
-            font=ctk.CTkFont(size=13),
+            font=ctk.CTkFont(size=13, weight="bold"),
             height=40,
-            width=135,
+            width=150,
             fg_color="#1976D2",
             hover_color="#1565C0",
             command=self._toggle_preview_mode,
@@ -1750,8 +1784,8 @@ class PrintLabelApp(ctk.CTk):
                 messagebox.showerror("Export Failed", str(e))
 
     def _on_print_clicked(self):
-        # If in batch preview mode or on the Print Queue tab, print batch
-        if self._preview_mode == "batch" or (hasattr(self, "tabview") and self.tabview.get() == "Print Queue"):
+        # If in batch preview mode or in Print Queue view, print batch
+        if self._preview_mode == "batch" or self._is_queue_view_active():
             if self.label_queue:
                 self._on_print_batch_clicked()
                 return

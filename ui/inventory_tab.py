@@ -90,18 +90,6 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.preset_combo.set("A2: Socket Cap 2-Bin (M3 x30 x35)")
         self.preset_combo.pack(side="left", padx=4)
 
-        # Direct Add to Queue Button
-        self.btn_queue_add = ctk.CTkButton(
-            top_bar,
-            text="➕ Add to Queue",
-            width=130,
-            fg_color="#1976D2",
-            hover_color="#1565C0",
-            command=self.on_add_queue,
-            font=ctk.CTkFont(size=12, weight="bold"),
-        )
-        self.btn_queue_add.pack(side="right", padx=4)
-
         # 2. Form Container Frame
         self.form_frame = ctk.CTkFrame(self, corner_radius=8)
         self.form_frame.pack(fill="both", expand=True, padx=12, pady=(0, 8))
