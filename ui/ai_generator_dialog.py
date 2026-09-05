@@ -465,7 +465,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         )
         bold_lbl.pack(anchor="w", padx=12, pady=(4, 2))
 
-        self.thickness_var = tk.StringVar(value="Bold")
+        self.thickness_var = tk.StringVar(value="Normal")
         self.seg_thickness = ctk.CTkSegmentedButton(
             container,
             values=["Normal", "Bold", "Extra Bold", "Heavy"],
@@ -531,7 +531,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             return 3
         elif val == "Heavy":
             return 4
-        return 2
+        return 1
 
     def _on_thickness_changed(self, val=None):
         self._update_processed_preview()

@@ -120,7 +120,8 @@ class TestAIGenerator(unittest.TestCase):
         draw = ImageDraw.Draw(img)
         draw.ellipse([30, 30, 120, 120], fill="gray")
 
-        edge_img = local_edge_filter(img, sensitivity=120, line_weight=2)
+        # Test with line_thickness parameter (which caused previous crash)
+        edge_img = local_edge_filter(img, sensitivity=120, line_weight=2, line_thickness=1)
         self.assertEqual(edge_img.size, (256, 256))
         self.assertEqual(edge_img.mode, "RGBA")
 
@@ -128,6 +129,7 @@ class TestAIGenerator(unittest.TestCase):
         gen = GeminiWireframeGenerator(api_key="TEST_KEY")
         self.assertEqual(gen.api_key, "TEST_KEY")
         self.assertIn("BOLD & THICK LINEWORK", THERMAL_WIREFRAME_SYSTEM_PROMPT)
+        self.assertIn("AGGRESSIVE SIMPLIFICATION & ABSTRACTION", THERMAL_WIREFRAME_SYSTEM_PROMPT)
         self.assertIn("thermal label", THERMAL_WIREFRAME_SYSTEM_PROMPT.lower())
 
 

@@ -23,14 +23,15 @@ from core.config import config_manager
 # System instruction prompt ensuring output is strictly thermal-print ready
 THERMAL_WIREFRAME_SYSTEM_PROMPT = (
     "You are an expert technical vector illustrator creating high-contrast icons specifically for miniature thermal label printers (such as Brother PT-P300BT / P-Touch). "
-    "Because thermal label tape has limited physical resolution (only 64 to 128 vertical print dots), THIN OR DELICATE HAIRLINE STROKES DISAPPEAR AND BECOME UNREADABLE ON PRINTED LABELS. "
+    "Because thermal label tape has limited physical resolution (only 64 to 128 vertical print dots), THIN OR DELICATE HAIRLINE STROKES AND CLUTTERED DETAILS DISAPPEAR OR BLUR TOGETHER ON PRINTED LABELS. "
     "\nCRITICAL DRAWING RULES:\n"
-    "1. BOLD & THICK LINEWORK: Draw ALL strokes with BOLD, HEAVY, PROMINENT THICKNESS (chunky technical line art, minimum 6 to 10 pixels stroke weight). Do NOT draw thin hairlines, faint outlines, or delicate sketches.\n"
-    "2. BACKGROUND: Pure solid white background (#FFFFFF) with zero texture, zero shading, and no background objects.\n"
-    "3. FOREGROUND: Pure solid jet black (#000000) for all strokes, outlines, and structural geometry.\n"
-    "4. NO GRADIENTS OR SHADING: Absolutely NO grayscale, NO soft gradients, NO airbrushing, NO cross-hatching, and NO drop shadows. Only crisp, high-contrast binary black lines on white.\n"
-    "5. ISOMETRIC PERSPECTIVE & GEOMETRY: Draw the subject in a clean isometric 3D perspective. Emphasize the bold outer silhouette and major functional mechanical contours. Simplify or omit tiny micro-details that would blur together on a physical thermal label.\n"
-    "6. HIGH LEGIBILITY AT SMALL SIZES: The resulting icon must be instantly recognizable when printed at a very small physical size (approx 9 mm / 0.35 inch high)."
+    "1. AGGRESSIVE SIMPLIFICATION & ABSTRACTION: You are explicitly permitted and encouraged to simplify, declutter, and abstract the item as you see fit to make the icon perfect and instantly readable on workshop labels. Strip out transparent housing reflections, glare, internal shadows, and complicated internal mechanisms (such as tiny springs, screws, or intricate busbars). Focus on the bold, recognizable outer silhouette, essential functional geometry (e.g. ports, clips, levers, primary body contours), and prominent brand/rating markings.\n"
+    "2. BOLD & THICK LINEWORK: Draw ALL strokes with BOLD, HEAVY, PROMINENT THICKNESS (chunky technical line art, minimum 6 to 10 pixels stroke weight). Do NOT draw thin hairlines, faint outlines, or delicate sketches.\n"
+    "3. BACKGROUND: Pure solid white background (#FFFFFF) with zero texture, zero shading, and no background objects.\n"
+    "4. FOREGROUND: Pure solid jet black (#000000) for all strokes, outlines, and structural geometry.\n"
+    "5. NO GRADIENTS OR SHADING: Absolutely NO grayscale, NO soft gradients, NO airbrushing, NO cross-hatching, and NO drop shadows. Only crisp, high-contrast binary black lines on white.\n"
+    "6. ISOMETRIC PERSPECTIVE & GEOMETRY: Draw the subject in a clean isometric 3D perspective (like a clean patent drawing, CAD wireframe, or crisp vector clip-art icon).\n"
+    "7. HIGH LEGIBILITY AT SMALL SIZES: The resulting icon must be instantly recognizable when printed at a very small physical size (approx 9 mm / 0.35 inch high)."
 )
 
 
@@ -38,7 +39,7 @@ def post_process_thermal(
     image: Image.Image,
     target_size: Tuple[int, int] = (256, 256),
     binarize_threshold: int = 210,
-    line_thickness: int = 2,
+    line_thickness: int = 1,
     transparent_bg: bool = True,
 ) -> Image.Image:
     """
@@ -137,6 +138,8 @@ def local_edge_filter(
     sensitivity: int = 120,
     line_weight: int = 2,
     invert: bool = False,
+    line_thickness: int = 1,
+    **kwargs,
 ) -> Image.Image:
     """
     Offline local edge-detection and contour filter.
@@ -165,7 +168,7 @@ def local_edge_filter(
         line_art = mono_edges
 
     # Post process for thermal printing
-    return post_process_thermal(line_art)
+    return post_process_thermal(line_art, line_thickness=line_thickness)
 
 
 class GeminiWireframeGenerator:
@@ -221,7 +224,7 @@ class GeminiWireframeGenerator:
         input_image: Image.Image,
         custom_instructions: str = "",
         model: str = "gemini-3.1-flash-image",
-        line_thickness: int = 2,
+        line_thickness: int = 1,
         return_raw: bool = False,
     ) -> Image.Image:
         """
@@ -238,6 +241,9 @@ class GeminiWireframeGenerator:
         prompt_text = (
             f"{THERMAL_WIREFRAME_SYSTEM_PROMPT}\n\n"
             "TASK: Generate a bold, heavy-outline isometric technical wireframe line-art icon of the item shown in the attached photo.\n"
+            "SIMPLIFICATION INSTRUCTIONS: You may aggressively simplify, declutter, and abstract the object as you see fit to make the icon perfect and immediately recognizable for our miniature label use case. "
+            "Strip out transparent housing reflections, internal clutter, shadows, and subtle micro-details. "
+            "Highlight the bold outer silhouette, characteristic functional shape (such as levers, wire ports, slots, threads), and any prominent bold markings.\n"
             "CRITICAL REQUIREMENT: Draw with EXTRA THICK, BOLD, SOLID BLACK contour lines (#000000) on pure white background (#FFFFFF). "
             "This icon is specifically for a low-resolution miniature thermal label printer. "
             "Hairlines, thin delicate strokes, and subtle hatching are strictly prohibited as they will not print. "
@@ -308,7 +314,7 @@ class GeminiWireframeGenerator:
         self,
         prompt: str,
         model: str = "gemini-3.1-flash-image",
-        line_thickness: int = 2,
+        line_thickness: int = 1,
         return_raw: bool = False,
     ) -> Image.Image:
         """
@@ -317,6 +323,8 @@ class GeminiWireframeGenerator:
         full_prompt = (
             f"{THERMAL_WIREFRAME_SYSTEM_PROMPT}\n\n"
             f"TASK: Generate a bold, heavy-outline isometric technical wireframe line-art icon of: {prompt}.\n"
+            "SIMPLIFICATION INSTRUCTIONS: You may aggressively simplify, declutter, and abstract the object as you see fit to make the icon perfect and immediately recognizable for our miniature label use case. "
+            "Omit tiny cluttered micro-details in favor of bold primary geometry and silhouette.\n"
             "CRITICAL REQUIREMENT: Draw with EXTRA THICK, BOLD, SOLID BLACK contour lines (#000000) on pure white background (#FFFFFF). "
             "Optimized for miniature low-resolution thermal label printing. "
             "Ensure strokes are thick, bold, and solid. Do NOT use thin hairlines or faint outlines.\n"
