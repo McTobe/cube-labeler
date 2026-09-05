@@ -151,7 +151,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         key = self.entry_api_key.get().strip()
         config_manager.gemini_api_key = key
         ai_generator.api_key = key
-        messagebox.showinfo("Gemini API", "API key saved successfully!")
+        messagebox.showinfo("Gemini API", "API key saved successfully!", parent=self)
 
     def _build_tab_photo(self):
         # 1. Source Image Picker
@@ -304,11 +304,11 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         self.lbl_import_filename = ctk.CTkLabel(
             self.tab_import,
-            text="No image selected",
+            text="No image selected (click Choose Image or Clean & Prepare)",
             font=ctk.CTkFont(size=12),
             text_color="gray70",
         )
-        self.lbl_import_filename.pack(fill="x", pady=(0, 10))
+        self.lbl_import_filename.pack(fill="x", pady=(0, 8))
 
         # Threshold slider for custom cleaning
         ctk.CTkLabel(
@@ -331,21 +331,58 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             self.tab_import,
             text="⚡ Clean & Prepare for Thermal Printing",
             height=38,
-            fg_color="#10B981",
-            hover_color="#059669",
+            fg_color="#0284C7",
+            hover_color="#0369A1",
             font=ctk.CTkFont(size=13, weight="bold"),
             command=self._apply_import_clean,
         )
         btn_clean.pack(fill="x", pady=4)
 
+        self.lbl_import_hint = ctk.CTkLabel(
+            self.tab_import,
+            text="💡 Tip: Cleaned preview appears on the right. When satisfied, save below.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray70",
+            wraplength=420,
+            justify="left",
+        )
+        self.lbl_import_hint.pack(fill="x", pady=(6, 4))
+
+        # Direct Save button right inside the tab for convenience
+        self.btn_import_save = ctk.CTkButton(
+            self.tab_import,
+            text="💾 Save Cleaned Icon to Library & Use",
+            height=38,
+            fg_color="#10B981",
+            hover_color="#059669",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            state="disabled",
+            command=self._save_and_use,
+        )
+        self.btn_import_save.pack(fill="x", pady=(4, 6))
+
+    def _flash_preview_box(self):
+        try:
+            self.preview_box.configure(border_color="#10B981", border_width=3)
+            self.after(500, lambda: self.preview_box.configure(border_color="gray40", border_width=2))
+        except Exception:
+            pass
+
     def _apply_import_clean(self):
         if not self.source_image:
-            messagebox.showwarning("Missing Image", "Please select an image first.")
+            # If no image chosen yet, automatically launch file picker so the button works immediately!
+            self._browse_source_image()
             return
 
         self.raw_unprocessed_image = self.source_image.copy()
         self._update_processed_preview()
-        self.lbl_status.configure(text="Cleaned & prepared for thermal print!", text_color="#10B981")
+        self.lbl_status.configure(text="✨ Cleaned & prepared for thermal print!", text_color="#10B981")
+        if hasattr(self, "lbl_import_hint"):
+            self.lbl_import_hint.configure(
+                text="✅ Cleaned & ready! Click '💾 Save Cleaned Icon to Library & Use' below or on the right.",
+                text_color="#10B981",
+            )
+        self._flash_preview_box()
 
     def _build_preview_panel(self, container):
         ctk.CTkLabel(
@@ -471,19 +508,23 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 line_thickness=thick,
             )
             self._display_result(processed)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[AIGeneratorDialog] Error during post_process_thermal: {e}")
 
     def _browse_source_image(self):
         path = filedialog.askopenfilename(
-            title="Select Component Photo",
+            parent=self,
+            title="Select Component Photo or Image",
             filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.bmp;*.webp")],
         )
         if path and os.path.isfile(path):
             self.source_path = path
             self.lbl_source_filename.configure(text=os.path.basename(path))
             if hasattr(self, "lbl_import_filename"):
-                self.lbl_import_filename.configure(text=os.path.basename(path))
+                self.lbl_import_filename.configure(
+                    text=f"Selected: {os.path.basename(path)}",
+                    text_color="#38BDF8",
+                )
             try:
                 self.source_image = Image.open(path).convert("RGBA")
                 # Update small thumbnail
@@ -505,7 +546,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 if "Clean & Import" in cur_tab:
                     self._apply_import_clean()
             except Exception as e:
-                messagebox.showerror("Error Loading Photo", str(e))
+                messagebox.showerror("Error Loading Photo", str(e), parent=self)
 
     def _display_result(self, image: Image.Image):
         self.generated_image = image
@@ -517,10 +558,12 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         )
         self.lbl_preview_canvas.configure(image=self._ctk_preview_img, text="")
         self.btn_save.configure(state="normal")
+        if hasattr(self, "btn_import_save"):
+            self.btn_import_save.configure(state="normal")
 
     def _generate_from_photo(self):
         if not self.source_image:
-            messagebox.showwarning("Missing Photo", "Please select a component photo first.")
+            messagebox.showwarning("Missing Photo", "Please select a component photo first.", parent=self)
             return
 
         api_key = self.entry_api_key.get().strip()
@@ -530,6 +573,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 "Please enter your Google Gemini API Key below.\n\n"
                 "You can get an API key from Google AI Studio (click 'Get Free Key ↗').\n"
                 "Or generate with Gemini Web Chat (gemini.google.com) and use the 'Clean & Import Image' tab.",
+                parent=self,
             )
             return
 
@@ -557,7 +601,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
     def _generate_from_text(self):
         prompt = self.entry_text_prompt.get("1.0", tk.END).strip()
         if not prompt:
-            messagebox.showwarning("Missing Description", "Please enter a component description.")
+            messagebox.showwarning("Missing Description", "Please enter a component description.", parent=self)
             return
 
         api_key = self.entry_api_key.get().strip()
@@ -567,6 +611,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 "Please enter your Google Gemini API Key below.\n\n"
                 "You can get an API key from Google AI Studio (click 'Get Free Key ↗').\n"
                 "Or generate with Gemini Web Chat (gemini.google.com) and use the 'Clean & Import Image' tab.",
+                parent=self,
             )
             return
 
@@ -599,11 +644,12 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         self._set_loading(False, "✨ Wireframe generated successfully!")
         self.lbl_status.configure(text="✨ AI Wireframe Generated!", text_color="#10B981")
         self._update_processed_preview()
+        self._flash_preview_box()
 
     def _on_generation_error(self, err_msg: str):
         self._set_loading(False, f"Error: {err_msg[:80]}...")
         self.lbl_status.configure(text=f"Failed: {err_msg[:60]}", text_color="#EF4444")
-        messagebox.showerror("Generation Error", f"Gemini generation error:\n\n{err_msg}")
+        messagebox.showerror("Generation Error", f"Gemini generation error:\n\n{err_msg}", parent=self)
 
     def _save_and_use(self):
         if not self.generated_image:
@@ -623,5 +669,6 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             "Icon Saved",
             f"Icon saved successfully to your library as:\n{saved_item.title}\n\n"
             f"Path: {saved_item.file_path}",
+            parent=self,
         )
         self.destroy()
