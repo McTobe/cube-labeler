@@ -30,6 +30,7 @@ from ui.templates import (
     export_config_to_json,
     import_config_from_json,
 )
+from ui.inventory_tab import HardwareInventoryTab
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -219,6 +220,7 @@ class PrintLabelApp(ctk.CTk):
 
         # Add tabs
         self.tab_text = self.tabview.add("Text & Typography")
+        self.tab_inventory = self.tabview.add("🔩 Hardware & Bins")
         self.tab_qr = self.tabview.add("QR & Barcode")
         self.tab_image = self.tabview.add("Images & Icons")
         self.tab_tape = self.tabview.add("Tape & Hardware")
@@ -226,6 +228,7 @@ class PrintLabelApp(ctk.CTk):
         self.tab_queue = self.tabview.add("Print Queue")
 
         self._build_text_tab()
+        self._build_inventory_tab()
         self._build_qr_tab()
         self._build_image_tab()
         self._build_tape_tab()
@@ -360,6 +363,24 @@ class PrintLabelApp(ctk.CTk):
         self.outline_slider.grid(row=1, column=4, padx=4)
         self.outline_val_label = ctk.CTkLabel(slider_grid, text="0 px", width=40)
         self.outline_val_label.grid(row=1, column=5)
+
+    # -------------------------------------------------------------------------
+    # TAB: HARDWARE & BINS (V2 INVENTORY SYSTEM)
+    # -------------------------------------------------------------------------
+    def _build_inventory_tab(self):
+        tab = self.tab_inventory
+        self.inventory_tab_widget = HardwareInventoryTab(
+            tab,
+            on_change=self._on_inventory_field_changed,
+            on_add_queue=self._on_add_to_queue,
+        )
+        self.inventory_tab_widget.pack(fill="both", expand=True)
+
+    def _on_inventory_field_changed(self):
+        """Triggered when any field in the Hardware & Bins editor changes."""
+        if hasattr(self, "inventory_tab_widget"):
+            self.config.inventory_config = self.inventory_tab_widget.get_current_inventory_config()
+            self._trigger_render()
 
     # -------------------------------------------------------------------------
     # TAB 2: QR CODE & BARCODE
@@ -795,27 +816,50 @@ class PrintLabelApp(ctk.CTk):
             info_col = ctk.CTkFrame(card, fg_color="transparent")
             info_col.pack(side="left", fill="both", expand=True, padx=6, pady=6)
 
-            first_line = cfg.text.strip().splitlines()[0] if cfg.text.strip() else "[Image / QR Only]"
-            if len(first_line) > 35:
-                first_line = first_line[:32] + "..."
+            if getattr(cfg, "inventory_config", None) is not None:
+                from core.inventory_renderer import FastenerLabelConfig
+                inv = cfg.inventory_config
+                if isinstance(inv, FastenerLabelConfig):
+                    card_title = f"📦 {inv.thread_size} {inv.category}"
+                    mode_str = inv.compartment_mode.capitalize()
+                    tool_str = inv.tool_type.replace("_", " ").upper()
+                    details = [
+                        f"Tape: {cfg.tape_width_mm}mm",
+                        f"Type: Fastener ({mode_str})",
+                        f"Drive: {tool_str}",
+                        f"Width: {inv.label_width_mm}mm",
+                    ]
+                else:
+                    card_title = f"📦 {inv.category_banner}: {inv.spec_primary}"
+                    icon_str = inv.icon_type.replace("_", " ").upper()
+                    details = [
+                        f"Tape: {cfg.tape_width_mm}mm",
+                        f"Type: Component",
+                        f"Icon: {icon_str}",
+                        f"Width: {inv.label_width_mm}mm",
+                    ]
+            else:
+                first_line = cfg.text.strip().splitlines()[0] if cfg.text.strip() else "[Image / QR Only]"
+                if len(first_line) > 35:
+                    first_line = first_line[:32] + "..."
+                card_title = first_line
+                details = [
+                    f"Tape: {cfg.tape_width_mm}mm",
+                    f"Font: {cfg.font_name}",
+                ]
+                if cfg.qr_enabled and cfg.qr_data:
+                    details.append("QR: Yes")
+                if cfg.image_path:
+                    details.append("Image: Yes")
+                if cfg.cut_line:
+                    details.append(f"Cut: {cfg.cut_line_style.capitalize()}")
 
             ctk.CTkLabel(
                 info_col,
-                text=first_line,
+                text=card_title,
                 font=ctk.CTkFont(size=13, weight="bold"),
                 anchor="w",
             ).pack(anchor="w")
-
-            details = [
-                f"Tape: {cfg.tape_width_mm}mm",
-                f"Font: {cfg.font_name}",
-            ]
-            if cfg.qr_enabled and cfg.qr_data:
-                details.append("QR: Yes")
-            if cfg.image_path:
-                details.append("Image: Yes")
-            if cfg.cut_line:
-                details.append(f"Cut: {cfg.cut_line_style.capitalize()}")
 
             ctk.CTkLabel(
                 info_col,
@@ -883,32 +927,54 @@ class PrintLabelApp(ctk.CTk):
             if self.label_queue:
                 self._preview_mode = "batch"
                 self._render_batch_preview()
-        else:
+        elif selected == "🔩 Hardware & Bins":
             if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
                 self.queue_bar_frame.pack_forget()
                 self.design_bar_frame.pack(side="left")
+            if hasattr(self, "inventory_tab_widget"):
+                self.config.inventory_config = self.inventory_tab_widget.get_current_inventory_config()
             if self._preview_mode == "batch":
                 self._preview_mode = "current"
                 if hasattr(self, "btn_preview_mode"):
                     self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
-                self._trigger_render()
+            self._trigger_render()
+        else:
+            if hasattr(self, "design_bar_frame") and hasattr(self, "queue_bar_frame"):
+                self.queue_bar_frame.pack_forget()
+                self.design_bar_frame.pack(side="left")
+            self.config.inventory_config = None
+            if self._preview_mode == "batch":
+                self._preview_mode = "current"
+                if hasattr(self, "btn_preview_mode"):
+                    self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
+            self._trigger_render()
 
     def _on_add_to_queue(self):
         """Adds current label configuration to the print queue."""
-        raw_text = self.text_editor.get("1.0", "end-1c")
-        if not raw_text.strip() and not self.config.image_path and not self.config.qr_data:
-            self.action_status_label.configure(text="Cannot add empty label to queue.")
-            return
-
         cfg_copy = copy.deepcopy(self.config)
-        cfg_copy.text = raw_text
+
+        if getattr(cfg_copy, "inventory_config", None) is not None:
+            from core.inventory_renderer import FastenerLabelConfig
+            inv = cfg_copy.inventory_config
+            if isinstance(inv, FastenerLabelConfig):
+                label_summary = f"{inv.thread_size} {inv.category}"
+            else:
+                label_summary = f"{inv.category_banner} {inv.spec_primary}"
+            cfg_copy.text = label_summary
+            first_line = label_summary
+        else:
+            raw_text = self.text_editor.get("1.0", "end-1c")
+            if not raw_text.strip() and not self.config.image_path and not self.config.qr_data:
+                self.action_status_label.configure(text="Cannot add empty label to queue.")
+                return
+            cfg_copy.text = raw_text
+            first_line = raw_text.strip().splitlines()[0] if raw_text.strip() else "[Label]"
 
         self.label_queue.append(cfg_copy)
         self._refresh_queue_display()
 
         q_len = len(self.label_queue)
         tape_saved = 25.0 * (q_len - 1)
-        first_line = raw_text.strip().splitlines()[0] if raw_text.strip() else "[Label]"
         if len(first_line) > 25:
             first_line = first_line[:22] + "..."
 
@@ -992,8 +1058,12 @@ class PrintLabelApp(ctk.CTk):
         if 0 <= index < len(self.label_queue):
             cfg = copy.deepcopy(self.label_queue[index])
             self.config = cfg
-            self._update_ui_from_config(cfg)
-            self.tabview.set("Text & Typography")
+            if getattr(cfg, "inventory_config", None) is not None and hasattr(self, "inventory_tab_widget"):
+                self.inventory_tab_widget.load_inventory_config(cfg.inventory_config)
+                self.tabview.set("🔩 Hardware & Bins")
+            else:
+                self._update_ui_from_config(cfg)
+                self.tabview.set("Text & Typography")
             self._on_tab_changed()
             self._preview_mode = "current"
             self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
@@ -1191,9 +1261,10 @@ class PrintLabelApp(ctk.CTk):
         if self._updating_ui_from_config:
             return
 
-        # Read text
-        raw_text = self.text_editor.get("1.0", "end-1c")
-        self.config.text = raw_text
+        # Read text if standard text label
+        if getattr(self.config, "inventory_config", None) is None:
+            raw_text = self.text_editor.get("1.0", "end-1c")
+            self.config.text = raw_text
 
         # Render with core renderer
         try:
