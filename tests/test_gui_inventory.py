@@ -22,14 +22,14 @@ def test_gui_inventory():
     app.update_idletasks()
     app.update()
 
-    # 1. Switch to Hardware & Bins Tab
-    app.tabview.set("🔩 Hardware & Bins")
-    app._on_tab_changed()
+    # 1. Switch to Hardware & Bins Studio Mode
+    app.studio_mode_seg.set("🔩 Hardware & Bins Studio")
+    app._on_studio_mode_changed("🔩 Hardware & Bins Studio")
     app.update()
 
-    assert app.config.inventory_config is not None, "inventory_config should be active on Hardware & Bins tab"
+    assert app.config.inventory_config is not None, "inventory_config should be active in Hardware & Bins Studio"
     assert isinstance(app.config.inventory_config, FastenerLabelConfig), "Default should be FastenerLabelConfig"
-    assert app.design_bar_frame.winfo_manager() == "pack", "Design bar should be visible on Hardware tab"
+    assert app.design_bar_frame.winfo_manager() == "pack", "Design bar should be visible in Hardware Studio"
 
     # 2. Select Preset A2: Socket Cap 2-Bin (M3 x30 x35)
     app.inventory_tab_widget.preset_combo.set("A2: Socket Cap 2-Bin (M3 x30 x35)")
@@ -74,9 +74,8 @@ def test_gui_inventory():
     app.update()
     assert len(app.label_queue) == 3, f"Expected 3 items, got {len(app.label_queue)}"
 
-    # 5. Switch to Print Queue tab
-    app.tabview.set("Print Queue")
-    app._on_tab_changed()
+    # 5. Switch to Print Queue tab via mode bar button
+    app._open_queue_tab()
     app.update()
 
     saved_text = app.queue_saved_badge.cget("text")
@@ -94,10 +93,21 @@ def test_gui_inventory():
     app._on_load_queue_item(1)
     app.update()
 
-    assert app.tabview.get() == "🔩 Hardware & Bins", f"Expected tab '🔩 Hardware & Bins', got '{app.tabview.get()}'"
+    assert app.studio_mode_seg.get() == "🔩 Hardware & Bins Studio", f"Expected mode '🔩 Hardware & Bins Studio', got '{app.studio_mode_seg.get()}'"
     assert app.inventory_tab_widget.active_archetype == "component"
     assert app.inventory_tab_widget.entry_banner_b.get() == "KULLAGER"
     assert app.inventory_tab_widget.entry_spec_pri.get() == "608ZZ"
+
+    # 7. Test custom component icon
+    custom_icon_path = os.path.join(artifact_dir, "scratch", "sample_custom_icon.png")
+    if os.path.exists(custom_icon_path):
+        app.inventory_tab_widget.icon_type_seg.set("Custom (🖼)")
+        app.inventory_tab_widget._on_icon_type_changed("Custom (🖼)")
+        app.inventory_tab_widget.component_cfg.custom_icon_path = custom_icon_path
+        app.inventory_tab_widget._on_field_change()
+        app.update()
+        assert app.config.inventory_config.icon_type == "custom"
+        assert app.config.inventory_config.custom_icon_path == custom_icon_path
 
     print("SUCCESS: Headless GUI Hardware Inventory tests passed!")
     app.destroy()

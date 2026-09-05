@@ -9,6 +9,7 @@ strict 8-10% interior safe zones, and 2-3px architectural divider hairlines.
 """
 
 import math
+import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -43,8 +44,9 @@ class FastenerLabelConfig:
     assortment_line2: str = "sorter"
     
     # Tool Drive Badge
-    tool_type: str = "internal_hex"       # "internal_hex", "external_hex", "washer", "torx", "phillips", "none"
+    tool_type: str = "internal_hex"       # "internal_hex", "external_hex", "washer", "torx", "phillips", "slotted", "custom", "none"
     tool_size: str = "2.5"                # e.g. "2.5", "3", "4", "8", "10", "17"
+    custom_tool_icon_path: Optional[str] = None
     
     # Dimensions
     label_width_mm: float = 38.0          # Typical width for organizer bin (38mm ~ 255 dots)
@@ -57,7 +59,8 @@ class ComponentLabelConfig:
     category_banner: str = "KULLAGER"     # e.g. "KULLAGER", "WAGO", "SÄKRINGSHÅLLARE"
     spec_primary: str = "608ZZ"           # e.g. "608ZZ", "221-413 • 3-väg", "16 AWG / 1.3 mm²"
     spec_secondary: str = ""              # e.g. "0.2 - 4.0 mm²", "Inline Type"
-    icon_type: str = "ball_bearing"       # "ball_bearing", "wago", "fuse", "resistor", "capacitor", "none"
+    icon_type: str = "ball_bearing"       # "ball_bearing", "wago", "fuse", "resistor", "capacitor", "custom", "none"
+    custom_icon_path: Optional[str] = None
     
     # Dimensions
     label_width_mm: float = 38.0          # Typical width for organizer bin (38mm ~ 255 dots)
@@ -76,6 +79,74 @@ class InventoryRenderer:
 
     def __init__(self):
         pass
+
+    @staticmethod
+    def _fit_text_font(
+        text: str,
+        max_w: int,
+        max_h: int,
+        start_pt: int = 22,
+        min_pt: int = 9,
+        font_name: str = "Arial Bold",
+        scale: int = 4,
+    ) -> ImageFont.FreeTypeFont:
+        """
+        Dynamically finds the largest font size (between start_pt and min_pt)
+        that fits within (max_w, max_h).
+        """
+        if not text:
+            return font_manager.load_font(font_name, start_pt * scale)
+        for pt in range(start_pt, min_pt - 1, -1):
+            f = font_manager.load_font(font_name, pt * scale)
+            bbox = f.getbbox(text)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+            if tw <= max_w and th <= max_h:
+                return f
+        return font_manager.load_font(font_name, min_pt * scale)
+
+    @staticmethod
+    def _draw_custom_image(
+        target_img: Image.Image,
+        cx: int,
+        cy: int,
+        max_w: int,
+        max_h: int,
+        image_path: Optional[str],
+    ):
+        """
+        Loads and renders a custom image (PNG/JPG/BMP/etc.) centered at (cx, cy)
+        scaled to fit within max_w x max_h preserving aspect ratio.
+        Binarizes to crisp monochrome (0 on 255 background).
+        """
+        if not image_path or not os.path.isfile(image_path):
+            return
+        try:
+            with Image.open(image_path) as src:
+                src_rgba = src.convert("RGBA")
+                # Flatten on solid white
+                bg = Image.new("RGBA", src_rgba.size, (255, 255, 255, 255))
+                bg.paste(src_rgba, mask=src_rgba.split()[3])
+                gray = bg.convert("L")
+
+                # Binarize
+                bw = gray.point(lambda p: 255 if p > 140 else 0)
+
+                # Scale preserving aspect ratio
+                w_ratio = max_w / float(bw.width)
+                h_ratio = max_h / float(bw.height)
+                ratio = min(w_ratio, h_ratio, 1.0)
+                if ratio < 1.0 or bw.width > max_w or bw.height > max_h:
+                    new_w = max(1, int(round(bw.width * ratio)))
+                    new_h = max(1, int(round(bw.height * ratio)))
+                    bw = bw.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                    bw = bw.point(lambda p: 255 if p > 140 else 0)
+
+                px = int(cx - bw.width // 2)
+                py = int(cy - bw.height // 2)
+                target_img.paste(bw, (px, py))
+        except Exception as e:
+            print(f"Warning: Could not render custom image '{image_path}': {e}")
 
     # =========================================================================
     # VECTOR ICON DRAWING HELPERS (Internal 4x scale coordinates)
@@ -129,6 +200,12 @@ class InventoryRenderer:
         w = r * 0.35
         draw.rectangle([(cx - w, cy - r), (cx + w, cy + r)], fill=fill)
         draw.rectangle([(cx - r, cy - w), (cx + r, cy + w)], fill=fill)
+        
+    @staticmethod
+    def _draw_slotted_icon(draw: ImageDraw.ImageDraw, cx: float, cy: float, r: float, stroke: int = 1, fill=0):
+        """Single horizontal slot / Flathead drive silhouette."""
+        h = r * 0.35
+        draw.rectangle([(cx - r, cy - h), (cx + r, cy + h)], fill=fill)
 
     @staticmethod
     def _draw_ball_bearing_icon(draw: ImageDraw.ImageDraw, cx: float, cy: float, r: float, stroke: int):
@@ -209,10 +286,11 @@ class InventoryRenderer:
         anchor_w = int(canvas_w * 0.32)
         draw.rectangle([(0, 0), (anchor_w, canvas_h - 1)], fill=0)
 
-        # Anchor text (e.g. M3, M5, M10)
+        # Anchor text (e.g. M3, M5, M10, 1/4", #6-32) auto-fit
         thread_txt = cfg.thread_size.strip()
-        f_size = 52 * scale if len(thread_txt) <= 2 else (42 * scale if len(thread_txt) <= 3 else 32 * scale)
-        font_anchor = font_manager.load_font("Arial Bold", f_size)
+        safe_anchor_w = max(10, anchor_w - 6 * scale)
+        safe_anchor_h = max(10, canvas_h - 6 * scale)
+        font_anchor = self._fit_text_font(thread_txt, safe_anchor_w, safe_anchor_h, start_pt=52, min_pt=18, scale=scale)
         draw.text((anchor_w // 2, canvas_h // 2), thread_txt, font=font_anchor, fill=255, anchor="mm")
 
         # 3. Top Category Header Bar (Top 36% of remaining area)
@@ -221,7 +299,9 @@ class InventoryRenderer:
         draw.line([(anchor_w, header_h), (canvas_w - 1, header_h)], fill=0, width=line_w)
 
         cat_txt = cfg.category.strip().upper()
-        font_cat = font_manager.load_font("Arial Bold", 22 * scale)
+        safe_cat_w = max(10, rem_w - 10 * scale)
+        safe_cat_h = max(6, header_h - 4 * scale)
+        font_cat = self._fit_text_font(cat_txt, safe_cat_w, safe_cat_h, start_pt=22, min_pt=8, scale=scale)
         draw.text(
             (anchor_w + rem_w // 2, header_h // 2),
             cat_txt,
@@ -244,7 +324,7 @@ class InventoryRenderer:
             tool_x = anchor_w + comp_w
             draw.line([(tool_x, bot_y0), (tool_x, canvas_h - 1)], fill=0, width=line_w)
 
-            # Draw Tool Badge (Tool size text + vector icon)
+            # Draw Tool Badge (Tool size text + vector/custom icon)
             self._render_tool_badge(
                 draw,
                 tool_x,
@@ -255,6 +335,8 @@ class InventoryRenderer:
                 cfg.tool_size,
                 scale,
                 line_w,
+                custom_icon_path=cfg.custom_tool_icon_path,
+                target_img=img,
             )
 
         # 5. Render Compartment Matrix inside comp_w
@@ -324,6 +406,8 @@ class InventoryRenderer:
         tool_size: str,
         scale: int,
         line_w: int,
+        custom_icon_path: Optional[str] = None,
+        target_img: Optional[Image.Image] = None,
     ):
         has_size_txt = bool(tool_size.strip()) and tool_type != "washer"
         cx = x0 + w // 2
@@ -350,6 +434,12 @@ class InventoryRenderer:
             self._draw_torx_icon(draw, cx, icon_cy, icon_r, fill=0)
         elif tool_type == "phillips":
             self._draw_phillips_icon(draw, cx, icon_cy, icon_r, stroke=line_w, fill=0)
+        elif tool_type == "slotted":
+            self._draw_slotted_icon(draw, cx, icon_cy, icon_r, stroke=line_w, fill=0)
+        elif tool_type == "custom" and custom_icon_path and target_img is not None:
+            max_w = int(w * 0.78)
+            max_h = int(h * 0.48) if has_size_txt else int(h * 0.78)
+            self._draw_custom_image(target_img, cx, icon_cy, max_w, max_h, custom_icon_path)
 
     # =========================================================================
     # ARCHETYPE B: DISCRETE COMPONENTS & ELECTRICAL HARDWARE
@@ -393,13 +483,18 @@ class InventoryRenderer:
                 self._draw_wago_icon(draw, icon_cx, icon_cy, icon_r, stroke=line_w)
             elif cfg.icon_type == "fuse":
                 self._draw_fuse_icon(draw, icon_cx, icon_cy, icon_r, stroke=line_w)
+            elif cfg.icon_type == "custom" and cfg.custom_icon_path:
+                max_dim = int(icon_w * 0.76)
+                self._draw_custom_image(img, icon_cx, icon_cy, max_dim, max_dim, cfg.custom_icon_path)
 
         # 3. Top Category Banner Strip (36% height) with Solid Inverted Block
         banner_h = int(canvas_h * 0.36)
         draw.rectangle([(0, 0), (left_content_w, banner_h)], fill=0)
 
         cat_txt = cfg.category_banner.strip().upper()
-        font_banner = font_manager.load_font("Arial Bold", 22 * scale)
+        safe_banner_w = max(10, left_content_w - 12 * scale)
+        safe_banner_h = max(6, banner_h - 4 * scale)
+        font_banner = self._fit_text_font(cat_txt, safe_banner_w, safe_banner_h, start_pt=22, min_pt=8, scale=scale)
         draw.text(
             (left_content_w // 2, banner_h // 2),
             cat_txt,
@@ -412,14 +507,15 @@ class InventoryRenderer:
         bot_y0 = banner_h
         bot_h = canvas_h - banner_h
         has_sec = bool(cfg.spec_secondary.strip())
+        safe_content_w = max(10, left_content_w - 10 * scale)
 
         if has_sec:
-            f_pri = font_manager.load_font("Arial Bold", 21 * scale)
+            f_pri = self._fit_text_font(cfg.spec_primary, safe_content_w, int(bot_h * 0.48), start_pt=21, min_pt=8, scale=scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h * 0.35), cfg.spec_primary, font=f_pri, fill=0, anchor="mm")
-            f_sec = font_manager.load_font("Arial Bold", 13 * scale)
+            f_sec = self._fit_text_font(cfg.spec_secondary, safe_content_w, int(bot_h * 0.36), start_pt=13, min_pt=7, scale=scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h * 0.75), cfg.spec_secondary, font=f_sec, fill=0, anchor="mm")
         else:
-            f_pri = font_manager.load_font("Arial Bold", 28 * scale)
+            f_pri = self._fit_text_font(cfg.spec_primary, safe_content_w, int(bot_h * 0.75), start_pt=28, min_pt=9, scale=scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h // 2), cfg.spec_primary, font=f_pri, fill=0, anchor="mm")
 
         # Downsample to target 64 dots height
