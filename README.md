@@ -56,8 +56,8 @@ Based on the [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT) Python util
 - **✨ Gemini AI Wireframe Generator & Line-Art Studio**:
   - **Photo to Technical Wireframe**: Convert photos of workshop items/parts into pure black-and-white vector wireframes using Google Gemini multimodal AI (`gemini-2.5-flash-image`, `gemini-3.1-flash-image`)
   - **Text Prompt to Wireframe**: Generate clean technical silhouettes directly from descriptive text prompts
-  - **Offline Edge Filter**: 100% local Sobel/contour edge filter with live sensitivity, thickness, and style presets requiring zero internet or API key
-  - **Clean & Import Tool**: Auto-crops white borders, thresholds, and imports images into your persistent library
+  - **Clean & Import Tool**: Auto-crops whitespace borders, removes background, strictly binarizes to 1-bit thermal monochrome, and centers imported web images or screenshots
+  - **Reverse / Invert Colors**: 1-click black-and-white color flip to instantly correct inverted or white-on-black graphics
   - **Thermal Printhead Line-Thickening**: Morphological line thickness controls (Normal, Bold, Extra Bold, Heavy) optimized specifically for Brother thermal printheads (64-dot height) so strokes never fade or break
 - **🔩 Hardware & Bins Inventory Design System (V2)**:
   - Professional procedural thermal label generator built according to the modular hardware inventory design standard
@@ -119,7 +119,7 @@ printlabel-ui/
 │   ├── label_renderer.py     # PIL rendering engine, auto-fit, QR codes & rasterization
 │   ├── inventory_renderer.py # Hardware & Bins procedural vector label generator & presets
 │   ├── icon_manager.py       # Curated icon library manager, search index & user storage
-│   ├── ai_generator.py       # Gemini AI multimodal wireframe & offline edge filter
+│   ├── ai_generator.py       # Gemini AI multimodal wireframe & thermal post-processing engine
 │   ├── config.py             # User persistent config (API keys, preferences)
 │   ├── printer.py            # Thread-safe serial communication driver & virtual mock
 │   └── cli.py                # Command-line interface driver
@@ -128,7 +128,7 @@ printlabel-ui/
 │   ├── tape_preview.py       # Interactive WYSIWYG canvas widget with zoom & metrics
 │   ├── inventory_tab.py      # Hardware & Bins Studio interactive workbench
 │   ├── icon_browser.py       # Icon Library modal gallery browser & search dialog
-│   ├── ai_generator_dialog.py# Gemini AI wireframe & offline edge filter dialog
+│   ├── ai_generator_dialog.py# Gemini AI wireframe & Clean and Import dialog
 │   └── templates.py          # Built-in presets & JSON template import/export
 ├── assets/
 │   ├── icons/                # Curated monochrome icon library (Fasteners, Engineering, etc.)
