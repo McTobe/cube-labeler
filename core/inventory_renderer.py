@@ -314,9 +314,31 @@ class InventoryRenderer:
         bot_y0 = header_h
         bot_h = canvas_h - header_h
 
-        # Determine Tool Drive Slot width
+        # Determine Tool Drive Slot width (Number on Left + Icon on Right)
         has_tool = cfg.tool_type != "none"
-        tool_slot_w = int(rem_w * 0.32) if has_tool else 0
+        if has_tool:
+            has_size_txt = bool(cfg.tool_size.strip()) and cfg.tool_type != "washer"
+            txt = cfg.tool_size.strip()
+
+            icon_r = int(14.5 * scale)  # ~58px radius, ~116px diameter
+            icon_w = int(29 * scale)
+            gap = int(6 * scale)
+            pad_sides = int(10 * scale)
+
+            if has_size_txt:
+                font = font_manager.load_font("Arial Bold", 22 * scale)
+                bbox = font.getbbox(txt)
+                txt_w = bbox[2] - bbox[0]
+                needed_w = txt_w + gap + icon_w + pad_sides
+                min_slot_w = int(rem_w * 0.33)
+                tool_slot_w = max(min_slot_w, needed_w)
+                tool_slot_w = min(tool_slot_w, int(rem_w * 0.52))
+            else:
+                icon_r_solo = int(16 * scale)
+                tool_slot_w = max(int(rem_w * 0.24), icon_r_solo * 2 + int(12 * scale))
+        else:
+            tool_slot_w = 0
+
         comp_w = rem_w - tool_slot_w
 
         # Vertical divider before tool slot
@@ -324,7 +346,7 @@ class InventoryRenderer:
             tool_x = anchor_w + comp_w
             draw.line([(tool_x, bot_y0), (tool_x, canvas_h - 1)], fill=0, width=line_w)
 
-            # Draw Tool Badge (Tool size text + vector/custom icon)
+            # Draw Tool Badge (Tool size text on left + icon on right)
             self._render_tool_badge(
                 draw,
                 tool_x,
@@ -410,36 +432,69 @@ class InventoryRenderer:
         target_img: Optional[Image.Image] = None,
     ):
         has_size_txt = bool(tool_size.strip()) and tool_type != "washer"
-        cx = x0 + w // 2
+        has_icon = tool_type not in ("none", "")
+        txt = tool_size.strip()
+        cy = y0 + h // 2
 
-        if has_size_txt:
-            icon_cy = y0 + int(h * 0.30)
-            icon_r = int(10.5 * scale)
-            txt = tool_size.strip()
-            f_pt = 17 if len(txt) <= 2 else (14 if len(txt) <= 3 else 12)
-            font = font_manager.load_font("Arial Bold", f_pt * scale)
-            text_cy = y0 + int(h * 0.76)
-            draw.text((cx, text_cy), txt, font=font, fill=0, anchor="mm")
-        else:
-            icon_cy = y0 + h // 2
-            icon_r = int(15 * scale)
+        if has_size_txt and has_icon:
+            # Side-by-side: Number on Left, Icon on Right
+            icon_r = int(14.5 * scale)  # ~58px radius, ~116px diameter, prominent & crisp
+            icon_w = int(29 * scale)
+            gap = int(6 * scale)
 
-        if tool_type == "internal_hex":
-            self._draw_internal_hex(draw, cx, icon_cy, icon_r, fill=0)
-        elif tool_type == "external_hex":
-            self._draw_external_hex(draw, cx, icon_cy, icon_r, stroke=line_w, outline=0)
-        elif tool_type == "washer":
-            self._draw_washer_icon(draw, cx, icon_cy, icon_r, stroke=line_w, outline=0, fill=0)
-        elif tool_type == "torx":
-            self._draw_torx_icon(draw, cx, icon_cy, icon_r, fill=0)
-        elif tool_type == "phillips":
-            self._draw_phillips_icon(draw, cx, icon_cy, icon_r, stroke=line_w, fill=0)
-        elif tool_type == "slotted":
-            self._draw_slotted_icon(draw, cx, icon_cy, icon_r, stroke=line_w, fill=0)
-        elif tool_type == "custom" and custom_icon_path and target_img is not None:
-            max_w = int(w * 0.78)
-            max_h = int(h * 0.48) if has_size_txt else int(h * 0.78)
-            self._draw_custom_image(target_img, cx, icon_cy, max_w, max_h, custom_icon_path)
+            # Fit text font (defaults to 22pt bold, never shrinking for numbers up to 3-4 chars)
+            max_txt_w = max(10, w - gap - icon_w - int(8 * scale))
+            font = self._fit_text_font(txt, max_txt_w, int(h * 0.75), start_pt=22, min_pt=10, scale=scale)
+            bbox = font.getbbox(txt)
+            txt_w = bbox[2] - bbox[0]
+
+            content_w = txt_w + gap + icon_w
+            start_x = x0 + max(0, (w - content_w) // 2)
+            num_cx = start_x + txt_w // 2
+            icon_cx = start_x + txt_w + gap + icon_w // 2
+
+            draw.text((num_cx, cy), txt, font=font, fill=0, anchor="mm")
+
+            if tool_type == "internal_hex":
+                self._draw_internal_hex(draw, icon_cx, cy, icon_r, fill=0)
+            elif tool_type == "external_hex":
+                self._draw_external_hex(draw, icon_cx, cy, icon_r, stroke=line_w, outline=0)
+            elif tool_type == "washer":
+                self._draw_washer_icon(draw, icon_cx, cy, icon_r, stroke=line_w, outline=0, fill=0)
+            elif tool_type == "torx":
+                self._draw_torx_icon(draw, icon_cx, cy, icon_r, fill=0)
+            elif tool_type == "phillips":
+                self._draw_phillips_icon(draw, icon_cx, cy, icon_r, stroke=line_w, fill=0)
+            elif tool_type == "slotted":
+                self._draw_slotted_icon(draw, icon_cx, cy, icon_r, stroke=line_w, fill=0)
+            elif tool_type == "custom" and custom_icon_path and target_img is not None:
+                self._draw_custom_image(target_img, icon_cx, cy, icon_w, icon_w, custom_icon_path)
+
+        elif has_icon:
+            # Solo icon (e.g. washer or tool_size empty)
+            cx = x0 + w // 2
+            icon_r = int(16 * scale)
+            if tool_type == "internal_hex":
+                self._draw_internal_hex(draw, cx, cy, icon_r, fill=0)
+            elif tool_type == "external_hex":
+                self._draw_external_hex(draw, cx, cy, icon_r, stroke=line_w, outline=0)
+            elif tool_type == "washer":
+                self._draw_washer_icon(draw, cx, cy, icon_r, stroke=line_w, outline=0, fill=0)
+            elif tool_type == "torx":
+                self._draw_torx_icon(draw, cx, cy, icon_r, fill=0)
+            elif tool_type == "phillips":
+                self._draw_phillips_icon(draw, cx, cy, icon_r, stroke=line_w, fill=0)
+            elif tool_type == "slotted":
+                self._draw_slotted_icon(draw, cx, cy, icon_r, stroke=line_w, fill=0)
+            elif tool_type == "custom" and custom_icon_path and target_img is not None:
+                max_dim = int(min(w * 0.78, h * 0.78))
+                self._draw_custom_image(target_img, cx, cy, max_dim, max_dim, custom_icon_path)
+
+        elif has_size_txt:
+            # Solo text (no icon)
+            cx = x0 + w // 2
+            font = self._fit_text_font(txt, max(10, w - int(8 * scale)), int(h * 0.75), start_pt=22, min_pt=10, scale=scale)
+            draw.text((cx, cy), txt, font=font, fill=0, anchor="mm")
 
     # =========================================================================
     # ARCHETYPE B: DISCRETE COMPONENTS & ELECTRICAL HARDWARE

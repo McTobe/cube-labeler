@@ -48,11 +48,24 @@ Based on the [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT) Python util
   - Full simulated raster streaming and progress bar feedback
 - **Template Library**:
   - 1-click presets: *Storage Box*, *Cable Wrap / Flag*, *WiFi Guest QR*, *Kitchen Spice Jar*, *Asset Tag*, *Name Badge*
+- **📚 Built-in Icon Library & Gallery Browser**:
+  - Over 30+ curated monochrome vector/line-art icons across 5 dedicated categories: *Fasteners*, *Engineering*, *Electronics*, *Tools*, and *Symbols*, plus persistent *My Icons*
+  - Fast instant keyword search (Torx, Bearing, Gear, Socket, Wrench, Fuse, etc.) and category filtering
+  - Seamless 1-click icon assignment in both Custom Designer and Hardware & Bins Studio
+  - Persistent user icon storage in `~/.printlabel/icons/` with direct "Open Custom Folder" integration
+- **✨ Gemini AI Wireframe Generator & Line-Art Studio**:
+  - **Photo to Technical Wireframe**: Convert photos of workshop items/parts into pure black-and-white vector wireframes using Google Gemini multimodal AI (`gemini-2.5-flash-image`, `gemini-3.1-flash-image`)
+  - **Text Prompt to Wireframe**: Generate clean technical silhouettes directly from descriptive text prompts
+  - **Offline Edge Filter**: 100% local Sobel/contour edge filter with live sensitivity, thickness, and style presets requiring zero internet or API key
+  - **Clean & Import Tool**: Auto-crops white borders, thresholds, and imports images into your persistent library
+  - **Thermal Printhead Line-Thickening**: Morphological line thickness controls (Normal, Bold, Extra Bold, Heavy) optimized specifically for Brother thermal printheads (64-dot height) so strokes never fade or break
 - **🔩 Hardware & Bins Inventory Design System (V2)**:
   - Professional procedural thermal label generator built according to the modular hardware inventory design standard
-  - **Archetype A (Threaded Fasteners)**: Solid black inverted size anchor block (`M3`, `M5`), upper category header (`SKRUV`, `MUTTER`, `BRICKOR`), 4 compartment modes (Single Size, 2-Bin Dual, 4-Bin 2×2 Grid, Assortment Text), and tool drive badges with geometric vector icons (`⬢` internal hex, `⬡` external wrench, `◉` washer, `✶` Torx, `✚` Phillips)
-  - **Archetype B (Discrete Components & Electrical)**: Inverted 38% category banner strip, spacious spec & rating zone, and dedicated 25% square right icon frame (`◎` ball bearing, `⧉` WAGO splicing clip, `⊷` inline fuse)
+  - **Archetype A (Threaded Fasteners)**: Solid black inverted size anchor block (`M3`, `M5`), upper category header (`SKRUV`, `MUTTER`, `BRICKOR`), 4 compartment modes (Single Size, 2-Bin Dual, 4-Bin 2×2 Grid, Assortment Text)
+  - **Horizontal Side-by-Side Tool Badge**: Bold drive size on the left (`2.5`, `8`, `10`, `T20`) with prominent vector silhouette icon on the right (`⬢` internal hex, `⬡` external wrench, `◉` washer, `✶` Torx, `✚` Phillips, or custom file/library icon) — dynamically sized so neither the text nor the icon ever shrinks or clips
+  - **Archetype B (Discrete Components & Electrical)**: Inverted 38% category banner strip, spacious spec & rating zone, and dedicated 25% square right icon frame (`◎` ball bearing, `⧉` WAGO splicing clip, `⊷` inline fuse, or custom file/library icon)
   - **8 Pre-loaded Catalog Presets**: Instant loading for standard workshop drawer configs (DIN 912, countersunk DIN 7991, hex nuts DIN 934, washers DIN 125, 608ZZ bearings, WAGO 221, inline fuses)
+  - Streamlined UI controls with direct `Choose File...`, `Library...`, and `Clear` actions
   - Seamless integration with the zero-waste batch print queue
 - **Exporting**:
   - Export high-resolution PNGs of your label designs
@@ -100,21 +113,36 @@ python main.py
 ```
 printlabel-ui/
 ├── core/
-│   ├── ptcbp.py           # PTCBP protocol serializer & TIFF PackBits RLE codec
-│   ├── ptstatus.py        # 32-byte printer status register unpacker & tables
-│   ├── font_manager.py    # Windows font registry discovery & TTF loader
-│   ├── label_renderer.py  # PIL rendering engine, auto-fit, QR codes & rasterization
-│   └── printer.py         # Thread-safe serial communication driver & virtual mock
+│   ├── ptcbp.py              # PTCBP protocol serializer & TIFF PackBits RLE codec
+│   ├── ptstatus.py           # 32-byte printer status register unpacker & tables
+│   ├── font_manager.py       # Windows font registry discovery & TTF loader
+│   ├── label_renderer.py     # PIL rendering engine, auto-fit, QR codes & rasterization
+│   ├── inventory_renderer.py # Hardware & Bins procedural vector label generator & presets
+│   ├── icon_manager.py       # Curated icon library manager, search index & user storage
+│   ├── ai_generator.py       # Gemini AI multimodal wireframe & offline edge filter
+│   ├── config.py             # User persistent config (API keys, preferences)
+│   ├── printer.py            # Thread-safe serial communication driver & virtual mock
+│   └── cli.py                # Command-line interface driver
 ├── ui/
-│   ├── app.py             # CustomTkinter main application window & event wiring
-│   ├── tape_preview.py    # Interactive WYSIWYG canvas widget with zoom & metrics
-│   └── templates.py       # Built-in presets & JSON template import/export
+│   ├── app.py                # CustomTkinter main application window & event wiring
+│   ├── tape_preview.py       # Interactive WYSIWYG canvas widget with zoom & metrics
+│   ├── inventory_tab.py      # Hardware & Bins Studio interactive workbench
+│   ├── icon_browser.py       # Icon Library modal gallery browser & search dialog
+│   ├── ai_generator_dialog.py# Gemini AI wireframe & offline edge filter dialog
+│   └── templates.py          # Built-in presets & JSON template import/export
+├── assets/
+│   ├── icons/                # Curated monochrome icon library (Fasteners, Engineering, etc.)
+│   └── icon.ico              # Application desktop icon
 ├── tests/
-│   └── test_all.py        # Automated test suite (14 unit tests)
-├── assets/                # Sample label outputs & icons
-├── main.py                # Main launch script
-├── run.bat                # Windows one-click launcher
-└── requirements.txt       # Dependencies
+│   ├── test_all.py           # Core printing & serialization unit tests
+│   ├── test_inventory.py     # Hardware inventory procedural engine unit tests
+│   ├── test_icons_and_ai.py  # Icon library discovery, search & AI processing tests
+│   └── test_gui_inventory.py # Headless GUI integration tests for hardware studio
+├── main.py                   # Main entry point (launches GUI or CLI depending on args)
+├── build.py                  # Automated PyInstaller build script for single portable .exe
+├── printlabel.spec           # PyInstaller spec bundling all assets & dependencies
+├── run.bat                   # Windows one-click launcher
+└── requirements.txt          # Python dependencies
 ```
 
 ---

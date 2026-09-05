@@ -101,10 +101,7 @@ def test_gui_inventory():
     # 7. Test custom component icon
     custom_icon_path = os.path.join(artifact_dir, "scratch", "sample_custom_icon.png")
     if os.path.exists(custom_icon_path):
-        app.inventory_tab_widget.icon_type_seg.set("Custom (🖼)")
-        app.inventory_tab_widget._on_icon_type_changed("Custom (🖼)")
-        app.inventory_tab_widget.component_cfg.custom_icon_path = custom_icon_path
-        app.inventory_tab_widget._on_field_change()
+        app.inventory_tab_widget._set_comp_icon_path(custom_icon_path)
         app.update()
         assert app.config.inventory_config.icon_type == "custom"
         assert app.config.inventory_config.custom_icon_path == custom_icon_path

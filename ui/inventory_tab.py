@@ -16,6 +16,8 @@ from core.inventory_renderer import (
     ComponentLabelConfig,
     INVENTORY_PRESETS,
 )
+from ui.icon_browser import IconBrowserDialog
+from ui.ai_generator_dialog import AIGeneratorDialog
 
 
 class HardwareInventoryTab(ctk.CTkFrame):
@@ -160,48 +162,51 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.comp_inputs_frame = ctk.CTkFrame(f, fg_color="transparent")
         self.comp_inputs_frame.pack(fill="x", pady=6)
 
-        # Row 4: Tool Drive Badge
+        # Row 4: Tool Drive Badge (Icon + Size)
         r4 = ctk.CTkFrame(f, fg_color="transparent")
         r4.pack(fill="x", pady=(8, 4))
 
-        ctk.CTkLabel(r4, text="Tool Drive Badge:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
-        self.tool_type_seg = ctk.CTkSegmentedButton(
-            r4,
-            values=["Socket (⬢)", "Hex Wrench (⬡)", "Washer (◉)", "Torx (✶)", "Phillips (✚)", "Slotted (-)", "Custom (🖼)", "None"],
-            command=self._on_tool_type_changed,
-        )
-        self.tool_type_seg.set("Socket (⬢)")
-        self.tool_type_seg.pack(side="left", padx=4)
+        ctk.CTkLabel(r4, text="Tool Drive Badge:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
 
-        ctk.CTkLabel(r4, text="Tool Size:").pack(side="left", padx=(16, 4))
-        self.entry_tool_size = ctk.CTkEntry(r4, width=65)
-        self.entry_tool_size.insert(0, "2.5")
-        self.entry_tool_size.pack(side="left", padx=4)
-        self.entry_tool_size.bind("<KeyRelease>", lambda e: self._on_field_change())
-
-        # Row 4b: Custom Tool Icon File Picker
-        self.custom_tool_icon_frame = ctk.CTkFrame(f, fg_color="transparent")
         self.btn_pick_tool_icon = ctk.CTkButton(
-            self.custom_tool_icon_frame,
-            text="🖼 Choose Tool Icon...",
-            width=150,
+            r4,
+            text="🖼 Choose File...",
+            width=120,
             command=self._on_browse_custom_tool_icon,
         )
-        self.btn_pick_tool_icon.pack(side="left", padx=(0, 8))
+        self.btn_pick_tool_icon.pack(side="left", padx=(0, 6))
+
+        self.btn_lib_tool_icon = ctk.CTkButton(
+            r4,
+            text="📚 Library...",
+            width=100,
+            fg_color="#0284C7",
+            hover_color="#0369A1",
+            command=self._on_open_tool_library,
+        )
+        self.btn_lib_tool_icon.pack(side="left", padx=(0, 6))
+
         self.lbl_custom_tool_icon = ctk.CTkLabel(
-            self.custom_tool_icon_frame,
+            r4,
             text="No icon chosen",
             text_color="gray",
         )
         self.lbl_custom_tool_icon.pack(side="left", padx=4)
+
         self.btn_clear_tool_icon = ctk.CTkButton(
-            self.custom_tool_icon_frame,
+            r4,
             text="✕ Clear",
             width=65,
             fg_color="gray40",
             command=self._on_clear_custom_tool_icon,
         )
-        self.btn_clear_tool_icon.pack(side="left", padx=8)
+        self.btn_clear_tool_icon.pack(side="left", padx=(4, 16))
+
+        ctk.CTkLabel(r4, text="Tool Size:").pack(side="left", padx=(0, 4))
+        self.entry_tool_size = ctk.CTkEntry(r4, width=65)
+        self.entry_tool_size.insert(0, "2.5")
+        self.entry_tool_size.pack(side="left", padx=4)
+        self.entry_tool_size.bind("<KeyRelease>", lambda e: self._on_field_change())
 
     def _render_dynamic_comp_inputs(self):
         """Builds input fields corresponding to the selected compartment mode."""
@@ -303,44 +308,51 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.entry_banner_b.pack(side="left", padx=4)
         self.entry_banner_b.bind("<KeyRelease>", lambda e: self._on_field_change())
 
-        ctk.CTkLabel(r1, text="Right Icon Frame:").pack(side="left", padx=(20, 6))
-        self.icon_type_seg = ctk.CTkSegmentedButton(
-            r1,
-            values=["Ball Bearing (◎)", "WAGO (⧉)", "Fuse (⊷)", "Custom (🖼)", "None"],
-            command=self._on_icon_type_changed,
-        )
-        self.icon_type_seg.set("Ball Bearing (◎)")
-        self.icon_type_seg.pack(side="left", padx=4)
-
         ctk.CTkLabel(r1, text="Width (mm):").pack(side="left", padx=(20, 6))
         self.entry_width_b = ctk.CTkEntry(r1, width=70)
         self.entry_width_b.insert(0, "38")
         self.entry_width_b.pack(side="left", padx=4)
         self.entry_width_b.bind("<KeyRelease>", lambda e: self._on_field_change())
 
-        # Row 1b: Custom Component Icon File Picker
-        self.custom_comp_icon_frame = ctk.CTkFrame(f, fg_color="transparent")
+        # Row 1b: Right Icon Frame
+        r_icon = ctk.CTkFrame(f, fg_color="transparent")
+        r_icon.pack(fill="x", pady=(4, 6))
+
+        ctk.CTkLabel(r_icon, text="Right Icon Frame:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
+
         self.btn_pick_comp_icon = ctk.CTkButton(
-            self.custom_comp_icon_frame,
-            text="🖼 Choose Component Icon...",
-            width=170,
+            r_icon,
+            text="🖼 Choose File...",
+            width=120,
             command=self._on_browse_custom_comp_icon,
         )
-        self.btn_pick_comp_icon.pack(side="left", padx=(0, 8))
+        self.btn_pick_comp_icon.pack(side="left", padx=(0, 6))
+
+        self.btn_lib_comp_icon = ctk.CTkButton(
+            r_icon,
+            text="📚 Library...",
+            width=100,
+            fg_color="#0284C7",
+            hover_color="#0369A1",
+            command=self._on_open_comp_library,
+        )
+        self.btn_lib_comp_icon.pack(side="left", padx=(0, 6))
+
         self.lbl_custom_comp_icon = ctk.CTkLabel(
-            self.custom_comp_icon_frame,
+            r_icon,
             text="No icon chosen",
             text_color="gray",
         )
         self.lbl_custom_comp_icon.pack(side="left", padx=4)
+
         self.btn_clear_comp_icon = ctk.CTkButton(
-            self.custom_comp_icon_frame,
+            r_icon,
             text="✕ Clear",
             width=65,
             fg_color="gray40",
             command=self._on_clear_custom_comp_icon,
         )
-        self.btn_clear_comp_icon.pack(side="left", padx=8)
+        self.btn_clear_comp_icon.pack(side="left", padx=6)
 
         # Row 2: Primary Spec Line
         r2 = ctk.CTkFrame(f, fg_color="transparent")
@@ -425,61 +437,67 @@ class HardwareInventoryTab(ctk.CTkFrame):
             "Custom (🖼)": "custom",
             "None": "none",
         }
-        self.fastener_cfg.tool_type = tool_map.get(value, "none")
-        if self.fastener_cfg.tool_type == "custom":
-            self.custom_tool_icon_frame.pack(fill="x", pady=4)
-        else:
-            self.custom_tool_icon_frame.pack_forget()
-        self._on_field_change()
-
     def _on_browse_custom_tool_icon(self):
         path = filedialog.askopenfilename(
-            title="Select Custom Tool Drive Icon",
+            title="Select Tool Drive Icon",
             filetypes=[
                 ("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.ico"),
                 ("All Files", "*.*"),
             ],
         )
         if path:
+            self._set_tool_icon_path(path)
+
+    def _set_tool_icon_path(self, path: str):
+        if path and os.path.isfile(path):
             self.fastener_cfg.custom_tool_icon_path = path
+            self.fastener_cfg.tool_type = "custom"
             self.lbl_custom_tool_icon.configure(text=os.path.basename(path), text_color=("gray10", "gray90"))
             self.on_change()
 
+    def _on_open_tool_library(self):
+        IconBrowserDialog(
+            self,
+            on_select=self._set_tool_icon_path,
+            initial_category="Fasteners",
+            title_suffix="Tool Drive",
+        )
+
     def _on_clear_custom_tool_icon(self):
         self.fastener_cfg.custom_tool_icon_path = None
+        self.fastener_cfg.tool_type = "none"
         self.lbl_custom_tool_icon.configure(text="No icon chosen", text_color="gray")
         self.on_change()
 
-    def _on_icon_type_changed(self, value: str):
-        icon_map = {
-            "Ball Bearing (◎)": "ball_bearing",
-            "WAGO (⧉)": "wago",
-            "Fuse (⊷)": "fuse",
-            "Custom (🖼)": "custom",
-            "None": "none",
-        }
-        self.component_cfg.icon_type = icon_map.get(value, "none")
-        if self.component_cfg.icon_type == "custom":
-            self.custom_comp_icon_frame.pack(fill="x", pady=4)
-        else:
-            self.custom_comp_icon_frame.pack_forget()
-        self._on_field_change()
-
     def _on_browse_custom_comp_icon(self):
         path = filedialog.askopenfilename(
-            title="Select Custom Component Icon",
+            title="Select Component Icon",
             filetypes=[
                 ("Image Files", "*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.ico"),
                 ("All Files", "*.*"),
             ],
         )
         if path:
+            self._set_comp_icon_path(path)
+
+    def _set_comp_icon_path(self, path: str):
+        if path and os.path.isfile(path):
             self.component_cfg.custom_icon_path = path
+            self.component_cfg.icon_type = "custom"
             self.lbl_custom_comp_icon.configure(text=os.path.basename(path), text_color=("gray10", "gray90"))
             self.on_change()
 
+    def _on_open_comp_library(self):
+        IconBrowserDialog(
+            self,
+            on_select=self._set_comp_icon_path,
+            initial_category="Engineering",
+            title_suffix="Component Icon",
+        )
+
     def _on_clear_custom_comp_icon(self):
         self.component_cfg.custom_icon_path = None
+        self.component_cfg.icon_type = "none"
         self.lbl_custom_comp_icon.configure(text="No icon chosen", text_color="gray")
         self.on_change()
 
@@ -555,58 +573,54 @@ class HardwareInventoryTab(ctk.CTkFrame):
             self.mode_seg.set(mode_rev.get(self.fastener_cfg.compartment_mode, "2-Bin (Dual)"))
             self._render_dynamic_comp_inputs()
 
-            tool_rev = {
-                "internal_hex": "Socket (⬢)",
-                "external_hex": "Hex Wrench (⬡)",
-                "washer": "Washer (◉)",
-                "torx": "Torx (✶)",
-                "phillips": "Phillips (✚)",
-                "slotted": "Slotted (-)",
-                "custom": "Custom (🖼)",
-                "none": "None",
-            }
-            self.tool_type_seg.set(tool_rev.get(self.fastener_cfg.tool_type, "None"))
             self.entry_tool_size.delete(0, "end")
             self.entry_tool_size.insert(0, self.fastener_cfg.tool_size)
 
-            if self.fastener_cfg.tool_type == "custom":
-                self.custom_tool_icon_frame.pack(fill="x", pady=4)
-                if self.fastener_cfg.custom_tool_icon_path:
-                    self.lbl_custom_tool_icon.configure(
-                        text=os.path.basename(self.fastener_cfg.custom_tool_icon_path),
-                        text_color=("gray10", "gray90"),
-                    )
-                else:
-                    self.lbl_custom_tool_icon.configure(text="No icon chosen", text_color="gray")
+            if self.fastener_cfg.custom_tool_icon_path:
+                self.lbl_custom_tool_icon.configure(
+                    text=os.path.basename(self.fastener_cfg.custom_tool_icon_path),
+                    text_color=("gray10", "gray90"),
+                )
+            elif self.fastener_cfg.tool_type and self.fastener_cfg.tool_type not in ("none", "custom"):
+                tool_names = {
+                    "internal_hex": "Preset: Socket (⬢)",
+                    "external_hex": "Preset: Hex Wrench (⬡)",
+                    "washer": "Preset: Washer (◉)",
+                    "torx": "Preset: Torx (✶)",
+                    "phillips": "Preset: Phillips (✚)",
+                    "slotted": "Preset: Slotted (-)",
+                }
+                self.lbl_custom_tool_icon.configure(
+                    text=tool_names.get(self.fastener_cfg.tool_type, self.fastener_cfg.tool_type),
+                    text_color=("gray10", "gray90"),
+                )
             else:
-                self.custom_tool_icon_frame.pack_forget()
+                self.lbl_custom_tool_icon.configure(text="No icon chosen", text_color="gray")
 
         else:
             self.entry_banner_b.set(self.component_cfg.category_banner)
             self.entry_width_b.delete(0, "end")
             self.entry_width_b.insert(0, str(self.component_cfg.label_width_mm))
 
-            icon_rev = {
-                "ball_bearing": "Ball Bearing (◎)",
-                "wago": "WAGO (⧉)",
-                "fuse": "Fuse (⊷)",
-                "custom": "Custom (🖼)",
-                "none": "None",
-            }
-            self.icon_type_seg.set(icon_rev.get(self.component_cfg.icon_type, "None"))
             self.entry_spec_pri.delete(0, "end")
             self.entry_spec_pri.insert(0, self.component_cfg.spec_primary)
             self.entry_spec_sec.delete(0, "end")
             self.entry_spec_sec.insert(0, self.component_cfg.spec_secondary)
 
-            if self.component_cfg.icon_type == "custom":
-                self.custom_comp_icon_frame.pack(fill="x", pady=4)
-                if self.component_cfg.custom_icon_path:
-                    self.lbl_custom_comp_icon.configure(
-                        text=os.path.basename(self.component_cfg.custom_icon_path),
-                        text_color=("gray10", "gray90"),
-                    )
-                else:
-                    self.lbl_custom_comp_icon.configure(text="No icon chosen", text_color="gray")
+            if self.component_cfg.custom_icon_path:
+                self.lbl_custom_comp_icon.configure(
+                    text=os.path.basename(self.component_cfg.custom_icon_path),
+                    text_color=("gray10", "gray90"),
+                )
+            elif self.component_cfg.icon_type and self.component_cfg.icon_type not in ("none", "custom"):
+                icon_names = {
+                    "ball_bearing": "Preset: Ball Bearing (◎)",
+                    "wago": "Preset: WAGO (⧉)",
+                    "fuse": "Preset: Fuse (⊷)",
+                }
+                self.lbl_custom_comp_icon.configure(
+                    text=icon_names.get(self.component_cfg.icon_type, self.component_cfg.icon_type),
+                    text_color=("gray10", "gray90"),
+                )
             else:
-                self.custom_comp_icon_frame.pack_forget()
+                self.lbl_custom_comp_icon.configure(text="No icon chosen", text_color="gray")

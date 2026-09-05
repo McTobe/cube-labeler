@@ -31,6 +31,8 @@ from ui.templates import (
     import_config_from_json,
 )
 from ui.inventory_tab import HardwareInventoryTab
+from ui.icon_browser import IconBrowserDialog
+from ui.ai_generator_dialog import AIGeneratorDialog
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -590,12 +592,23 @@ class PrintLabelApp(ctk.CTk):
         file_row.pack(fill="x", pady=(0, 10))
 
         self.btn_pick_img = ctk.CTkButton(
-            file_row, text="🖼 Choose Image File...", width=160, command=self._on_browse_image
+            file_row, text="🖼 Choose File...", width=130, command=self._on_browse_image
         )
-        self.btn_pick_img.pack(side="left", padx=(0, 8))
+        self.btn_pick_img.pack(side="left", padx=(0, 6))
+
+        self.btn_open_icon_lib = ctk.CTkButton(
+            file_row,
+            text="📚 Icon Library...",
+            width=135,
+            fg_color="#0284C7",
+            hover_color="#0369A1",
+            font=ctk.CTkFont(weight="bold"),
+            command=self._on_open_icon_library,
+        )
+        self.btn_open_icon_lib.pack(side="left", padx=(0, 8))
 
         self.img_path_label = ctk.CTkLabel(
-            file_row, text="No image selected (supports PNG, JPG, BMP)", text_color="gray"
+            file_row, text="No image selected", text_color="gray"
         )
         self.img_path_label.pack(side="left", fill="x", expand=True)
 
@@ -1544,9 +1557,27 @@ class PrintLabelApp(ctk.CTk):
             filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.ico"), ("All files", "*.*")],
         )
         if p and os.path.isfile(p):
-            self.config.image_path = p
-            self.img_path_label.configure(text=os.path.basename(p))
+            self._set_custom_designer_image(p)
+
+    def _set_custom_designer_image(self, path: str):
+        if path and os.path.isfile(path):
+            self.config.image_path = path
+            self.img_path_label.configure(text=os.path.basename(path))
             self._trigger_render()
+
+    def _on_open_icon_library(self):
+        IconBrowserDialog(
+            self,
+            on_select=self._set_custom_designer_image,
+            title_suffix="Custom Designer",
+            on_open_ai_generator=self._on_open_ai_generator,
+        )
+
+    def _on_open_ai_generator(self):
+        AIGeneratorDialog(
+            self,
+            on_save_callback=self._set_custom_designer_image,
+        )
 
     def _on_clear_image(self):
         self.config.image_path = None

@@ -46,6 +46,9 @@ hiddenimports = ctk_submodules + [
     'dataclasses',
     'core',
     'core.cli',
+    'core.config',
+    'core.icon_manager',
+    'core.ai_generator',
     'core.font_manager',
     'core.inventory_renderer',
     'core.label_renderer',
@@ -55,6 +58,8 @@ hiddenimports = ctk_submodules + [
     'ui',
     'ui.app',
     'ui.inventory_tab',
+    'ui.icon_browser',
+    'ui.ai_generator_dialog',
     'ui.tape_preview',
     'ui.templates',
 ]

@@ -68,6 +68,36 @@ class TestInventoryRenderer(unittest.TestCase):
             img = self.renderer.render_fastener(cfg)
             self.assertEqual(img.size[1], 64)
 
+    def test_horizontal_tool_badge_no_clipping(self):
+        """Verify number on the left and icon on the right never clip and support 2 numbers + dot."""
+        test_cases = [
+            ("2.5", "internal_hex"),
+            ("8", "external_hex"),
+            ("10", "external_hex"),
+            ("T25", "torx"),
+            ("PH2", "phillips"),
+        ]
+        for size_str, tool_type in test_cases:
+            cfg = FastenerLabelConfig(
+                thread_size="M3",
+                category="SKRUV",
+                compartment_mode="dual",
+                tool_type=tool_type,
+                tool_size=size_str,
+            )
+            img = self.renderer.render_fastener(cfg)
+            self.assertEqual(img.size[1], 64)
+            self.assertEqual(img.mode, "1")
+            
+            # Verify badge area has valid pixel distribution
+            w, h = img.size
+            # Top boundary row 23-26 (just below category header divider)
+            # Inspect badge region (rightmost 25%)
+            badge_crop = img.crop((int(w * 0.75), 26, w - 2, h - 3))
+            # Must have black pixels (number + icon)
+            black_count = sum(1 for p in badge_crop.convert("L").tobytes() if p == 0)
+            self.assertGreater(black_count, 30, f"Expected black pixels for {size_str} {tool_type}")
+
     def test_component_icon_types(self):
         """Verify Archetype B renders across all component icon types."""
         icons = ["ball_bearing", "wago", "fuse", "none"]
