@@ -1,4 +1,4 @@
-﻿name: Build & Release Standalone Executable
+name: Build & Release Standalone Executable
 
 on:
   push:
@@ -10,6 +10,8 @@ jobs:
   build:
     name: Build Windows Executable
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout Repository
@@ -48,6 +50,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: dist/PrintLabel.exe
           name: PrintLabel Studio ${{ github.ref_name }}
