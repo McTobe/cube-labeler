@@ -52,7 +52,7 @@ class TapePreviewWidget(ctk.CTkFrame):
         # Zoom Segmented Button
         self.zoom_seg = ctk.CTkSegmentedButton(
             self.toolbar,
-            values=["Fit", "100%", "150%", "200%"],
+            values=["Fit", "100%", "150%", "200%", "300%"],
             command=self._on_zoom_change,
         )
         self.zoom_seg.set("Fit")
@@ -68,7 +68,7 @@ class TapePreviewWidget(ctk.CTkFrame):
             bg="#1E1E1E",
             highlightthickness=0,
             bd=0,
-            height=120,
+            height=210,
         )
         self.canvas.pack(fill="both", expand=True, padx=6, pady=6)
         self.canvas.bind("<Configure>", lambda e: self._redraw())
@@ -121,6 +121,8 @@ class TapePreviewWidget(ctk.CTkFrame):
             self.zoom_mode = "1.5"
         elif value == "200%":
             self.zoom_mode = "2.0"
+        elif value == "300%":
+            self.zoom_mode = "3.0"
         self._redraw()
 
     def update_content(
@@ -180,10 +182,10 @@ class TapePreviewWidget(ctk.CTkFrame):
         img_w, img_h = active_img.size
 
         if self.zoom_mode == "fit":
-            # Leave 40px margin horizontally and 30px vertically
-            max_w = max(cw - 40, 100)
-            max_h = max(ch - 30, 40)
-            scale = min(max_w / img_w, max_h / img_h, 3.0)
+            # Leave 24px margin horizontally and 16px vertically
+            max_w = max(cw - 24, 80)
+            max_h = max(ch - 16, 40)
+            scale = min(max_w / img_w, max_h / img_h, 4.0)
             scale = max(scale, 0.4)
         else:
             scale = float(self.zoom_mode)

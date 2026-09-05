@@ -48,7 +48,12 @@ Based on the [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT) Python util
   - Full simulated raster streaming and progress bar feedback
 - **Template Library**:
   - 1-click presets: *Storage Box*, *Cable Wrap / Flag*, *WiFi Guest QR*, *Kitchen Spice Jar*, *Asset Tag*, *Name Badge*
-  - Save and load custom label designs to/from JSON files
+- **🔩 Hardware & Bins Inventory Design System (V2)**:
+  - Professional procedural thermal label generator built according to the modular hardware inventory design standard
+  - **Archetype A (Threaded Fasteners)**: Solid black inverted size anchor block (`M3`, `M5`), upper category header (`SKRUV`, `MUTTER`, `BRICKOR`), 4 compartment modes (Single Size, 2-Bin Dual, 4-Bin 2×2 Grid, Assortment Text), and tool drive badges with geometric vector icons (`⬢` internal hex, `⬡` external wrench, `◉` washer, `✶` Torx, `✚` Phillips)
+  - **Archetype B (Discrete Components & Electrical)**: Inverted 38% category banner strip, spacious spec & rating zone, and dedicated 25% square right icon frame (`◎` ball bearing, `⧉` WAGO splicing clip, `⊷` inline fuse)
+  - **8 Pre-loaded Catalog Presets**: Instant loading for standard workshop drawer configs (DIN 912, countersunk DIN 7991, hex nuts DIN 934, washers DIN 125, 608ZZ bearings, WAGO 221, inline fuses)
+  - Seamless integration with the zero-waste batch print queue
 - **Exporting**:
   - Export high-resolution PNGs of your label designs
 

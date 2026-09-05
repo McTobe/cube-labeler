@@ -87,6 +87,9 @@ class LabelConfig:
     cut_line_position: str = "end"  # "end", "both"
     auto_cut_hardware: bool = True  # Send hardware auto-cut flag to printer (default ON)
 
+    # Hardware Inventory Design System (V2)
+    inventory_config: Optional[object] = None  # FastenerLabelConfig or ComponentLabelConfig
+
 
 class LabelRenderer:
     """Core renderer for Brother PT-P300BT labels."""
@@ -238,6 +241,18 @@ class LabelRenderer:
         tape_h = spec["tape_height"]
         canvas_h = spec["canvas_height"]
         print_border = (canvas_h - printable_h) // 2
+
+        # Hardware Inventory System V2 rendering
+        if getattr(config, "inventory_config", None) is not None:
+            from core.inventory_renderer import inventory_renderer, FastenerLabelConfig
+            if isinstance(config.inventory_config, FastenerLabelConfig):
+                inv_img = inventory_renderer.render_fastener(config.inventory_config)
+            else:
+                inv_img = inventory_renderer.render_component(config.inventory_config)
+            inv_w, inv_h = inv_img.size
+            img_canvas = Image.new("RGB", (inv_w, canvas_h), "white")
+            img_canvas.paste(inv_img.convert("RGB"), (0, print_border))
+            return img_canvas, spec, print_border, printable_h, canvas_h, 16
 
         # 1. Parse text lines
         raw_text = config.text.replace("\\n", "\n")
