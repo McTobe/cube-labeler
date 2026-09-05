@@ -4,7 +4,7 @@ AI Wireframe Generator Dialog for Brother PT-P300BT Label Studio.
 Provides:
 1. Photo-to-Wireframe using Gemini Vision / Image generation
 2. Text-to-Wireframe description generator
-3. Offline Local Edge Filter with live slider controls
+3. Clean & Import existing images/web wireframes for thermal printing
 4. Save directly into user icon library & immediate label insertion
 """
 
@@ -20,7 +20,6 @@ from PIL import Image
 from core.config import config_manager
 from core.ai_generator import (
     ai_generator,
-    local_edge_filter,
     post_process_thermal,
     THERMAL_WIREFRAME_SYSTEM_PROMPT,
 )
@@ -28,7 +27,7 @@ from core.icon_manager import icon_manager
 
 
 class AIGeneratorDialog(ctk.CTkToplevel):
-    """Modal dialog for generating thermal wireframe icons using Gemini AI or local filters."""
+    """Modal dialog for generating thermal wireframe icons using Gemini AI or cleaning web icons."""
 
     def __init__(self, parent, on_save_callback: Optional[Callable[[str], None]] = None):
         super().__init__(parent)
@@ -88,12 +87,10 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         self.tab_photo = self.tabview.add("📷 Photo to Wireframe")
         self.tab_text = self.tabview.add("✍ Text to Wireframe")
-        self.tab_local = self.tabview.add("⚡ Offline Edge Filter")
         self.tab_import = self.tabview.add("📥 Clean & Import Image")
 
         self._build_tab_photo()
         self._build_tab_text()
-        self._build_tab_local()
         self._build_tab_import()
 
         # --- API Key Section below tabs ---
@@ -224,7 +221,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         # Billing / Quota note
         ctk.CTkLabel(
             self.tab_photo,
-            text="💡 Note: Direct Gemini *-image API calls require billing enabled on your Google AI Studio project (free-tier quota is 0). If unbilled, use '⚡ Offline Edge Filter' (100% free locally) or generate in Gemini Web Chat and use '📥 Clean & Import'.",
+            text="💡 Note: Direct Gemini *-image API calls require billing enabled on your Google AI Studio project. Or generate free in Gemini Web Chat (gemini.google.com) and import using '📥 Clean & Import Image'.",
             font=ctk.CTkFont(size=11),
             text_color="#FBBF24",
             wraplength=420,
@@ -280,88 +277,6 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         )
         self.btn_gen_text.pack(fill="x", pady=4)
 
-    def _build_tab_local(self):
-        ctk.CTkLabel(
-            self.tab_local,
-            text="Offline Local Edge Filter (No Internet or API Key Needed)",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        ).pack(anchor="w", pady=(6, 2))
-
-        ctk.CTkLabel(
-            self.tab_local,
-            text="Extracts high-contrast line-art contours locally from any photo.",
-            font=ctk.CTkFont(size=11),
-            text_color="gray70",
-        ).pack(anchor="w", pady=(0, 8))
-
-        btn_browse_local = ctk.CTkButton(
-            self.tab_local,
-            text="📂 Select Photo for Local Filter...",
-            command=self._browse_source_image,
-        )
-        btn_browse_local.pack(fill="x", pady=(0, 8))
-
-        # Quick Presets Row
-        presets_row = ctk.CTkFrame(self.tab_local, fg_color="transparent")
-        presets_row.pack(fill="x", pady=(0, 6))
-        ctk.CTkLabel(presets_row, text="Presets:", font=ctk.CTkFont(size=11, weight="bold")).pack(side="left", padx=(0, 4))
-        ctk.CTkButton(
-            presets_row, text="Technical", width=80, height=24, font=ctk.CTkFont(size=11),
-            command=lambda: self._set_local_preset(130, 2)
-        ).pack(side="left", padx=2)
-        ctk.CTkButton(
-            presets_row, text="Bold Outline", width=90, height=24, font=ctk.CTkFont(size=11),
-            command=lambda: self._set_local_preset(175, 3)
-        ).pack(side="left", padx=2)
-        ctk.CTkButton(
-            presets_row, text="Fine Detail", width=80, height=24, font=ctk.CTkFont(size=11),
-            command=lambda: self._set_local_preset(85, 1)
-        ).pack(side="left", padx=2)
-
-        # Sensitivity Slider
-        ctk.CTkLabel(
-            self.tab_local,
-            text="Edge Sensitivity (Detail Level):",
-            font=ctk.CTkFont(size=12),
-        ).pack(anchor="w")
-
-        self.slider_sens = ctk.CTkSlider(
-            self.tab_local,
-            from_=30,
-            to=220,
-            number_of_steps=19,
-            command=lambda val: self._apply_local_filter(),
-        )
-        self.slider_sens.set(130)
-        self.slider_sens.pack(fill="x", pady=(2, 6))
-
-        # Line Thickness
-        ctk.CTkLabel(
-            self.tab_local,
-            text="Line Thickness:",
-            font=ctk.CTkFont(size=12),
-        ).pack(anchor="w")
-
-        self.slider_thick = ctk.CTkSlider(
-            self.tab_local,
-            from_=1,
-            to=4,
-            number_of_steps=3,
-            command=lambda val: self._apply_local_filter(),
-        )
-        self.slider_thick.set(2)
-        self.slider_thick.pack(fill="x", pady=(2, 8))
-
-        btn_apply_local = ctk.CTkButton(
-            self.tab_local,
-            text="⚡ Apply Local Filter Now",
-            fg_color="#0284C7",
-            hover_color="#0369A1",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            command=self._apply_local_filter,
-        )
-        btn_apply_local.pack(fill="x", pady=4)
-
     def _build_tab_import(self):
         ctk.CTkLabel(
             self.tab_import,
@@ -385,7 +300,15 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             font=ctk.CTkFont(size=13, weight="bold"),
             command=self._browse_source_image,
         )
-        btn_browse_import.pack(fill="x", pady=(0, 10))
+        btn_browse_import.pack(fill="x", pady=(0, 4))
+
+        self.lbl_import_filename = ctk.CTkLabel(
+            self.tab_import,
+            text="No image selected",
+            font=ctk.CTkFont(size=12),
+            text_color="gray70",
+        )
+        self.lbl_import_filename.pack(fill="x", pady=(0, 10))
 
         # Threshold slider for custom cleaning
         ctk.CTkLabel(
@@ -414,11 +337,6 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             command=self._apply_import_clean,
         )
         btn_clean.pack(fill="x", pady=4)
-
-    def _set_local_preset(self, sens: int, thick: int):
-        self.slider_sens.set(sens)
-        self.slider_thick.set(thick)
-        self._apply_local_filter()
 
     def _apply_import_clean(self):
         if not self.source_image:
@@ -564,6 +482,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         if path and os.path.isfile(path):
             self.source_path = path
             self.lbl_source_filename.configure(text=os.path.basename(path))
+            if hasattr(self, "lbl_import_filename"):
+                self.lbl_import_filename.configure(text=os.path.basename(path))
             try:
                 self.source_image = Image.open(path).convert("RGBA")
                 # Update small thumbnail
@@ -580,12 +500,10 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 self.entry_icon_name.delete(0, tk.END)
                 self.entry_icon_name.insert(0, clean_name)
 
-                # Auto-process if currently on Import or Offline Filter tab
+                # Auto-process if currently on Import tab
                 cur_tab = self.tabview.get()
                 if "Clean & Import" in cur_tab:
                     self._apply_import_clean()
-                elif "Offline Edge" in cur_tab:
-                    self._apply_local_filter()
             except Exception as e:
                 messagebox.showerror("Error Loading Photo", str(e))
 
@@ -610,8 +528,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             messagebox.showwarning(
                 "Missing Gemini API Key",
                 "Please enter your Google Gemini API Key below.\n\n"
-                "You can get a free key from Google AI Studio (click 'Get Free Key ↗').\n"
-                "Or use the 'Offline Edge Filter' tab without an API key.",
+                "You can get an API key from Google AI Studio (click 'Get Free Key ↗').\n"
+                "Or generate with Gemini Web Chat (gemini.google.com) and use the 'Clean & Import Image' tab.",
             )
             return
 
@@ -646,7 +564,9 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         if not api_key:
             messagebox.showwarning(
                 "Missing API Key",
-                "Please enter your Google Gemini API Key below.",
+                "Please enter your Google Gemini API Key below.\n\n"
+                "You can get an API key from Google AI Studio (click 'Get Free Key ↗').\n"
+                "Or generate with Gemini Web Chat (gemini.google.com) and use the 'Clean & Import Image' tab.",
             )
             return
 
@@ -666,24 +586,6 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 self.after(0, lambda err=str(e): self._on_generation_error(err))
 
         threading.Thread(target=worker, daemon=True).start()
-
-    def _apply_local_filter(self):
-        if not self.source_image:
-            messagebox.showwarning("Missing Photo", "Please select a photo first.")
-            return
-
-        sens = int(self.slider_sens.get())
-        thick = int(self.slider_thick.get())
-
-        self.lbl_status.configure(text="Processing local edge filter...", text_color="#38BDF8")
-        try:
-            # Generate offline line art from local filter
-            result = local_edge_filter(self.source_image, sensitivity=sens, line_weight=thick, line_thickness=1)
-            self.raw_unprocessed_image = result
-            self._update_processed_preview()
-            self.lbl_status.configure(text="Local filter applied successfully!", text_color="#10B981")
-        except Exception as e:
-            messagebox.showerror("Local Filter Error", str(e))
 
     def _set_loading(self, loading: bool, message: str = ""):
         self.is_generating = loading
