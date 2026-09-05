@@ -1,0 +1,5 @@
+pyserial>=3.5
+pillow>=10.0.0
+customtkinter>=5.2.0
+qrcode[pil]>=7.4.2
+packbits>=0.6

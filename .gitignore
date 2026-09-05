@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Build artifacts
+dist/
+build/
+*.spec
+
+# Test files
+tests/test_template.json
+tests/temp_icon.png
+
+# Reference repo
+pt_p300bt_reference/
