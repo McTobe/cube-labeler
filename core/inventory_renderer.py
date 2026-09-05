@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Hardware Inventory Label Design System & Template Catalog (V2) Engine.
 Implements crisp procedural vector rendering for modular storage bin labels:
@@ -211,17 +211,17 @@ class InventoryRenderer:
 
         # Anchor text (e.g. M3, M5, M10)
         thread_txt = cfg.thread_size.strip()
-        f_size = 46 * scale if len(thread_txt) <= 2 else (38 * scale if len(thread_txt) <= 3 else 30 * scale)
+        f_size = 52 * scale if len(thread_txt) <= 2 else (42 * scale if len(thread_txt) <= 3 else 32 * scale)
         font_anchor = font_manager.load_font("Arial Bold", f_size)
         draw.text((anchor_w // 2, canvas_h // 2), thread_txt, font=font_anchor, fill=255, anchor="mm")
 
-        # 3. Top Category Header Bar (Top 38% of remaining area)
+        # 3. Top Category Header Bar (Top 36% of remaining area)
         rem_w = canvas_w - anchor_w
-        header_h = int(canvas_h * 0.38)
+        header_h = int(canvas_h * 0.36)
         draw.line([(anchor_w, header_h), (canvas_w - 1, header_h)], fill=0, width=line_w)
 
         cat_txt = cfg.category.strip().upper()
-        font_cat = font_manager.load_font("Arial Bold", 19 * scale)
+        font_cat = font_manager.load_font("Arial Bold", 22 * scale)
         draw.text(
             (anchor_w + rem_w // 2, header_h // 2),
             cat_txt,
@@ -282,25 +282,25 @@ class InventoryRenderer:
     ):
         has_std = bool(cfg.standard_line1.strip())
         if has_std:
-            f_len = font_manager.load_font("Arial Bold", 19 * scale)
-            draw.text((x0 + w * 0.45, y0 + h * 0.32), cfg.length_single, font=f_len, fill=0, anchor="mm")
-            f_sub = font_manager.load_font("Arial Bold", 10 * scale)
-            draw.text((x0 + w * 0.45, y0 + h * 0.72), f"{cfg.standard_line1} {cfg.standard_line2}".strip(), font=f_sub, fill=0, anchor="mm")
+            f_len = font_manager.load_font("Arial Bold", 24 * scale)
+            draw.text((x0 + w * 0.45, y0 + h * 0.35), cfg.length_single, font=f_len, fill=0, anchor="mm")
+            f_sub = font_manager.load_font("Arial Bold", 12 * scale)
+            draw.text((x0 + w * 0.45, y0 + h * 0.75), f"{cfg.standard_line1} {cfg.standard_line2}".strip(), font=f_sub, fill=0, anchor="mm")
         else:
-            f_len = font_manager.load_font("Arial Bold", 22 * scale)
+            f_len = font_manager.load_font("Arial Bold", 28 * scale)
             draw.text((x0 + w // 2, y0 + h // 2), cfg.length_single, font=f_len, fill=0, anchor="mm")
 
     def _render_fastener_dual(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int, line_w: int
     ):
-        f_len = font_manager.load_font("Arial Bold", 18 * scale)
+        f_len = font_manager.load_font("Arial Bold", 22 * scale)
         draw.text((x0 + w * 0.28, y0 + h // 2), cfg.length_dual_1, font=f_len, fill=0, anchor="mm")
         draw.text((x0 + w * 0.72, y0 + h // 2), cfg.length_dual_2, font=f_len, fill=0, anchor="mm")
 
     def _render_fastener_quad(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int, line_w: int
     ):
-        f_grid = font_manager.load_font("Arial Bold", 13 * scale)
+        f_grid = font_manager.load_font("Arial Bold", 15 * scale)
         draw.text((x0 + w * 0.28, y0 + h * 0.28), cfg.length_quad_1, font=f_grid, fill=0, anchor="mm")
         draw.text((x0 + w * 0.72, y0 + h * 0.28), cfg.length_quad_2, font=f_grid, fill=0, anchor="mm")
         draw.text((x0 + w * 0.28, y0 + h * 0.72), cfg.length_quad_3, font=f_grid, fill=0, anchor="mm")
@@ -309,7 +309,7 @@ class InventoryRenderer:
     def _render_fastener_assortment(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int
     ):
-        f_assort = font_manager.load_font("Arial Bold", 12 * scale)
+        f_assort = font_manager.load_font("Arial Bold", 14 * scale)
         draw.text((x0 + w // 2, y0 + h * 0.30), cfg.assortment_line1, font=f_assort, fill=0, anchor="mm")
         draw.text((x0 + w // 2, y0 + h * 0.70), cfg.assortment_line2, font=f_assort, fill=0, anchor="mm")
 
@@ -329,13 +329,13 @@ class InventoryRenderer:
         mid_y = y0 + h // 2
 
         if has_size_txt and tool_type != "washer":
-            f_size = font_manager.load_font("Arial Bold", 15 * scale)
+            f_size = font_manager.load_font("Arial Bold", 18 * scale)
             draw.text((x0 + w * 0.35, mid_y), tool_size.strip(), font=f_size, fill=0, anchor="mm")
             icon_cx = x0 + w * 0.75
         else:
             icon_cx = x0 + w // 2
 
-        icon_r = 9 * scale
+        icon_r = 11 * scale
 
         if tool_type == "internal_hex":
             self._draw_internal_hex(draw, icon_cx, mid_y, icon_r, fill=0)
@@ -391,12 +391,12 @@ class InventoryRenderer:
             elif cfg.icon_type == "fuse":
                 self._draw_fuse_icon(draw, icon_cx, icon_cy, icon_r, stroke=line_w)
 
-        # 3. Top Category Banner Strip (38% height) with Solid Inverted Block
-        banner_h = int(canvas_h * 0.38)
+        # 3. Top Category Banner Strip (36% height) with Solid Inverted Block
+        banner_h = int(canvas_h * 0.36)
         draw.rectangle([(0, 0), (left_content_w, banner_h)], fill=0)
 
         cat_txt = cfg.category_banner.strip().upper()
-        font_banner = font_manager.load_font("Arial Bold", 18 * scale)
+        font_banner = font_manager.load_font("Arial Bold", 22 * scale)
         draw.text(
             (left_content_w // 2, banner_h // 2),
             cat_txt,
@@ -405,18 +405,18 @@ class InventoryRenderer:
             anchor="mm",
         )
 
-        # 4. Lower Spec Area (62% height)
+        # 4. Lower Spec Area (64% height)
         bot_y0 = banner_h
         bot_h = canvas_h - banner_h
         has_sec = bool(cfg.spec_secondary.strip())
 
         if has_sec:
-            f_pri = font_manager.load_font("Arial Bold", 17 * scale)
-            draw.text((left_content_w // 2, bot_y0 + bot_h * 0.34), cfg.spec_primary, font=f_pri, fill=0, anchor="mm")
-            f_sec = font_manager.load_font("Arial Bold", 12 * scale)
+            f_pri = font_manager.load_font("Arial Bold", 21 * scale)
+            draw.text((left_content_w // 2, bot_y0 + bot_h * 0.35), cfg.spec_primary, font=f_pri, fill=0, anchor="mm")
+            f_sec = font_manager.load_font("Arial Bold", 13 * scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h * 0.75), cfg.spec_secondary, font=f_sec, fill=0, anchor="mm")
         else:
-            f_pri = font_manager.load_font("Arial Bold", 22 * scale)
+            f_pri = font_manager.load_font("Arial Bold", 28 * scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h // 2), cfg.spec_primary, font=f_pri, fill=0, anchor="mm")
 
         # Downsample to target 64 dots height

@@ -43,8 +43,8 @@ class PrintLabelApp(ctk.CTk):
         super().__init__()
 
         self.title("Brother P-touch Cube (PT-P300BT) Label Studio")
-        self.geometry("1100x750")
-        self.minsize(960, 580)
+        self.geometry("1150x850")
+        self.minsize(980, 680)
 
         # Thread-safe cross-thread task queue
         self._task_queue = queue.Queue()
@@ -210,7 +210,7 @@ class PrintLabelApp(ctk.CTk):
 
     def _setup_preview(self):
         """WYSIWYG Interactive Tape Canvas."""
-        self.preview_widget = TapePreviewWidget(self, height=180)
+        self.preview_widget = TapePreviewWidget(self)
         self.preview_widget.pack(side="top", fill="x", padx=12, pady=(0, 6))
 
     def _setup_tabs(self):
