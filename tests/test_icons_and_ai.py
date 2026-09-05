@@ -26,6 +26,7 @@ class TestConfigManager(unittest.TestCase):
         cfg = ConfigManager()
         self.assertIn("gemini_api_key", cfg._config)
         self.assertIn("gemini_model", cfg._config)
+        self.assertIn("last_serial_port", cfg._config)
         user_dir = cfg.user_icons_dir
         self.assertTrue(os.path.isdir(user_dir))
         self.assertEqual(user_dir, os.path.normpath(user_dir))

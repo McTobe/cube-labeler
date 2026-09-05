@@ -104,10 +104,20 @@ class BrotherPrinter:
         self._ser: Optional[serial.Serial] = None
 
     def connect(self) -> None:
-        """Opens the serial connection."""
+        """Opens the serial connection, with 1 retry for Bluetooth sleep wakeup."""
         if self._ser and self._ser.is_open:
             return
-        self._ser = serial.Serial(self.port, baudrate=self.baudrate, timeout=self.timeout)
+        last_err = None
+        for attempt in range(2):
+            try:
+                self._ser = serial.Serial(self.port, baudrate=self.baudrate, timeout=self.timeout)
+                return
+            except (serial.SerialException, OSError) as e:
+                last_err = e
+                if attempt == 0:
+                    time.sleep(1.0)
+        if last_err:
+            raise last_err
 
     def disconnect(self) -> None:
         """Closes the serial connection."""

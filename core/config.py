@@ -16,6 +16,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "gemini_model": "gemini-2.5-flash",
     "last_used_category": "All",
     "auto_save_ai_icons": True,
+    "last_serial_port": "",
 }
 
 
@@ -62,6 +63,15 @@ class ConfigManager:
     @gemini_api_key.setter
     def gemini_api_key(self, value: str):
         self._config["gemini_api_key"] = value.strip()
+        self.save()
+
+    @property
+    def last_serial_port(self) -> str:
+        return self._config.get("last_serial_port", "").strip()
+
+    @last_serial_port.setter
+    def last_serial_port(self, value: str):
+        self._config["last_serial_port"] = value.strip()
         self.save()
 
     @property

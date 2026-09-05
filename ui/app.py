@@ -22,6 +22,7 @@ from core.printer import (
     list_serial_ports,
 )
 from core.ptstatus import PrinterStatus
+from core.config import config_manager
 from ui.tape_preview import TapePreviewWidget
 from ui.templates import (
     BUILTIN_PRESETS,
@@ -1760,19 +1761,22 @@ class PrintLabelApp(ctk.CTk):
             # 1. If previous selection is still present and valid, KEEP IT!
             if prev_device and prev_device in self._port_device_to_label:
                 target_device = prev_device
+            elif config_manager.last_serial_port and config_manager.last_serial_port in self._port_device_to_label:
+                # 2. If remembered port from config is available, use it!
+                target_device = config_manager.last_serial_port
             else:
-                # 2. Prefer Brother Outgoing printer port (is_preferred=True)
+                # 3. Prefer Brother Outgoing printer port (is_preferred=True)
                 for p in ports:
                     if p.is_preferred:
                         target_device = p.device
                         break
-                # 3. If none preferred, take first non-incoming port
+                # 4. If none preferred, take first non-incoming port
                 if not target_device:
                     for p in ports:
                         if not p.is_incoming:
                             target_device = p.device
                             break
-                # 4. Fallback to first available port
+                # 5. Fallback to first available port
                 if not target_device:
                     target_device = ports[0].device
 
@@ -1780,6 +1784,7 @@ class PrintLabelApp(ctk.CTk):
             self.port_combo.set(target_label)
             self.port_var.set(target_label)
             self._selected_port_device = target_device
+            config_manager.last_serial_port = target_device
             self.action_status_label.configure(text=f"Selected Port: {target_label}")
 
             # Auto-query status if physical mode
@@ -1792,6 +1797,7 @@ class PrintLabelApp(ctk.CTk):
                 self._selected_port_device = self._port_label_to_device[value]
             else:
                 self._selected_port_device = value.split()[0]
+            config_manager.last_serial_port = self._selected_port_device
             self.action_status_label.configure(text=f"Selected Port: {value}")
             if not self.virtual_mode_var.get():
                 self._on_query_status()
