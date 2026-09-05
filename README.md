@@ -119,10 +119,44 @@ printlabel-ui/
 
 ---
 
+## 📦 Standalone Portable Executable (.exe)
+
+`PrintLabel` can be compiled into a single, completely self-contained portable `.exe` that runs on any 64-bit Windows PC with **no Python installation required**:
+
+- **Pre-compiled Single Executable**: `dist\PrintLabel.exe` (~20 MB)
+- **GUI Mode**: Double-click `PrintLabel.exe` or run without arguments to launch the modern desktop UI.
+- **CLI Mode**: Run from Command Prompt or PowerShell with standard `printlabel` arguments:
+  ```powershell
+  # Show command-line help
+  PrintLabel.exe --help
+
+  # List available COM ports & detected Brother printers
+  PrintLabel.exe --ports
+
+  # Check printer telemetry (battery, loaded tape width & color)
+  PrintLabel.exe COM4 --status
+
+  # Print a label directly from the terminal
+  PrintLabel.exe COM4 "Storage Box #42"
+
+  # Feed tape by 25mm
+  PrintLabel.exe COM4 --feed
+  ```
+
+### 🔨 Compiling From Source
+To compile your own portable single `.exe` file:
+1. Double-click `build.bat` **or** run:
+   ```powershell
+   python build.py
+   ```
+2. The executable will be generated at `dist\PrintLabel.exe`.
+
+---
+
 ## 🧪 Testing
 
 Run the automated test suite:
 
 ```bash
-python -m unittest tests/test_all.py
+python -m unittest discover tests
 ```

@@ -46,6 +46,15 @@ class PrintLabelApp(ctk.CTk):
         self.geometry("1150x850")
         self.minsize(980, 680)
 
+        # Set Window Icon
+        base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        ico_candidate = os.path.join(base_dir, "assets", "icon.ico")
+        if os.path.isfile(ico_candidate):
+            try:
+                self.iconbitmap(ico_candidate)
+            except Exception:
+                pass
+
         # Thread-safe cross-thread task queue
         self._task_queue = queue.Queue()
         self._process_task_queue()
