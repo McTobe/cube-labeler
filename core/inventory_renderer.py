@@ -325,28 +325,31 @@ class InventoryRenderer:
         scale: int,
         line_w: int,
     ):
-        has_size_txt = bool(tool_size.strip())
-        mid_y = y0 + h // 2
+        has_size_txt = bool(tool_size.strip()) and tool_type != "washer"
+        cx = x0 + w // 2
 
-        if has_size_txt and tool_type != "washer":
-            f_size = font_manager.load_font("Arial Bold", 18 * scale)
-            draw.text((x0 + w * 0.35, mid_y), tool_size.strip(), font=f_size, fill=0, anchor="mm")
-            icon_cx = x0 + w * 0.75
+        if has_size_txt:
+            icon_cy = y0 + int(h * 0.30)
+            icon_r = int(10.5 * scale)
+            txt = tool_size.strip()
+            f_pt = 17 if len(txt) <= 2 else (14 if len(txt) <= 3 else 12)
+            font = font_manager.load_font("Arial Bold", f_pt * scale)
+            text_cy = y0 + int(h * 0.76)
+            draw.text((cx, text_cy), txt, font=font, fill=0, anchor="mm")
         else:
-            icon_cx = x0 + w // 2
-
-        icon_r = 11 * scale
+            icon_cy = y0 + h // 2
+            icon_r = int(15 * scale)
 
         if tool_type == "internal_hex":
-            self._draw_internal_hex(draw, icon_cx, mid_y, icon_r, fill=0)
+            self._draw_internal_hex(draw, cx, icon_cy, icon_r, fill=0)
         elif tool_type == "external_hex":
-            self._draw_external_hex(draw, icon_cx, mid_y, icon_r, stroke=line_w, outline=0)
+            self._draw_external_hex(draw, cx, icon_cy, icon_r, stroke=line_w, outline=0)
         elif tool_type == "washer":
-            self._draw_washer_icon(draw, icon_cx, mid_y, icon_r * 1.05, stroke=line_w, outline=0, fill=0)
+            self._draw_washer_icon(draw, cx, icon_cy, icon_r, stroke=line_w, outline=0, fill=0)
         elif tool_type == "torx":
-            self._draw_torx_icon(draw, icon_cx, mid_y, icon_r, fill=0)
+            self._draw_torx_icon(draw, cx, icon_cy, icon_r, fill=0)
         elif tool_type == "phillips":
-            self._draw_phillips_icon(draw, icon_cx, mid_y, icon_r, stroke=line_w, fill=0)
+            self._draw_phillips_icon(draw, cx, icon_cy, icon_r, stroke=line_w, fill=0)
 
     # =========================================================================
     # ARCHETYPE B: DISCRETE COMPONENTS & ELECTRICAL HARDWARE
