@@ -114,6 +114,11 @@ class TestAIGenerator(unittest.TestCase):
         self.assertGreater(bold_black, normal_black, "Bold should have more stroke pixels than normal")
         self.assertGreater(extra_bold_black, bold_black, "Extra bold should have more stroke pixels than bold")
 
+        # Test explicit color inversion
+        inverted = post_process_thermal(img, target_size=(128, 128), line_thickness=1, invert=True)
+        self.assertEqual(inverted.size, (128, 128))
+        self.assertEqual(inverted.mode, "RGBA")
+
     def test_local_edge_filter(self):
         # Create image with shapes
         img = Image.new("RGB", (150, 150), "white")

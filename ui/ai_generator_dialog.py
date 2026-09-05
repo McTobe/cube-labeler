@@ -304,11 +304,11 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         self.lbl_import_filename = ctk.CTkLabel(
             self.tab_import,
-            text="No image selected (click Choose Image or Clean & Prepare)",
+            text="No image selected",
             font=ctk.CTkFont(size=12),
             text_color="gray70",
         )
-        self.lbl_import_filename.pack(fill="x", pady=(0, 8))
+        self.lbl_import_filename.pack(fill="x", pady=(0, 10))
 
         # Threshold slider for custom cleaning
         ctk.CTkLabel(
@@ -325,41 +325,19 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             command=lambda val: self._apply_import_clean(),
         )
         self.slider_import_thresh.set(210)
-        self.slider_import_thresh.pack(fill="x", pady=(2, 8))
+        self.slider_import_thresh.pack(fill="x", pady=(2, 10))
 
-        btn_clean = ctk.CTkButton(
+        # Reverse / Invert Colors Button
+        self.btn_invert = ctk.CTkButton(
             self.tab_import,
-            text="⚡ Clean & Prepare for Thermal Printing",
+            text="🔄 Reverse / Invert Colors (Black ↔ White)",
             height=38,
-            fg_color="#0284C7",
-            hover_color="#0369A1",
+            fg_color="#374151",
+            hover_color="#1F2937",
             font=ctk.CTkFont(size=13, weight="bold"),
-            command=self._apply_import_clean,
+            command=self._toggle_invert,
         )
-        btn_clean.pack(fill="x", pady=4)
-
-        self.lbl_import_hint = ctk.CTkLabel(
-            self.tab_import,
-            text="💡 Tip: Cleaned preview appears on the right. When satisfied, save below.",
-            font=ctk.CTkFont(size=11),
-            text_color="gray70",
-            wraplength=420,
-            justify="left",
-        )
-        self.lbl_import_hint.pack(fill="x", pady=(6, 4))
-
-        # Direct Save button right inside the tab for convenience
-        self.btn_import_save = ctk.CTkButton(
-            self.tab_import,
-            text="💾 Save Cleaned Icon to Library & Use",
-            height=38,
-            fg_color="#10B981",
-            hover_color="#059669",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            state="disabled",
-            command=self._save_and_use,
-        )
-        self.btn_import_save.pack(fill="x", pady=(4, 6))
+        self.btn_invert.pack(fill="x", pady=(4, 6))
 
     def _flash_preview_box(self):
         try:
@@ -368,21 +346,23 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         except Exception:
             pass
 
+    def _toggle_invert(self):
+        if not self.source_image:
+            self._browse_source_image()
+            return
+        self.invert_colors = not getattr(self, "invert_colors", False)
+        self._update_processed_preview()
+        self._flash_preview_box()
+        state = "Inverted (Black ↔ White)" if self.invert_colors else "Normal"
+        self.lbl_status.configure(text=f"Colors: {state}", text_color="#38BDF8")
+
     def _apply_import_clean(self):
         if not self.source_image:
-            # If no image chosen yet, automatically launch file picker so the button works immediately!
-            self._browse_source_image()
             return
 
         self.raw_unprocessed_image = self.source_image.copy()
         self._update_processed_preview()
-        self.lbl_status.configure(text="✨ Cleaned & prepared for thermal print!", text_color="#10B981")
-        if hasattr(self, "lbl_import_hint"):
-            self.lbl_import_hint.configure(
-                text="✅ Cleaned & ready! Click '💾 Save Cleaned Icon to Library & Use' below or on the right.",
-                text_color="#10B981",
-            )
-        self._flash_preview_box()
+        self.lbl_status.configure(text="Cleaned & prepared for thermal print!", text_color="#10B981")
 
     def _build_preview_panel(self, container):
         ctk.CTkLabel(
@@ -501,11 +481,13 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 thresh = int(self.slider_import_thresh.get())
             except Exception:
                 pass
+        invert = getattr(self, "invert_colors", False)
         try:
             processed = post_process_thermal(
                 self.raw_unprocessed_image,
                 binarize_threshold=thresh,
                 line_thickness=thick,
+                invert=invert,
             )
             self._display_result(processed)
         except Exception as e:
@@ -519,6 +501,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         )
         if path and os.path.isfile(path):
             self.source_path = path
+            self.invert_colors = False
             self.lbl_source_filename.configure(text=os.path.basename(path))
             if hasattr(self, "lbl_import_filename"):
                 self.lbl_import_filename.configure(
@@ -558,8 +541,6 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         )
         self.lbl_preview_canvas.configure(image=self._ctk_preview_img, text="")
         self.btn_save.configure(state="normal")
-        if hasattr(self, "btn_import_save"):
-            self.btn_import_save.configure(state="normal")
 
     def _generate_from_photo(self):
         if not self.source_image:

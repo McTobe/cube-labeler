@@ -41,6 +41,7 @@ def post_process_thermal(
     binarize_threshold: int = 210,
     line_thickness: int = 1,
     transparent_bg: bool = True,
+    invert: bool = False,
 ) -> Image.Image:
     """
     Cleans, auto-crops, and strictly binarizes an image into pure monochrome
@@ -51,6 +52,8 @@ def post_process_thermal(
       2 = Bold (recommended for low-res thermal labels, 3x3 dilation)
       3 = Extra Bold (5x5 dilation)
       4 = Heavy / Chunky (7x7 dilation)
+    invert:
+      If True, explicitly inverts the image colors (black <-> white).
     """
     # 1. Flatten against white background
     if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
@@ -69,6 +72,10 @@ def post_process_thermal(
     ]
     if sum(corners) / 4.0 < 128:
         # Invert so background is white and drawing is black
+        gray = ImageOps.invert(gray)
+
+    # 2b. Explicit user-requested color inversion (reverse colors)
+    if invert:
         gray = ImageOps.invert(gray)
 
     # 3. Auto-crop whitespace margins based on binarized threshold
