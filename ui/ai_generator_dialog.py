@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-AI Wireframe Generator Dialog for Brother PT-P300BT Label Studio.
+"Make an icon" dialog for Brother PT-P300BT Label Studio.
 Provides:
-1. Photo-to-Wireframe using Gemini Vision / Image generation
-2. Text-to-Wireframe description generator
-3. Clean & Import existing images/web wireframes for thermal printing
-4. Save directly into user icon library & immediate label insertion
+1. Clean and import: tidy up an existing image for thermal printing (free, offline)
+2. From a photo: line-art from a photo using Gemini
+3. From a description: line-art from a text description using Gemini
+4. Save directly into the user icon library and use it on the label
 """
 
 import os
@@ -26,6 +26,19 @@ from core.ai_generator import (
 )
 from core.icon_manager import icon_manager
 
+TAB_IMPORT = "Clean and import"
+TAB_PHOTO = "From a photo"
+TAB_TEXT = "From a description"
+
+# Line thickness choices and the stroke width each one adds
+THICKNESS = {"Normal": 1, "Bold": 2, "Extra bold": 3, "Heavy": 4}
+
+MUTED = ("gray40", "gray60")
+PREVIEW_BOX = 220
+OK_GREEN = "#10B981"
+BUSY_BLUE = "#38BDF8"
+ERROR_RED = "#EF4444"
+
 
 class AIGeneratorDialog(ctk.CTkToplevel):
     """Modal dialog for generating thermal wireframe icons using Gemini AI or cleaning web icons."""
@@ -34,7 +47,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         super().__init__(parent)
         self.on_save_callback = on_save_callback
 
-        self.title("✨ AI Wireframe & Line-Art Generator")
+        self.title("Make an icon")
         self.geometry("880x680")
         self.minsize(780, 580)
 
@@ -59,16 +72,16 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         title_lbl = ctk.CTkLabel(
             header,
-            text="✨ AI Monochrome Wireframe Generator",
+            text="Make an icon",
             font=ctk.CTkFont(size=18, weight="bold"),
         )
         title_lbl.pack(anchor="w")
 
         desc_lbl = ctk.CTkLabel(
             header,
-            text="Convert photos or descriptions into pure black-and-white line-art icons ready for thermal printing.",
+            text="Turn an image, a photo or a description into a black-and-white icon for the label.",
             font=ctk.CTkFont(size=12),
-            text_color="gray70",
+            text_color=MUTED,
         )
         desc_lbl.pack(anchor="w")
 
@@ -86,15 +99,15 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         self.tabview = ctk.CTkTabview(left_frame)
         self.tabview.pack(fill="both", expand=True, padx=8, pady=8)
 
-        self.tab_photo = self.tabview.add("📷 Photo to Wireframe")
-        self.tab_text = self.tabview.add("✍ Text to Wireframe")
-        self.tab_import = self.tabview.add("📥 Clean & Import Image")
+        # The free, offline option comes first; the Gemini tabs need an API key
+        self.tab_import = self.tabview.add(TAB_IMPORT)
+        self.tab_photo = self.tabview.add(TAB_PHOTO)
+        self.tab_text = self.tabview.add(TAB_TEXT)
 
+        self._build_tab_import()
         self._build_tab_photo()
         self._build_tab_text()
-        self._build_tab_import()
-        # Open on the free, offline option; the Gemini tabs need a paid API key
-        self.tabview.set("📥 Clean & Import Image")
+        self.tabview.set(TAB_IMPORT)
 
         # The Gemini key lives in Settings; just say whether it's set
         key_note = (
@@ -103,7 +116,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             else "Gemini options need an API key. Add one in Settings in the main window."
         )
         self.lbl_key_note = ctk.CTkLabel(
-            left_frame, text=key_note, anchor="w", text_color="gray60", font=ctk.CTkFont(size=11)
+            left_frame, text=key_note, anchor="w", text_color=MUTED, font=ctk.CTkFont(size=11)
         )
         self.lbl_key_note.pack(fill="x", padx=12, pady=(0, 8))
 
@@ -118,8 +131,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         btn_browse = ctk.CTkButton(
             picker_frame,
-            text="📂 Choose Part Photo...",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            text="Choose photo…",
             command=self._browse_source_image,
         )
         btn_browse.pack(side="left", padx=(0, 8))
@@ -128,17 +140,18 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             picker_frame,
             text="No photo selected",
             font=ctk.CTkFont(size=12),
-            text_color="gray70",
+            text_color=MUTED,
         )
         self.lbl_source_filename.pack(side="left")
 
         # Thumbnail display of source photo
         self.lbl_source_thumb = ctk.CTkLabel(
             self.tab_photo,
-            text="[ Photo Preview ]",
+            text="No photo",
+            text_color=MUTED,
             width=140,
             height=120,
-            fg_color="gray15",
+            fg_color=("gray85", "gray15"),
             corner_radius=6,
         )
         self.lbl_source_thumb.pack(pady=4)
@@ -146,18 +159,18 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         # Prompt / Style
         ctk.CTkLabel(
             self.tab_photo,
-            text="Style Preset:",
+            text="Style",
             font=ctk.CTkFont(size=12, weight="bold"),
         ).pack(anchor="w", pady=(6, 2))
 
-        self.style_var = tk.StringVar(value="Isometric Technical Wireframe (Recommended)")
+        self.style_var = tk.StringVar(value="Isometric technical wireframe (recommended)")
         self.combo_style = ctk.CTkComboBox(
             self.tab_photo,
             values=[
-                "Isometric Technical Wireframe (Recommended)",
-                "Top-Down Blueprint Outline",
-                "Monochrome Silhouette",
-                "Schematic Vector Symbol",
+                "Isometric technical wireframe (recommended)",
+                "Top-down blueprint outline",
+                "Monochrome silhouette",
+                "Schematic vector symbol",
             ],
             variable=self.style_var,
         )
@@ -165,7 +178,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(
             self.tab_photo,
-            text="Extra Details / Instructions (Optional):",
+            text="Extra details (optional)",
             font=ctk.CTkFont(size=12),
         ).pack(anchor="w", pady=(2, 2))
 
@@ -176,23 +189,24 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         )
         self.entry_photo_details.pack(fill="x", pady=(0, 10))
 
-        # Billing / Quota note
+        # Billing note
         ctk.CTkLabel(
             self.tab_photo,
-            text="💡 Note: Direct Gemini *-image API calls require billing enabled on your Google AI Studio project. Or generate free in Gemini Web Chat (gemini.google.com) and import using '📥 Clean & Import Image'.",
+            text="Gemini image generation needs billing turned on in Google AI Studio. "
+                 "For a free option, make the image in Gemini on the web (gemini.google.com) "
+                 f"and bring it in with {TAB_IMPORT}.",
             font=ctk.CTkFont(size=11),
-            text_color="#FBBF24",
+            text_color=MUTED,
             wraplength=420,
             justify="left",
+            anchor="w",
         ).pack(fill="x", pady=(4, 6))
 
         # Generate Button
         self.btn_gen_photo = ctk.CTkButton(
             self.tab_photo,
-            text="✨ Generate AI Wireframe (Gemini)",
-            height=40,
-            fg_color="#8B5CF6",
-            hover_color="#7C3AED",
+            text="Generate with Gemini",
+            height=36,
             font=ctk.CTkFont(size=13, weight="bold"),
             command=self._generate_from_photo,
         )
@@ -201,7 +215,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
     def _build_tab_text(self):
         ctk.CTkLabel(
             self.tab_text,
-            text="Describe the Component or Tool:",
+            text="Describe the part or tool",
             font=ctk.CTkFont(size=12, weight="bold"),
         ).pack(anchor="w", pady=(8, 4))
 
@@ -218,18 +232,17 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(
             self.tab_text,
-            text="Examples: 'M3 nylon lock nut', 'NEMA 17 stepper motor', 'USB Type-C female SMD port', 'rotary encoder'",
+            text="For example: M3 nylon lock nut, NEMA 17 stepper motor, USB-C socket, rotary encoder",
             font=ctk.CTkFont(size=11),
-            text_color="gray70",
+            text_color=MUTED,
             wraplength=420,
+            justify="left",
         ).pack(anchor="w", pady=(0, 12))
 
         self.btn_gen_text = ctk.CTkButton(
             self.tab_text,
-            text="✨ Generate from Description (Imagen / Gemini)",
-            height=40,
-            fg_color="#8B5CF6",
-            hover_color="#7C3AED",
+            text="Generate with Gemini",
+            height=36,
             font=ctk.CTkFont(size=13, weight="bold"),
             command=self._generate_from_text,
         )
@@ -238,23 +251,25 @@ class AIGeneratorDialog(ctk.CTkToplevel):
     def _build_tab_import(self):
         ctk.CTkLabel(
             self.tab_import,
-            text="Clean & Import Existing Image / Web Wireframe",
+            text="Use an image you already have",
             font=ctk.CTkFont(size=13, weight="bold"),
         ).pack(anchor="w", pady=(6, 2))
 
         ctk.CTkLabel(
             self.tab_import,
-            text="Drop or select any image (e.g. generated from Gemini Web Chat at gemini.google.com, screenshots, or Google images). "
-                 "Automatically auto-crops whitespace borders, removes background, strictly binarizes to 1-bit thermal monochrome, and centers it.",
+            text="Pick any image, such as one made in Gemini on the web, a screenshot or a downloaded icon. "
+                 "It is cropped to its content, the background is removed, and it is turned into "
+                 "pure black and white for the printer. Free and works offline.",
             font=ctk.CTkFont(size=11),
-            text_color="gray70",
+            text_color=MUTED,
             wraplength=420,
             justify="left",
         ).pack(anchor="w", pady=(0, 8))
 
         btn_browse_import = ctk.CTkButton(
             self.tab_import,
-            text="📂 Choose Image to Clean & Import...",
+            text="Choose image…",
+            height=36,
             font=ctk.CTkFont(size=13, weight="bold"),
             command=self._browse_source_image,
         )
@@ -264,14 +279,14 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             self.tab_import,
             text="No image selected",
             font=ctk.CTkFont(size=12),
-            text_color="gray70",
+            text_color=MUTED,
         )
         self.lbl_import_filename.pack(fill="x", pady=(0, 10))
 
         # Threshold slider for custom cleaning
         ctk.CTkLabel(
             self.tab_import,
-            text="Binarization Threshold (Darkness Cutoff):",
+            text="Darkness cutoff",
             font=ctk.CTkFont(size=12),
         ).pack(anchor="w")
 
@@ -285,21 +300,19 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         self.slider_import_thresh.set(210)
         self.slider_import_thresh.pack(fill="x", pady=(2, 10))
 
-        # Reverse / Invert Colors Button
+        # Swap black and white
         self.btn_invert = ctk.CTkButton(
             self.tab_import,
-            text="🔄 Reverse / Invert Colors (Black ↔ White)",
-            height=38,
-            fg_color="#374151",
-            hover_color="#1F2937",
-            font=ctk.CTkFont(size=13, weight="bold"),
+            text="Swap black and white",
+            fg_color="gray40",
+            hover_color="gray30",
             command=self._toggle_invert,
         )
         self.btn_invert.pack(fill="x", pady=(4, 6))
 
     def _flash_preview_box(self):
         try:
-            self.preview_box.configure(border_color="#10B981", border_width=3)
+            self.preview_box.configure(border_color=OK_GREEN, border_width=3)
             self.after(500, lambda: self.preview_box.configure(border_color="gray40", border_width=2))
         except Exception:
             pass
@@ -311,8 +324,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         self.invert_colors = not getattr(self, "invert_colors", False)
         self._update_processed_preview()
         self._flash_preview_box()
-        state = "Inverted (Black ↔ White)" if self.invert_colors else "Normal"
-        self.lbl_status.configure(text=f"Colors: {state}", text_color="#38BDF8")
+        state = "Black and white swapped" if self.invert_colors else "Black and white as in the image"
+        self.lbl_status.configure(text=state, text_color=MUTED)
 
     def _apply_import_clean(self):
         if not self.source_image:
@@ -320,20 +333,53 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         self.raw_unprocessed_image = self.source_image.copy()
         self._update_processed_preview()
-        self.lbl_status.configure(text="Cleaned & prepared for thermal print!", text_color="#10B981")
+        self.lbl_status.configure(text="Image cleaned up for printing", text_color=OK_GREEN)
 
     def _build_preview_panel(self, container):
+        # Packed from the bottom first so Save and Close stay visible when the dialog is small
+        btn_close = ctk.CTkButton(
+            container,
+            text="Close",
+            fg_color="gray40",
+            hover_color="gray30",
+            command=self.destroy,
+        )
+        btn_close.pack(side="bottom", fill="x", padx=12, pady=(0, 12))
+
+        self.btn_save = ctk.CTkButton(
+            container,
+            text="Save and use",
+            height=36,
+            font=ctk.CTkFont(size=13, weight="bold"),
+            state="disabled",
+            command=self._save_and_use,
+        )
+        self.btn_save.pack(side="bottom", fill="x", padx=12, pady=(0, 6))
+
+        self.entry_icon_name = ctk.CTkEntry(
+            container,
+            placeholder_text="e.g. wago_221, m3_hex_screw",
+            font=ctk.CTkFont(size=12),
+        )
+        self.entry_icon_name.pack(side="bottom", fill="x", padx=12, pady=(0, 8))
+
         ctk.CTkLabel(
             container,
-            text="Generated Icon Preview",
+            text="Icon name",
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).pack(side="bottom", anchor="w", padx=12, pady=(4, 2))
+
+        ctk.CTkLabel(
+            container,
+            text="Preview",
             font=ctk.CTkFont(size=14, weight="bold"),
         ).pack(anchor="w", padx=12, pady=(10, 4))
 
-        # 256x256 Preview Box (White background with dark frame)
+        # White preview box, like the tape
         self.preview_box = ctk.CTkFrame(
             container,
-            width=260,
-            height=260,
+            width=PREVIEW_BOX,
+            height=PREVIEW_BOX,
             fg_color="#FFFFFF",
             corner_radius=8,
             border_width=2,
@@ -344,24 +390,24 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
         self.lbl_preview_canvas = ctk.CTkLabel(
             self.preview_box,
-            text="[ Generated wireframe\nwill appear here ]",
+            text="The icon will appear here",
             text_color="gray40",
             font=ctk.CTkFont(size=12),
         )
         self.lbl_preview_canvas.pack(fill="both", expand=True)
 
-        # Line Boldness Control for Thermal Printing
+        # Line thickness on the printed label
         bold_lbl = ctk.CTkLabel(
             container,
-            text="Line Boldness (Thermal Label):",
-            font=ctk.CTkFont(size=11, weight="bold"),
+            text="Line thickness",
+            font=ctk.CTkFont(size=12, weight="bold"),
         )
         bold_lbl.pack(anchor="w", padx=12, pady=(4, 2))
 
         self.thickness_var = tk.StringVar(value="Normal")
         self.seg_thickness = ctk.CTkSegmentedButton(
             container,
-            values=["Normal", "Bold", "Extra Bold", "Heavy"],
+            values=list(THICKNESS),
             variable=self.thickness_var,
             command=self._on_thickness_changed,
             height=28,
@@ -372,59 +418,15 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         # Status Label
         self.lbl_status = ctk.CTkLabel(
             container,
-            text="Ready",
+            text="",
             font=ctk.CTkFont(size=12),
-            text_color="gray60",
+            text_color=MUTED,
+            wraplength=PREVIEW_BOX,
         )
-        self.lbl_status.pack(pady=4)
-
-        # Icon Name Entry
-        ctk.CTkLabel(
-            container,
-            text="Icon Name / Part ID:",
-            font=ctk.CTkFont(size=12, weight="bold"),
-        ).pack(anchor="w", padx=12, pady=(4, 2))
-
-        self.entry_icon_name = ctk.CTkEntry(
-            container,
-            placeholder_text="e.g. wago_221, m3_hex_screw",
-            font=ctk.CTkFont(size=12),
-        )
-        self.entry_icon_name.pack(fill="x", padx=12, pady=(0, 8))
-
-        # Save Button
-        self.btn_save = ctk.CTkButton(
-            container,
-            text="💾 Save to Library & Use",
-            height=38,
-            fg_color="#10B981",
-            hover_color="#059669",
-            font=ctk.CTkFont(size=13, weight="bold"),
-            state="disabled",
-            command=self._save_and_use,
-        )
-        self.btn_save.pack(fill="x", padx=12, pady=(0, 6))
-
-        btn_close = ctk.CTkButton(
-            container,
-            text="Close",
-            fg_color="gray30",
-            hover_color="gray40",
-            command=self.destroy,
-        )
-        btn_close.pack(fill="x", padx=12)
+        self.lbl_status.pack(padx=12, pady=4)
 
     def _get_selected_thickness(self) -> int:
-        val = self.thickness_var.get()
-        if val == "Normal":
-            return 1
-        elif val == "Bold":
-            return 2
-        elif val == "Extra Bold":
-            return 3
-        elif val == "Heavy":
-            return 4
-        return 1
+        return THICKNESS.get(self.thickness_var.get(), 1)
 
     def _on_thickness_changed(self, val=None):
         self._update_processed_preview()
@@ -454,7 +456,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
     def _browse_source_image(self):
         path = filedialog.askopenfilename(
             parent=self,
-            title="Select Component Photo or Image",
+            title="Choose an image",
             filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.bmp;*.webp")],
         )
         if path and os.path.isfile(path):
@@ -463,8 +465,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             self.lbl_source_filename.configure(text=os.path.basename(path))
             if hasattr(self, "lbl_import_filename"):
                 self.lbl_import_filename.configure(
-                    text=f"Selected: {os.path.basename(path)}",
-                    text_color="#38BDF8",
+                    text=os.path.basename(path),
+                    text_color=("gray10", "gray90"),
                 )
             try:
                 self.source_image = Image.open(path).convert("RGBA")
@@ -482,18 +484,18 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 self.entry_icon_name.delete(0, tk.END)
                 self.entry_icon_name.insert(0, clean_name)
 
-                # Auto-process if currently on Import tab
-                cur_tab = self.tabview.get()
-                if "Clean & Import" in cur_tab:
+                # Clean it up straight away when on the import tab
+                if self.tabview.get() == TAB_IMPORT:
                     self._apply_import_clean()
             except Exception as e:
-                messagebox.showerror("Error Loading Photo", str(e), parent=self)
+                messagebox.showerror("Could not open the image", str(e), parent=self)
 
     def _display_result(self, image: Image.Image):
         self.generated_image = image
-        # Create thumbnail for 240x240 display inside white preview box
+        # Thumbnail that fits inside the white preview box
         preview_copy = image.copy()
-        preview_copy.thumbnail((240, 240), Image.Resampling.LANCZOS)
+        size = PREVIEW_BOX - 20
+        preview_copy.thumbnail((size, size), Image.Resampling.LANCZOS)
         self._ctk_preview_img = ctk.CTkImage(
             light_image=preview_copy, dark_image=preview_copy, size=preview_copy.size
         )
@@ -502,14 +504,14 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
     def _generate_from_photo(self):
         if not self.source_image:
-            messagebox.showwarning("Missing Photo", "Please select a component photo first.", parent=self)
+            messagebox.showwarning("Choose a photo", "Choose a photo of the part first.", parent=self)
             return
 
         api_key = self._api_key_or_warn()
         if not api_key:
             return
 
-        self._set_loading(True, "Contacting Gemini API & generating wireframe...")
+        self._set_loading(True, "Asking Gemini for an icon…")
         details = self.entry_photo_details.get().strip()
         style = self.style_var.get()
         instructions = f"Style preference: {style}. {details}".strip()
@@ -529,14 +531,14 @@ class AIGeneratorDialog(ctk.CTkToplevel):
     def _generate_from_text(self):
         prompt = self.entry_text_prompt.get("1.0", tk.END).strip()
         if not prompt:
-            messagebox.showwarning("Missing Description", "Please enter a component description.", parent=self)
+            messagebox.showwarning("Add a description", "Describe the part or tool first.", parent=self)
             return
 
         api_key = self._api_key_or_warn()
         if not api_key:
             return
 
-        self._set_loading(True, "Generating wireframe from description with Gemini...")
+        self._set_loading(True, "Asking Gemini for an icon…")
         thick = self._get_selected_thickness()
 
         ai_generator.api_key = api_key
@@ -554,7 +556,7 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             messagebox.showwarning(
                 "Add a Gemini API key",
                 "Gemini needs an API key. Add one under Settings in the main window.\n\n"
-                "Or make the icon in Gemini on the web and bring it in with 'Clean & Import Image'.",
+                f"Or make the image in Gemini on the web and bring it in with {TAB_IMPORT}.",
                 parent=self,
             )
         return key
@@ -590,22 +592,22 @@ class AIGeneratorDialog(ctk.CTkToplevel):
 
     def _set_loading(self, loading: bool, message: str = ""):
         self.is_generating = loading
-        self.lbl_status.configure(text=message, text_color="#38BDF8" if loading else "gray60")
+        self.lbl_status.configure(text=message, text_color=BUSY_BLUE if loading else MUTED)
         state = "disabled" if loading else "normal"
         self.btn_gen_photo.configure(state=state)
         self.btn_gen_text.configure(state=state)
 
     def _on_generation_success(self, raw_result: Image.Image):
         self.raw_unprocessed_image = raw_result
-        self._set_loading(False, "✨ Wireframe generated successfully!")
-        self.lbl_status.configure(text="✨ AI Wireframe Generated!", text_color="#10B981")
+        self._set_loading(False)
+        self.lbl_status.configure(text="Icon ready", text_color=OK_GREEN)
         self._update_processed_preview()
         self._flash_preview_box()
 
     def _on_generation_error(self, err_msg: str):
-        self._set_loading(False, f"Error: {err_msg[:80]}...")
-        self.lbl_status.configure(text=f"Failed: {err_msg[:60]}", text_color="#EF4444")
-        messagebox.showerror("Generation Error", f"Gemini generation error:\n\n{err_msg}", parent=self)
+        self._set_loading(False)
+        self.lbl_status.configure(text="Gemini could not make the icon", text_color=ERROR_RED)
+        messagebox.showerror("Gemini could not make the icon", err_msg, parent=self)
 
     def _save_and_use(self):
         if not self.generated_image:
@@ -622,9 +624,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             self.on_save_callback(saved_item.file_path)
 
         messagebox.showinfo(
-            "Icon Saved",
-            f"Icon saved successfully to your library as:\n{saved_item.title}\n\n"
-            f"Path: {saved_item.file_path}",
+            "Icon saved",
+            f"Saved to your icon library as {saved_item.title}.\n\n{saved_item.file_path}",
             parent=self,
         )
         self.destroy()
