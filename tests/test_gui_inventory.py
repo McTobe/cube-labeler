@@ -15,6 +15,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from ui.app import PrintLabelApp, VIEW_BIN, VIEW_QUEUE
 from core.inventory_renderer import FastenerLabelConfig, ComponentLabelConfig
+from ui.inventory_tab import MODE_LABELS
 
 
 def test_gui_inventory():
@@ -95,6 +96,19 @@ def test_gui_inventory():
         app.update()
         assert app.config.inventory_config.icon_type == "custom"
         assert app.config.inventory_config.custom_icon_path == custom_icon_path
+
+    # 8. Each layout button sets its compartment mode, and loading a preset shows it again
+    tab = app.inventory_tab_widget
+    tab._on_preset_selected("A2")
+    app.update()
+    for mode, label in MODE_LABELS.items():
+        tab.mode_seg.set(label)
+        tab._on_comp_mode_changed(label)
+        app.update()
+        assert app.config.inventory_config.compartment_mode == mode, (label, mode)
+    tab._on_preset_selected("A2")
+    app.update()
+    assert tab.mode_seg.get() == MODE_LABELS["dual"]
 
     print("SUCCESS: Headless GUI Hardware Inventory tests passed!")
     app.destroy()
