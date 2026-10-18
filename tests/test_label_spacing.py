@@ -13,7 +13,8 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from core.label_language import build_presets
-from core.label_renderer import BATCH_GAP_DOTS, LabelConfig, LabelRenderer
+from core.label_renderer import BATCH_GAP_DOTS, SINGLE_BIN_PADDING_MM, LabelConfig, LabelRenderer
+from core.specs import DOT_PITCH_MM
 
 
 def _ink_bbox(img):
@@ -35,9 +36,9 @@ class TestLabelSpacing(unittest.TestCase):
         cfg = LabelConfig(inventory_config=build_presets("en")["A2"].config)
         preview = self.renderer.render(cfg)[0]
         left, _, right, _ = _ink_bbox(preview)
-        margin = BATCH_GAP_DOTS // 2
-        self.assertGreaterEqual(left, margin)
-        self.assertGreaterEqual(preview.width - right, margin)
+        pad = round(SINGLE_BIN_PADDING_MM / DOT_PITCH_MM)
+        self.assertEqual(left, pad)
+        self.assertEqual(preview.width - right, pad)
 
     def test_every_queued_label_has_equal_cut_margins(self):
         configs = [

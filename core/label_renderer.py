@@ -100,6 +100,8 @@ class LabelConfig:
 
 # Tape between labels in a batch; each label gets half of it on both sides (14 dots ≈ 2 mm)
 BATCH_GAP_DOTS = 28
+# Blank tape on each side of a single bin label, which is otherwise drawn border to border
+SINGLE_BIN_PADDING_MM = 1.0
 
 
 class LabelRenderer:
@@ -405,9 +407,9 @@ class LabelRenderer:
             self._render_base_canvas(config)
         )
 
-        # Bin labels are drawn border to border; leave the same tape around them as in a queue
+        # Bin labels are drawn border to border; leave a little blank tape on each side
         if getattr(config, "inventory_config", None) is not None:
-            pad = BATCH_GAP_DOTS // 2
+            pad = int(round(SINGLE_BIN_PADDING_MM / self.DOT_PITCH_MM))
             padded = Image.new("RGB", (img_canvas.width + 2 * pad, img_canvas.height), "white")
             padded.paste(img_canvas, (pad, 0))
             img_canvas = padded
