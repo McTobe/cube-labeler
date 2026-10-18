@@ -16,6 +16,11 @@ from PIL import Image
 from core.icon_manager import icon_manager, IconItem
 from core.config import config_manager
 
+TILE_BG = "#F5F5F5"
+TILE_HOVER = "#E3E3E3"
+TILE_SELECTED = "#1F6AA5"
+TITLE_MAX_CHARS = 22
+
 
 class IconBrowserDialog(ctk.CTkToplevel):
     """Modal dialog allowing users to browse, search, and select icons."""
@@ -60,14 +65,14 @@ class IconBrowserDialog(ctk.CTkToplevel):
 
         lbl_title = ctk.CTkLabel(
             top_row,
-            text="🏷 Monochrome Icon Library",
+            text="Icon library",
             font=ctk.CTkFont(size=18, weight="bold"),
         )
         lbl_title.pack(side="left")
 
         btn_ai = ctk.CTkButton(
             top_row,
-            text="✨ AI Wireframe Generator...",
+            text="Make an icon…",
             width=190,
             fg_color="#8B5CF6",
             hover_color="#7C3AED",
@@ -78,7 +83,7 @@ class IconBrowserDialog(ctk.CTkToplevel):
 
         btn_open_folder = ctk.CTkButton(
             top_row,
-            text="📂 Open Custom Folder",
+            text="Open my icons folder",
             width=150,
             fg_color="gray30",
             hover_color="gray40",
@@ -91,16 +96,15 @@ class IconBrowserDialog(ctk.CTkToplevel):
         search_row = ctk.CTkFrame(header_frame, fg_color="transparent")
         search_row.pack(fill="x", pady=(0, 8))
 
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", lambda *args: self._refresh_icons())
+        # No textvariable: CTkEntry hides its placeholder when one is attached
         self.entry_search = ctk.CTkEntry(
             search_row,
-            textvariable=self.search_var,
-            placeholder_text="🔍 Search icons (e.g. wago, torx, hex, fuse, bearing, caliper)...",
+            placeholder_text="Search icons, e.g. torx, fuse, bearing",
             height=34,
             font=ctk.CTkFont(size=13),
         )
         self.entry_search.pack(fill="x", expand=True)
+        self.entry_search.bind("<KeyRelease>", lambda e: self._refresh_icons())
 
         # Category Tabs Row
         cat_row = ctk.CTkFrame(header_frame, fg_color="transparent")
@@ -137,7 +141,7 @@ class IconBrowserDialog(ctk.CTkToplevel):
         # Right buttons
         self.btn_use = ctk.CTkButton(
             bottom_bar,
-            text="✔ Insert Selected Icon",
+            text="Insert icon",
             width=170,
             height=36,
             fg_color="#10B981",
@@ -211,7 +215,7 @@ class IconBrowserDialog(ctk.CTkToplevel):
             child.destroy()
 
         category = self.category_var.get()
-        query = self.search_var.get()
+        query = self.entry_search.get()
         icons = icon_manager.list_icons(category=category, search_query=query)
 
         # Configure columns (5 columns)
@@ -229,28 +233,35 @@ class IconBrowserDialog(ctk.CTkToplevel):
             empty_lbl.grid(row=0, column=0, columnspan=cols, pady=40)
             return
 
+        self._tiles = {}
         for idx, item in enumerate(icons):
             row = idx // cols
             col = idx % cols
 
             thumb = self._get_thumbnail(item.file_path, size=52)
 
+            # Light tiles: icons print black on white tape, so show them that way
             tile = ctk.CTkButton(
                 self.scroll_grid,
-                text=f"\n{item.title}",
+                text=f"\n{self._short_title(item.title)}",
                 image=thumb,
                 compound="top",
                 width=135,
                 height=110,
                 corner_radius=8,
-                fg_color="gray20",
-                hover_color="gray30",
-                border_width=1,
-                border_color="gray30",
+                fg_color=TILE_BG,
+                hover_color=TILE_HOVER,
+                text_color="#222222",
+                border_width=2,
+                border_color=TILE_BG,
                 font=ctk.CTkFont(size=11),
                 command=lambda it=item: self._select_icon(it),
             )
             tile.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
+            tile.bind("<Double-Button-1>", lambda e, it=item: (self._select_icon(it), self._confirm_selection()))
+            self._tiles[item.file_path] = tile
+            if self.selected_icon and self.selected_icon.file_path == item.file_path:
+                tile.configure(border_color=TILE_SELECTED)
 
         # Ensure scroll snaps to top after new widgets are rendered
         self.after(10, self._reset_scroll_top)
@@ -262,8 +273,19 @@ class IconBrowserDialog(ctk.CTkToplevel):
         except Exception:
             pass
 
+    @staticmethod
+    def _short_title(title: str, limit: int = TITLE_MAX_CHARS) -> str:
+        """Cuts long names at the end so the start of the name always shows."""
+        return title if len(title) <= limit else title[: limit - 1].rstrip() + "…"
+
     def _select_icon(self, icon: IconItem):
+        previous = self.selected_icon
         self.selected_icon = icon
+        tiles = getattr(self, "_tiles", {})
+        if previous and previous.file_path in tiles:
+            tiles[previous.file_path].configure(border_color=TILE_BG)
+        if icon.file_path in tiles:
+            tiles[icon.file_path].configure(border_color=TILE_SELECTED)
         self.preview_badge.configure(
             text=f"Selected: {icon.title} ({icon.category})",
             text_color="#10B981",

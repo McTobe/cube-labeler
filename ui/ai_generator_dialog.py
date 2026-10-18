@@ -93,6 +93,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         self._build_tab_photo()
         self._build_tab_text()
         self._build_tab_import()
+        # Open on the free, offline option; the Gemini tabs need a paid API key
+        self.tabview.set("📥 Clean & Import Image")
 
         # --- API Key Section below tabs ---
         api_frame = ctk.CTkFrame(left_frame)

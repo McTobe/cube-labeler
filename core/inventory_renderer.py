@@ -22,7 +22,7 @@ from core.specs import DOT_PITCH_MM, INVENTORY_TAPE_WIDTH_MM, get_tape_spec
 class FastenerLabelConfig:
     """Configuration for Archetype A: Threaded Fasteners."""
     thread_size: str = "M3"              # e.g. "M3", "M4", "M5", "M6", "M8", "M10"
-    category: str = "SKRUV"               # e.g. "SKRUV", "MUTTER", "BRICKOR"
+    category: str = "SCREWS"              # e.g. "SCREWS", "NUTS", "WASHERS" (see core.label_language)
     compartment_mode: str = "dual"        # "single", "dual", "quad", "assortment"
     
     # Single size fields
@@ -41,8 +41,8 @@ class FastenerLabelConfig:
     length_quad_4: str = "x16"
     
     # Assortment / Custom text
-    assortment_line1: str = "Blandade"
-    assortment_line2: str = "sorter"
+    assortment_line1: str = "Mixed"
+    assortment_line2: str = "sizes"
     
     # Tool Drive Badge
     tool_type: str = "internal_hex"       # "internal_hex", "external_hex", "washer", "torx", "phillips", "slotted", "custom", "none"
@@ -57,9 +57,9 @@ class FastenerLabelConfig:
 @dataclass
 class ComponentLabelConfig:
     """Configuration for Archetype B: Discrete Components & Electrical Hardware."""
-    category_banner: str = "KULLAGER"     # e.g. "KULLAGER", "WAGO", "SÄKRINGSHÅLLARE"
-    spec_primary: str = "608ZZ"           # e.g. "608ZZ", "221-413 • 3-väg", "16 AWG / 1.3 mm²"
-    spec_secondary: str = ""              # e.g. "0.2 - 4.0 mm²", "Inline Type"
+    category_banner: str = "BEARINGS"     # e.g. "BEARINGS", "WAGO", "FUSE HOLDERS"
+    spec_primary: str = "608ZZ"           # e.g. "608ZZ", "221-413 • 3-way", "16 AWG / 1.3 mm²"
+    spec_secondary: str = ""              # e.g. "0.2 - 4.0 mm²", "Inline type"
     icon_type: str = "ball_bearing"       # "ball_bearing", "wago", "fuse", "resistor", "capacitor", "custom", "none"
     custom_icon_path: Optional[str] = None
     
@@ -582,73 +582,3 @@ class InventoryRenderer:
 
 
 inventory_renderer = InventoryRenderer()
-
-
-INVENTORY_PRESETS = {
-    "A1: Hex Head Screw (M5 x 20, DIN 933)": FastenerLabelConfig(
-        thread_size="M5",
-        category="SKRUV",
-        compartment_mode="single",
-        length_single="x 20",
-        standard_line1="DIN 933",
-        standard_line2="FZB • 8.8",
-        tool_type="external_hex",
-        tool_size="8",
-    ),
-    "A2: Socket Cap 2-Bin (M3 x30 x35)": FastenerLabelConfig(
-        thread_size="M3",
-        category="SKRUV",
-        compartment_mode="dual",
-        length_dual_1="x30",
-        length_dual_2="x35",
-        tool_type="internal_hex",
-        tool_size="2.5",
-    ),
-    "A3: Socket Cap 4-Bin (M3 2×2 Grid)": FastenerLabelConfig(
-        thread_size="M3",
-        category="SKRUV",
-        compartment_mode="quad",
-        length_quad_1="x25",
-        length_quad_2="x18",
-        length_quad_3="x20",
-        length_quad_4="x16",
-        tool_type="internal_hex",
-        tool_size="2.5",
-    ),
-    "A4: Hex Nut Assortment (M5 MUTTER)": FastenerLabelConfig(
-        thread_size="M5",
-        category="MUTTER",
-        compartment_mode="assortment",
-        assortment_line1="Blandade",
-        assortment_line2="sorter",
-        tool_type="external_hex",
-        tool_size="8",
-    ),
-    "A5: Washer Assortment (M5 BRICKOR)": FastenerLabelConfig(
-        thread_size="M5",
-        category="BRICKOR",
-        compartment_mode="assortment",
-        assortment_line1="Blandade",
-        assortment_line2="storlekar",
-        tool_type="washer",
-        tool_size="",
-    ),
-    "B1: Ball Bearings (KULLAGER 608ZZ)": ComponentLabelConfig(
-        category_banner="KULLAGER",
-        spec_primary="608ZZ",
-        spec_secondary="",
-        icon_type="ball_bearing",
-    ),
-    "B2: Lever Connectors (WAGO 221-413)": ComponentLabelConfig(
-        category_banner="WAGO",
-        spec_primary="221-413 • 3-väg",
-        spec_secondary="0.2 – 4.0 mm²",
-        icon_type="wago",
-    ),
-    "B3: Inline Fuse Holder (16 AWG)": ComponentLabelConfig(
-        category_banner="SÄKRINGSHÅLLARE",
-        spec_primary="16 AWG / 1.3 mm²",
-        spec_secondary="Inline Type",
-        icon_type="fuse",
-    ),
-}

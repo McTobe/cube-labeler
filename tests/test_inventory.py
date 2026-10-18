@@ -15,10 +15,12 @@ from core.inventory_renderer import (
     InventoryRenderer,
     FastenerLabelConfig,
     ComponentLabelConfig,
-    INVENTORY_PRESETS,
     inventory_renderer,
 )
 from core.label_renderer import LabelConfig, LabelRenderer
+from core.label_language import build_presets
+
+INVENTORY_PRESETS = {pid: p.config for pid, p in build_presets("en").items()}
 
 
 class TestInventoryRenderer(unittest.TestCase):
@@ -113,7 +115,7 @@ class TestInventoryRenderer(unittest.TestCase):
 
     def test_label_renderer_integration(self):
         """Verify seamless integration with core LabelRenderer and batch queuing."""
-        cfg_fastener = LabelConfig(inventory_config=INVENTORY_PRESETS["A2: Socket Cap 2-Bin (M3 x30 x35)"])
+        cfg_fastener = LabelConfig(inventory_config=INVENTORY_PRESETS["A2"])
         prev, rast, r_bytes, metrics = self.label_renderer.render(cfg_fastener)
 
         self.assertEqual(rast.size[0], 128)  # 128-dot Brother printhead width
@@ -121,7 +123,7 @@ class TestInventoryRenderer(unittest.TestCase):
         self.assertAlmostEqual(metrics.print_length_mm, 38.0, delta=1.5)
 
         # Batch rendering
-        cfg_comp = LabelConfig(inventory_config=INVENTORY_PRESETS["B1: Ball Bearings (KULLAGER 608ZZ)"])
+        cfg_comp = LabelConfig(inventory_config=INVENTORY_PRESETS["B1"])
         b_prev, b_rast, b_bytes, b_metrics = self.label_renderer.render_batch([cfg_fastener, cfg_comp])
 
         self.assertEqual(b_metrics.label_count, 2)

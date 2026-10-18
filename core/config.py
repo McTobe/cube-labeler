@@ -23,6 +23,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "gemini_api_key_protected": "",
     "gemini_model": DEFAULT_GEMINI_IMAGE_MODEL,
     "last_serial_port": "",
+    "label_language": "en",
 }
 
 

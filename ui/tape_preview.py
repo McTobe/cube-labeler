@@ -149,12 +149,12 @@ class TapePreviewWidget(ctk.CTkFrame):
         
         if metrics.tape_saved_mm > 0:
             self.used_label.configure(
-                text=f"Total Tape: {metrics.total_used_length_mm:.1f} mm  |  🎉 Saved: {metrics.tape_saved_mm:.1f} mm",
-                text_color="#4CAF50",
+                text=f"Total tape: {metrics.total_used_length_mm:.1f} mm",
+                text_color="gray",
             )
         else:
             self.used_label.configure(
-                text=f"Total Tape: {metrics.total_used_length_mm:.1f} mm",
+                text=f"Total tape: {metrics.total_used_length_mm:.1f} mm",
                 text_color="gray",
             )
 
