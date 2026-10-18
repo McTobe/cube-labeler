@@ -60,7 +60,7 @@ def test_gui_inventory():
     tab._on_bins_changed("Two")
     _type(tab.entry_len_dual_1, "30")
     _type(tab.entry_len_dual_2, "35")
-    tab._on_drive_selected("Pozidriv (PZ)")
+    tab._on_drive_selected("PZ")
     _type(tab.entry_tool_size, "PZ2")
     tab._on_field_change()
     app.update()
@@ -72,6 +72,17 @@ def test_gui_inventory():
     app._on_add_to_queue()
     app.update()
     assert len(app.label_queue) == 1
+
+    # Own icon via the Library…/File… buttons: the dropdown reads "Custom"; a built-in drive replaces it
+    icon_path = os.path.join(BASE_DIR, "assets", "icons", "fasteners", "robertson.png")
+    tab._set_tool_icon_path(icon_path)
+    assert app.config.inventory_config.tool_type == "custom"
+    assert tab.drive_combo.get() == "Custom"
+    assert tab.lbl_custom_tool_icon.cget("text") == "robertson.png"
+    tab._on_drive_selected("PZ")
+    assert app.config.inventory_config.tool_type == "pozidriv"
+    assert app.config.inventory_config.custom_tool_icon_path is None
+    assert tab.lbl_custom_tool_icon.cget("text") == ""
 
     # 3. Four bins, laid out as a 2×2 grid of boxes
     tab.mode_seg.set("Four")
@@ -119,7 +130,7 @@ def test_gui_inventory():
     assert tab.active_archetype == "fastener"
     assert tab.mode_seg.get() == "Two"
     assert tab.entry_len_dual_1.get() == "30"
-    assert tab.drive_combo.get() == "Pozidriv (PZ)"
+    assert tab.drive_combo.get() == "PZ"
 
     # 7. Older labels: the "assortment" layout opens as one bin with a note
     tab.load_inventory_config(

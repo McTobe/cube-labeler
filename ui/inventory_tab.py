@@ -40,26 +40,25 @@ BIN_MODES = {"One": "single", "Two": "dual", "Four": "quad"}
 
 SIZES = ["M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12"]
 
-ICON_FROM_LIBRARY = "Icon from library…"
-ICON_FROM_FILE = "Image file…"
 NO_ICON = "None"
+CUSTOM_ICON = "Custom"  # Shown when an icon from the library or a file is in use
 
 # Drive dropdown -> renderer tool_type
 DRIVES = {
-    "Hex socket (Allen)": "internal_hex",
-    "Hex head": "external_hex",
-    "Phillips (PH)": "phillips",
-    "Pozidriv (PZ)": "pozidriv",
+    "Allen": "internal_hex",
+    "Hex": "external_hex",
+    "PH": "phillips",
+    "PZ": "pozidriv",
     "Torx": "torx",
-    "Slotted": "slotted",
+    "Slot": "slotted",
 }
 # Drives older labels may use but the dropdown no longer offers
 LEGACY_DRIVES = {"Washer": "washer"}
 
 # Part icon dropdown -> renderer icon_type
 PART_ICONS = {
-    "Ball bearing": "ball_bearing",
-    "WAGO connector": "wago",
+    "Bearing": "ball_bearing",
+    "WAGO": "wago",
     "Fuse": "fuse",
 }
 
@@ -201,6 +200,16 @@ class HardwareInventoryTab(ctk.CTkFrame):
             )
         return controls
 
+    @staticmethod
+    def _icon_buttons(parent, on_library: Callable[[], None], on_file: Callable[[], None]):
+        """Library… and File… buttons for using your own icon instead of a built-in one."""
+        style = dict(width=70, fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
+        lib = ctk.CTkButton(parent, text="Library…", command=on_library, **style)
+        lib.pack(side="left", padx=(12, 0))
+        pick = ctk.CTkButton(parent, text="File…", command=on_file, **style)
+        pick.pack(side="left", padx=(6, 0))
+        return lib, pick
+
     def _entry(self, parent, width: int, placeholder: str = "") -> ctk.CTkEntry:
         entry = ctk.CTkEntry(parent, width=width, placeholder_text=placeholder)
         entry.bind("<KeyRelease>", lambda e: self._on_field_change())
@@ -229,13 +238,17 @@ class HardwareInventoryTab(ctk.CTkFrame):
         r = self._row(f, 3, "Lengths", "Numbers print as x30")
         self.comp_inputs_frame = r
 
-        r = self._row(f, 4, "Drive", "Size, e.g. 2.5, T20, PH2")
+        r = self._row(f, 4, "Drive")
         self.drive_combo = ctk.CTkComboBox(
-            r, values=self._drive_values(), width=180, state="readonly", command=self._on_drive_selected
+            r, values=self._drive_values(), width=100, state="readonly", command=self._on_drive_selected
         )
         self.drive_combo.pack(side="left")
-        self.entry_tool_size = self._entry(r, 70)
+        self.entry_tool_size = self._entry(r, 70, "Size")
         self.entry_tool_size.pack(side="left", padx=(8, 0))
+        self.btn_lib_tool_icon, self.btn_pick_tool_icon = self._icon_buttons(
+            r, lambda: self._choose_icon("library", self._set_tool_icon_path, "Fasteners"),
+            lambda: self._choose_icon("file", self._set_tool_icon_path, "Fasteners"),
+        )
         self.lbl_custom_tool_icon = ctk.CTkLabel(r, text="", text_color=MUTED_TEXT)
         self.lbl_custom_tool_icon.pack(side="left", padx=(8, 0))
 
@@ -256,9 +269,13 @@ class HardwareInventoryTab(ctk.CTkFrame):
 
         r = self._row(f, 3, "Icon")
         self.part_icon_combo = ctk.CTkComboBox(
-            r, values=self._part_icon_values(), width=200, state="readonly", command=self._on_part_icon_selected
+            r, values=self._part_icon_values(), width=110, state="readonly", command=self._on_part_icon_selected
         )
         self.part_icon_combo.pack(side="left")
+        self.btn_lib_comp_icon, self.btn_pick_comp_icon = self._icon_buttons(
+            r, lambda: self._choose_icon("library", self._set_comp_icon_path, "Engineering"),
+            lambda: self._choose_icon("file", self._set_comp_icon_path, "Engineering"),
+        )
         self.lbl_custom_comp_icon = ctk.CTkLabel(r, text="", text_color=MUTED_TEXT)
         self.lbl_custom_comp_icon.pack(side="left", padx=(8, 0))
 
@@ -315,7 +332,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         legacy = next((name for name, t in LEGACY_DRIVES.items() if t == self.fastener_cfg.tool_type), None)
         if legacy:
             values.append(legacy)
-        return values + [ICON_FROM_LIBRARY, ICON_FROM_FILE]
+        return values
 
     def _drive_display(self) -> str:
         t = self.fastener_cfg.tool_type
@@ -323,11 +340,11 @@ class HardwareInventoryTab(ctk.CTkFrame):
             if tool_type == t:
                 return name
         if t == "custom" and self.fastener_cfg.custom_tool_icon_path:
-            return ICON_FROM_LIBRARY
+            return CUSTOM_ICON
         return NO_ICON
 
     def _part_icon_values(self):
-        return list(PART_ICONS) + [NO_ICON, ICON_FROM_LIBRARY, ICON_FROM_FILE]
+        return list(PART_ICONS) + [NO_ICON]
 
     def _part_icon_display(self) -> str:
         t = self.component_cfg.icon_type
@@ -335,7 +352,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
             if icon_type == t:
                 return name
         if t == "custom" and self.component_cfg.custom_icon_path:
-            return ICON_FROM_LIBRARY
+            return CUSTOM_ICON
         return NO_ICON
 
     # =========================================================================
@@ -371,28 +388,20 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self._on_field_change()
 
     def _on_drive_selected(self, value: str):
-        if value in (ICON_FROM_LIBRARY, ICON_FROM_FILE):
-            self._choose_icon(value, self._set_tool_icon_path, "Fasteners")
-            # Until an icon is chosen, keep showing the current drive
-            self.drive_combo.set(self._drive_display())
-            return
         self.fastener_cfg.tool_type = {**DRIVES, **LEGACY_DRIVES}.get(value, "none")
         self.fastener_cfg.custom_tool_icon_path = None
         self.lbl_custom_tool_icon.configure(text="")
         self._on_field_change()
 
     def _on_part_icon_selected(self, value: str):
-        if value in (ICON_FROM_LIBRARY, ICON_FROM_FILE):
-            self._choose_icon(value, self._set_comp_icon_path, "Engineering")
-            self.part_icon_combo.set(self._part_icon_display())
-            return
         self.component_cfg.icon_type = PART_ICONS.get(value, "none")
         self.component_cfg.custom_icon_path = None
         self.lbl_custom_comp_icon.configure(text="")
         self._on_field_change()
 
     def _choose_icon(self, source: str, on_chosen: Callable[[str], None], category: str):
-        if source == ICON_FROM_LIBRARY:
+        """source is "library" (the icon library) or "file" (any image file)."""
+        if source == "library":
             IconBrowserDialog(self, on_select=on_chosen, initial_category=category, title_suffix="Bin label icon")
         else:
             path = filedialog.askopenfilename(
@@ -406,7 +415,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         if path and os.path.isfile(path):
             self.fastener_cfg.tool_type = "custom"
             self.fastener_cfg.custom_tool_icon_path = path
-            self.drive_combo.set(ICON_FROM_LIBRARY)
+            self.drive_combo.set(CUSTOM_ICON)
             self.lbl_custom_tool_icon.configure(text=_short_name(path))
             self._schedule_save()
             self.on_change()
@@ -415,7 +424,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         if path and os.path.isfile(path):
             self.component_cfg.icon_type = "custom"
             self.component_cfg.custom_icon_path = path
-            self.part_icon_combo.set(ICON_FROM_LIBRARY)
+            self.part_icon_combo.set(CUSTOM_ICON)
             self.lbl_custom_comp_icon.configure(text=_short_name(path))
             self._schedule_save()
             self.on_change()
