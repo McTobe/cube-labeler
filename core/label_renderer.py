@@ -98,6 +98,10 @@ class LabelConfig:
     inventory_config: Optional[object] = None  # FastenerLabelConfig or ComponentLabelConfig
 
 
+# Tape between labels in a batch; each label gets half of it on both sides (14 dots ≈ 2 mm)
+BATCH_GAP_DOTS = 28
+
+
 class LabelRenderer:
     """Core renderer for Brother PT-P300BT labels."""
 
@@ -112,10 +116,30 @@ class LabelRenderer:
     def _get_tape_spec(self, tape_width_mm: float) -> dict:
         return get_tape_spec(tape_width_mm)
 
+    @staticmethod
+    def _line_ink_extent(font: ImageFont.FreeTypeFont, line: str, stroke_width: int = 0) -> Tuple[int, int]:
+        """
+        Left and right edge of the ink a line draws at x=0. Font boxes include each glyph's
+        side bearings (a "1" in Arial has much more space on its left), so centring on the box
+        puts the ink off-centre.
+        """
+        advance = int(font.getlength(line)) + 2 * stroke_width
+        pad = 8 + 2 * stroke_width
+        height = max(font.getbbox(line, anchor="lt")[3], 1) + 2 * pad
+        probe = Image.new("L", (advance + 2 * pad, height), 0)
+        ImageDraw.Draw(probe).text(
+            (pad, pad), line, font=font, fill=255, anchor="lt",
+            stroke_width=stroke_width, stroke_fill=255,
+        )
+        bbox = probe.getbbox()
+        if not bbox:
+            return 0, 0
+        return bbox[0] - pad, bbox[2] - pad
+
     def calculate_multiline_dims(
-        self, lines: List[str], font: ImageFont.FreeTypeFont, line_spacing: float
+        self, lines: List[str], font: ImageFont.FreeTypeFont, line_spacing: float, stroke_width: int = 0
     ) -> Tuple[int, int, List[int]]:
-        """Calculates total width, height and individual line heights for multiline text."""
+        """Calculates total ink width, height and individual line heights for multiline text."""
         if not lines:
             return 0, 0, []
         sample_bbox = font.getbbox("".join(lines) or "Ag", anchor="lt")
@@ -125,9 +149,9 @@ class LabelRenderer:
         line_heights = []
 
         for line in lines:
-            if line:
-                bbox = font.getbbox(line, anchor="lt")
-                w = bbox[2] - bbox[0]
+            if line.strip():
+                left, right = self._line_ink_extent(font, line, stroke_width)
+                w = right - left
             else:
                 w = 0
             max_width = max(max_width, w)
@@ -270,7 +294,7 @@ class LabelRenderer:
             font = font_manager.load_font(config.font_name, effective_size)
             spacing = config.line_spacing
 
-        text_w, text_h, _ = self.calculate_multiline_dims(lines, font, spacing)
+        text_w, text_h, _ = self.calculate_multiline_dims(lines, font, spacing, config.stroke_width)
         self._last_text_overflow = text_h > printable_h
 
         # 3. Handle QR Code
@@ -340,8 +364,8 @@ class LabelRenderer:
             current_line_y = y_text
             for line in lines:
                 if line.strip():
-                    line_bbox = font.getbbox(line, anchor="lt")
-                    lw = line_bbox[2] - line_bbox[0]
+                    ink_left, ink_right = self._line_ink_extent(font, line, config.stroke_width)
+                    lw = ink_right - ink_left
                     if config.alignment == "center":
                         line_x = cur_x + (text_w - lw) // 2
                     elif config.alignment == "right":
@@ -349,8 +373,9 @@ class LabelRenderer:
                     else:
                         line_x = cur_x
 
+                    # Shift by the ink's own offset so the ink, not the font box, lands at line_x
                     draw.text(
-                        (line_x, current_line_y),
+                        (line_x - ink_left, current_line_y),
                         line,
                         font=font,
                         fill="black",
@@ -448,11 +473,13 @@ class LabelRenderer:
         return preview_img, padded_128, raster_bytes, metrics
 
     def render_batch(
-        self, configs: List[LabelConfig], gap_dots: int = 24
+        self, configs: List[LabelConfig], gap_dots: int = BATCH_GAP_DOTS
     ) -> Tuple[Image.Image, Image.Image, bytes, LabelMetrics]:
         """
         Renders a continuous batch chain of multiple labels with dotted cut lines in between,
         eliminating the ~25mm wasted tape between consecutive individual prints.
+        Every label gets the same half-gap of tape on both sides, first and last included,
+        with a cut line at each end of the strip.
         """
         if not configs:
             return self.render(LabelConfig(text=""))
@@ -476,27 +503,25 @@ class LabelRenderer:
         print_border = borders[0]
         printable_h = printable_hs[0]
 
-        # Total stitched width
-        total_w = sum(c.width for c in canvases) + gap_dots * (len(canvases) - 1)
+        # Total stitched width: half a gap before the first and after the last label
+        margin = gap_dots // 2
+        total_w = sum(c.width for c in canvases) + gap_dots * (len(canvases) - 1) + 2 * margin
         batch_canvas = Image.new("RGB", (max(total_w, 10), canvas_h), "white")
         draw = ImageDraw.Draw(batch_canvas)
 
-        cur_x = 0
+        def cut_line(x: int):
+            for cy in range(print_border, print_border + printable_h, 4):
+                draw.line([(x, cy), (x, cy + 1)], fill="black", width=1)
+
+        cut_line(0)
+        cur_x = margin
         for idx, c in enumerate(canvases):
             batch_canvas.paste(c, (cur_x, 0))
             cur_x += c.width
-
-            # Draw dotted cut line in the middle of gap between labels
             if idx < len(canvases) - 1:
-                cut_x = cur_x + gap_dots // 2
-                for cy in range(print_border, print_border + printable_h, 4):
-                    draw.line([(cut_x, cy), (cut_x, cy + 1)], fill="black", width=1)
+                cut_line(cur_x + margin)
                 cur_x += gap_dots
-
-        # Final cut line at the end
-        final_cut_x = batch_canvas.width - 3
-        for cy in range(print_border, print_border + printable_h, 4):
-            draw.line([(final_cut_x, cy), (final_cut_x, cy + 1)], fill="black", width=1)
+        cut_line(batch_canvas.width - 1)
 
         # 128-dot raster transformation
         rotated = ImageOps.invert(
