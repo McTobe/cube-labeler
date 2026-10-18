@@ -16,6 +16,7 @@ from core.specs import (
     DOT_PITCH_MM,
     INVENTORY_TAPE_WIDTH_MM,
     PRINTHEAD_DOTS,
+    TAPE_LEAD_MM,
     TAPE_SPECS,
     get_tape_spec,
 )
@@ -421,7 +422,7 @@ class LabelRenderer:
         # 9. Metrics
         raster_lines = padded_128.size[1]
         print_len_mm = raster_lines * self.DOT_PITCH_MM
-        total_used_mm = print_len_mm + 26.0
+        total_used_mm = print_len_mm + TAPE_LEAD_MM
         print_dur = print_len_mm / 20.0
 
         warning = None
@@ -522,8 +523,8 @@ class LabelRenderer:
         # Metrics & tape savings
         raster_lines = padded_128.size[1]
         print_len_mm = raster_lines * self.DOT_PITCH_MM
-        total_used_mm = print_len_mm + 26.0  # Only ONE lead-in + trail
-        tape_saved_mm = 25.0 * (len(configs) - 1)
+        total_used_mm = print_len_mm + TAPE_LEAD_MM  # Only ONE lead-in + trail
+        tape_saved_mm = TAPE_LEAD_MM * (len(configs) - 1)
         print_dur = print_len_mm / 20.0
 
         warning = None

@@ -3,10 +3,13 @@
 Shared physical constants for the Brother PT-P300BT printhead and supported tapes.
 """
 
-# Millimetres per raster line. The PT-P300BT is specified at 180 dpi (25.4 / 180 = 0.141 mm),
-# but labels have historically been laid out at 0.149 mm. Measure a fixed-width label on real
-# hardware before changing this; every length calculation in the app derives from it.
-DOT_PITCH_MM = 0.149
+# Millimetres per raster line: the PT-P300BT prints at 180 dpi. Verified on hardware: 100 mm and
+# 200 mm fixed-width labels used 120 mm and 215 mm of tape, i.e. 95 mm per 709 dots.
+DOT_PITCH_MM = 25.4 / 180
+
+# Blank tape the printer adds per print job (lead-in to the cutter plus trailing margin).
+# Measured on hardware as about 25 mm; a batch pays it once instead of once per label.
+TAPE_LEAD_MM = 25.0
 
 PRINTHEAD_DOTS = 128  # Total printhead width in dots
 

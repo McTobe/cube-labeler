@@ -62,8 +62,11 @@ def feed_tape(port: str, mm: float = 25.0, virtual: bool = False) -> int:
     print(f"Feeding {mm}mm tape on {'Virtual Mock' if virtual else port}...")
     try:
         printer = MockBrotherPrinter() if virtual else BrotherPrinter(port)
-        printer.feed_tape(length_mm=mm)
-        print("Tape fed successfully.")
+        status = printer.feed_tape(length_mm=mm)
+        if status.completion_confirmed:
+            print("Tape fed successfully (confirmed by printer).")
+        else:
+            print("Feed sent, but the printer did not confirm completion.")
         return 0
     except Exception as e:
         print(f"Error feeding tape: {e}", file=sys.stderr)
@@ -83,10 +86,12 @@ def print_label(
     preview_only: bool = False,
     save_png: Optional[str] = None,
     virtual: bool = False,
+    width_mm: Optional[float] = None,
 ) -> int:
     """Renders and prints a label."""
     cfg = LabelConfig(
         text=text,
+        fixed_width_mm=width_mm,
         font_name=font_name,
         auto_fit_font=(font_size is None),
         fixed_font_size=font_size or 40,
@@ -126,13 +131,16 @@ def print_label(
     print(f"Sending print job to {'Virtual Mock' if virtual else port}...")
     try:
         printer = MockBrotherPrinter() if virtual else BrotherPrinter(port)
-        printer.print_raster_data(
+        status = printer.print_raster_data(
             raster_data=raster_bytes,
             no_feed=no_feed,
             auto_cut=auto_cut,
             end_margin=end_margin_dots,
         )
-        print("Print completed successfully!")
+        if status.completion_confirmed:
+            print("Print completed successfully (confirmed by printer).")
+        else:
+            print("Print sent, but the printer did not confirm completion. Check the label.")
         return 0
     except Exception as e:
         print(f"Print error: {e}", file=sys.stderr)
@@ -165,6 +173,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--font", "-f",
         default="Arial",
         help="Font family or .ttf/.otf file path (default: Arial).",
+    )
+    parser.add_argument(
+        "--width",
+        type=float,
+        default=None,
+        metavar="MM",
+        help="Minimum label length in millimetres (pads short labels to this length).",
     )
     parser.add_argument(
         "--font-size",
@@ -292,6 +307,7 @@ def cli_main(args: Optional[List[str]] = None) -> int:
         preview_only=parsed.preview,
         save_png=parsed.save_png,
         virtual=parsed.virtual,
+        width_mm=parsed.width,
     )
 
 

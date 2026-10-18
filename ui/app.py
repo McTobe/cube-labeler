@@ -27,6 +27,7 @@ from core.ptstatus import PrinterStatus
 from core.config import config_manager
 from core.specs import (
     INVENTORY_TAPE_WIDTH_MM,
+    TAPE_LEAD_MM,
     TAPE_SPECS,
     format_tape_width,
     tape_width_from_status,
@@ -1157,7 +1158,7 @@ class PrintLabelApp(ctk.CTk):
         self._refresh_queue_display()
 
         q_len = len(self.label_queue)
-        tape_saved = 25.0 * (q_len - 1)
+        tape_saved = TAPE_LEAD_MM * (q_len - 1)
         if len(first_line) > 25:
             first_line = first_line[:22] + "..."
 
