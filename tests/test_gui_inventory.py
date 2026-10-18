@@ -73,11 +73,21 @@ def test_gui_inventory():
     app.update()
     assert len(app.label_queue) == 1
 
+    # Drives print with the library picture unless "Simple icon" is ticked
+    assert app.config.inventory_config.simple_drive_icon is False
+    tab.chk_simple_icon.select()
+    tab._on_simple_icon_toggled()
+    assert app.config.inventory_config.simple_drive_icon is True
+    tab.chk_simple_icon.deselect()
+    tab._on_simple_icon_toggled()
+    assert app.config.inventory_config.simple_drive_icon is False
+
     # Own icon via the Library…/File… buttons: the dropdown reads "Custom"; a built-in drive replaces it
     icon_path = os.path.join(BASE_DIR, "assets", "icons", "fasteners", "robertson.png")
     tab._set_tool_icon_path(icon_path)
     assert app.config.inventory_config.tool_type == "custom"
     assert tab.drive_combo.get() == "Custom"
+    assert tab.chk_simple_icon.cget("state") == "disabled", "Simple icon only applies to built-in drives"
     assert tab.lbl_custom_tool_icon.cget("text") == "robertson.png"
     tab._on_drive_selected("PZ")
     assert app.config.inventory_config.tool_type == "pozidriv"

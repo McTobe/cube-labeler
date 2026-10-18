@@ -10,12 +10,33 @@ strict 8-10% interior safe zones, and 2-3px architectural divider hairlines.
 
 import math
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from core.font_manager import font_manager
 from core.specs import DOT_PITCH_MM, INVENTORY_TAPE_WIDTH_MM, get_tape_spec
+
+# Icon library pictures used for drive icons (unless a label asks for the simple drawn ones)
+DRIVE_LIBRARY_ICONS = {
+    "internal_hex": "hex_socket.png",
+    "external_hex": "hex_bolt.png",
+    "phillips": "phillips.png",
+    "pozidriv": "pozidriv.png",
+    "torx": "torx.png",
+    "slotted": "slotted.png",
+}
+
+
+def drive_library_icon(tool_type: str) -> Optional[str]:
+    """Path of the icon library picture for a drive, or None if there isn't one."""
+    name = DRIVE_LIBRARY_ICONS.get(tool_type)
+    if not name:
+        return None
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, "assets", "icons", "fasteners", name)
+    return path if os.path.isfile(path) else None
 
 
 @dataclass
@@ -48,6 +69,7 @@ class FastenerLabelConfig:
     tool_type: str = "internal_hex"       # "internal_hex", "external_hex", "washer", "torx", "phillips", "pozidriv", "slotted", "custom", "none"
     tool_size: str = "2.5"                # e.g. "2.5", "3", "4", "8", "10", "17"
     custom_tool_icon_path: Optional[str] = None
+    simple_drive_icon: bool = False       # True: bold drawn drive icon instead of the library picture
     
     # Dimensions
     label_width_mm: float = 38.0          # Typical width for organizer bin (38mm ~ 255 dots)
@@ -385,17 +407,21 @@ class InventoryRenderer:
             draw.line([(tool_x, bot_y0), (tool_x, canvas_h - 1)], fill=0, width=line_w)
 
             # Draw Tool Badge (Tool size text on left + icon on right)
+            badge_type, badge_icon = cfg.tool_type, cfg.custom_tool_icon_path
+            library_icon = None if cfg.simple_drive_icon else drive_library_icon(cfg.tool_type)
+            if library_icon:
+                badge_type, badge_icon = "custom", library_icon
             self._render_tool_badge(
                 draw,
                 tool_x,
                 bot_y0,
                 tool_slot_w,
                 bot_h,
-                cfg.tool_type,
+                badge_type,
                 cfg.tool_size,
                 scale,
                 line_w,
-                custom_icon_path=cfg.custom_tool_icon_path,
+                custom_icon_path=badge_icon,
                 target_img=img,
             )
 

@@ -245,6 +245,12 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.drive_combo.pack(side="left")
         self.entry_tool_size = self._entry(r, 70, "Size")
         self.entry_tool_size.pack(side="left", padx=(8, 0))
+        # Off: the drive prints with its icon library picture; on: a bolder drawn shape
+        self.simple_icon_var = ctk.BooleanVar(value=False)
+        self.chk_simple_icon = ctk.CTkCheckBox(
+            r, text="Simple icon", variable=self.simple_icon_var, command=self._on_simple_icon_toggled
+        )
+        self.chk_simple_icon.pack(side="left", padx=(12, 0))
         self.btn_lib_tool_icon, self.btn_pick_tool_icon = self._icon_buttons(
             r, lambda: self._choose_icon("library", self._set_tool_icon_path, "Fasteners"),
             lambda: self._choose_icon("file", self._set_tool_icon_path, "Fasteners"),
@@ -391,7 +397,17 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.fastener_cfg.tool_type = {**DRIVES, **LEGACY_DRIVES}.get(value, "none")
         self.fastener_cfg.custom_tool_icon_path = None
         self.lbl_custom_tool_icon.configure(text="")
+        self._sync_simple_icon_state()
         self._on_field_change()
+
+    def _on_simple_icon_toggled(self):
+        self.fastener_cfg.simple_drive_icon = bool(self.simple_icon_var.get())
+        self._on_field_change()
+
+    def _sync_simple_icon_state(self):
+        """The simple/library choice only applies to the built-in drives."""
+        applies = self.fastener_cfg.tool_type in DRIVES.values()
+        self.chk_simple_icon.configure(state="normal" if applies else "disabled")
 
     def _on_part_icon_selected(self, value: str):
         self.component_cfg.icon_type = PART_ICONS.get(value, "none")
@@ -417,6 +433,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
             self.fastener_cfg.custom_tool_icon_path = path
             self.drive_combo.set(CUSTOM_ICON)
             self.lbl_custom_tool_icon.configure(text=_short_name(path))
+            self._sync_simple_icon_state()
             self._schedule_save()
             self.on_change()
 
@@ -488,6 +505,8 @@ class HardwareInventoryTab(ctk.CTkFrame):
             self.drive_combo.configure(values=self._drive_values())
             self.drive_combo.set(self._drive_display())
             self._set_entry(self.entry_tool_size, cfg.tool_size)
+            self.simple_icon_var.set(bool(cfg.simple_drive_icon))
+            self._sync_simple_icon_state()
             self.lbl_custom_tool_icon.configure(
                 text=_short_name(cfg.custom_tool_icon_path) if cfg.tool_type == "custom" and cfg.custom_tool_icon_path else ""
             )
