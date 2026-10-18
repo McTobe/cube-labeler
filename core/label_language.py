@@ -19,19 +19,11 @@ TERMS: Dict[str, Dict[str, str]] = {
     "screws": {"en": "SCREWS", "sv": "SKRUV"},
     "nuts": {"en": "NUTS", "sv": "MUTTER"},
     "washers": {"en": "WASHERS", "sv": "BRICKOR"},
-    "threaded_rod": {"en": "THREADED ROD", "sv": "GÄNGSTÅNG"},
-    "screws_nuts": {"en": "SCREWS & NUTS", "sv": "SKRUV & MUTTER"},
-    "wood_screws": {"en": "WOOD SCREWS", "sv": "TRÄSKRUV"},
     "bolts": {"en": "BOLTS", "sv": "BULTAR"},
     # Component categories
     "bearings": {"en": "BEARINGS", "sv": "KULLAGER"},
     "wago": {"en": "WAGO", "sv": "WAGO"},
     "fuse_holders": {"en": "FUSE HOLDERS", "sv": "SÄKRINGSHÅLLARE"},
-    "relays": {"en": "RELAYS", "sv": "RELÄ"},
-    "resistors": {"en": "RESISTORS", "sv": "MOTSTÅND"},
-    "capacitors": {"en": "CAPACITORS", "sv": "KONDENSATOR"},
-    "diodes": {"en": "DIODES", "sv": "DIOD"},
-    "connectors": {"en": "CONNECTORS", "sv": "KONTAKTER"},
     # Free text used by presets
     "mixed": {"en": "Mixed", "sv": "Blandade"},
     "sizes": {"en": "sizes", "sv": "storlekar"},
@@ -40,10 +32,9 @@ TERMS: Dict[str, Dict[str, str]] = {
     "inline_type": {"en": "Inline type", "sv": "Inline-typ"},
 }
 
-FASTENER_CATEGORY_KEYS = ["screws", "nuts", "washers", "threaded_rod", "screws_nuts", "wood_screws", "bolts"]
-COMPONENT_CATEGORY_KEYS = [
-    "bearings", "wago", "fuse_holders", "relays", "resistors", "capacitors", "diodes", "connectors",
-]
+# Only a few suggestions for the name box; anything else is typed in
+FASTENER_CATEGORY_KEYS = ["screws", "nuts", "washers", "bolts"]
+COMPONENT_CATEGORY_KEYS = ["bearings", "wago", "fuse_holders"]
 
 InventoryConfig = Union[FastenerLabelConfig, ComponentLabelConfig]
 
