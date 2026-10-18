@@ -10,12 +10,33 @@ strict 8-10% interior safe zones, and 2-3px architectural divider hairlines.
 
 import math
 import os
+import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from core.font_manager import font_manager
 from core.specs import DOT_PITCH_MM, INVENTORY_TAPE_WIDTH_MM, get_tape_spec
+
+# Icon library pictures used for drive icons (unless a label asks for the simple drawn ones)
+DRIVE_LIBRARY_ICONS = {
+    "internal_hex": "hex_socket.png",
+    "external_hex": "hex_bolt.png",
+    "phillips": "phillips.png",
+    "pozidriv": "pozidriv.png",
+    "torx": "torx.png",
+    "slotted": "slotted.png",
+}
+
+
+def drive_library_icon(tool_type: str) -> Optional[str]:
+    """Path of the icon library picture for a drive, or None if there isn't one."""
+    name = DRIVE_LIBRARY_ICONS.get(tool_type)
+    if not name:
+        return None
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    path = os.path.join(base, "assets", "icons", "fasteners", name)
+    return path if os.path.isfile(path) else None
 
 
 @dataclass
@@ -45,9 +66,10 @@ class FastenerLabelConfig:
     assortment_line2: str = "sizes"
     
     # Tool Drive Badge
-    tool_type: str = "internal_hex"       # "internal_hex", "external_hex", "washer", "torx", "phillips", "slotted", "custom", "none"
+    tool_type: str = "internal_hex"       # "internal_hex", "external_hex", "washer", "torx", "phillips", "pozidriv", "slotted", "custom", "none"
     tool_size: str = "2.5"                # e.g. "2.5", "3", "4", "8", "10", "17"
     custom_tool_icon_path: Optional[str] = None
+    simple_drive_icon: bool = False       # True: bold drawn drive icon instead of the library picture
     
     # Dimensions
     label_width_mm: float = 38.0          # Typical width for organizer bin (38mm ~ 255 dots)
@@ -204,6 +226,42 @@ class InventoryRenderer:
         draw.rectangle([(cx - r, cy - w), (cx + r, cy + w)], fill=fill)
         
     @staticmethod
+    def _draw_pozidriv_icon(draw: ImageDraw.ImageDraw, cx: float, cy: float, r: float, stroke: int, fill=0):
+        """Pozidriv: a Phillips cross with a short tick between each pair of arms."""
+        w = r * 0.30
+        draw.rectangle([(cx - w, cy - r), (cx + w, cy + r)], fill=fill)
+        draw.rectangle([(cx - r, cy - w), (cx + r, cy + w)], fill=fill)
+        inner, outer = r * 0.45, r * 0.85
+        tick = max(int(r * 0.16), 2)
+        for dx, dy in ((1, 1), (1, -1), (-1, 1), (-1, -1)):
+            k = 0.7071
+            draw.line(
+                [(cx + dx * inner * k, cy + dy * inner * k), (cx + dx * outer * k, cy + dy * outer * k)],
+                fill=fill,
+                width=tick,
+            )
+
+    def _draw_drive_icon(self, draw: ImageDraw.ImageDraw, tool_type: str, cx: float, cy: float, r: float, line_w: int):
+        """Draws one of the built-in drive icons; returns False for types it does not draw."""
+        if tool_type == "internal_hex":
+            self._draw_internal_hex(draw, cx, cy, r, fill=0)
+        elif tool_type == "external_hex":
+            self._draw_external_hex(draw, cx, cy, r, stroke=line_w, outline=0)
+        elif tool_type == "washer":
+            self._draw_washer_icon(draw, cx, cy, r, stroke=line_w, outline=0, fill=0)
+        elif tool_type == "torx":
+            self._draw_torx_icon(draw, cx, cy, r, fill=0)
+        elif tool_type == "phillips":
+            self._draw_phillips_icon(draw, cx, cy, r, stroke=line_w, fill=0)
+        elif tool_type == "pozidriv":
+            self._draw_pozidriv_icon(draw, cx, cy, r, stroke=line_w, fill=0)
+        elif tool_type == "slotted":
+            self._draw_slotted_icon(draw, cx, cy, r, stroke=line_w, fill=0)
+        else:
+            return False
+        return True
+
+    @staticmethod
     def _draw_slotted_icon(draw: ImageDraw.ImageDraw, cx: float, cy: float, r: float, stroke: int = 1, fill=0):
         """Single horizontal slot / Flathead drive silhouette."""
         h = r * 0.35
@@ -349,17 +407,21 @@ class InventoryRenderer:
             draw.line([(tool_x, bot_y0), (tool_x, canvas_h - 1)], fill=0, width=line_w)
 
             # Draw Tool Badge (Tool size text on left + icon on right)
+            badge_type, badge_icon = cfg.tool_type, cfg.custom_tool_icon_path
+            library_icon = None if cfg.simple_drive_icon else drive_library_icon(cfg.tool_type)
+            if library_icon:
+                badge_type, badge_icon = "custom", library_icon
             self._render_tool_badge(
                 draw,
                 tool_x,
                 bot_y0,
                 tool_slot_w,
                 bot_h,
-                cfg.tool_type,
+                badge_type,
                 cfg.tool_size,
                 scale,
                 line_w,
-                custom_icon_path=cfg.custom_tool_icon_path,
+                custom_icon_path=badge_icon,
                 target_img=img,
             )
 
@@ -457,18 +519,8 @@ class InventoryRenderer:
 
             draw.text((num_cx, cy), txt, font=font, fill=0, anchor="mm")
 
-            if tool_type == "internal_hex":
-                self._draw_internal_hex(draw, icon_cx, cy, icon_r, fill=0)
-            elif tool_type == "external_hex":
-                self._draw_external_hex(draw, icon_cx, cy, icon_r, stroke=line_w, outline=0)
-            elif tool_type == "washer":
-                self._draw_washer_icon(draw, icon_cx, cy, icon_r, stroke=line_w, outline=0, fill=0)
-            elif tool_type == "torx":
-                self._draw_torx_icon(draw, icon_cx, cy, icon_r, fill=0)
-            elif tool_type == "phillips":
-                self._draw_phillips_icon(draw, icon_cx, cy, icon_r, stroke=line_w, fill=0)
-            elif tool_type == "slotted":
-                self._draw_slotted_icon(draw, icon_cx, cy, icon_r, stroke=line_w, fill=0)
+            if self._draw_drive_icon(draw, tool_type, icon_cx, cy, icon_r, line_w):
+                pass
             elif tool_type == "custom" and custom_icon_path and target_img is not None:
                 self._draw_custom_image(target_img, icon_cx, cy, icon_w, icon_w, custom_icon_path)
 
@@ -476,18 +528,8 @@ class InventoryRenderer:
             # Solo icon (e.g. washer or tool_size empty)
             cx = x0 + w // 2
             icon_r = int(16 * scale)
-            if tool_type == "internal_hex":
-                self._draw_internal_hex(draw, cx, cy, icon_r, fill=0)
-            elif tool_type == "external_hex":
-                self._draw_external_hex(draw, cx, cy, icon_r, stroke=line_w, outline=0)
-            elif tool_type == "washer":
-                self._draw_washer_icon(draw, cx, cy, icon_r, stroke=line_w, outline=0, fill=0)
-            elif tool_type == "torx":
-                self._draw_torx_icon(draw, cx, cy, icon_r, fill=0)
-            elif tool_type == "phillips":
-                self._draw_phillips_icon(draw, cx, cy, icon_r, stroke=line_w, fill=0)
-            elif tool_type == "slotted":
-                self._draw_slotted_icon(draw, cx, cy, icon_r, stroke=line_w, fill=0)
+            if self._draw_drive_icon(draw, tool_type, cx, cy, icon_r, line_w):
+                pass
             elif tool_type == "custom" and custom_icon_path and target_img is not None:
                 max_dim = int(min(w * 0.78, h * 0.78))
                 self._draw_custom_image(target_img, cx, cy, max_dim, max_dim, custom_icon_path)

@@ -279,25 +279,27 @@ class PrintLabelApp(ctk.CTk):
         self._view = view
         self.sidebar.set_active(view)
 
-        if view in (VIEW_TEXT, VIEW_BIN):
-            self.preview_widget.pack(fill="both", expand=True, pady=(0, 8))
-        elif view == VIEW_QUEUE:
-            self.preview_widget.pack(fill="x", pady=(0, 8))
-
+        # The editors are packed from the bottom first, so on a small window the
+        # preview shrinks instead of the form being cut off
         if view == VIEW_TEXT:
-            self.text_workspace.pack(fill="x")
+            self.text_workspace.pack(side="bottom", fill="x")
             self.designer_panel.grid(row=0, column=2, sticky="ns", padx=(10, 0))
             self.config.inventory_config = None
         elif view == VIEW_BIN:
-            self.inventory_studio_frame.pack(fill="x")
+            self.inventory_studio_frame.pack(side="bottom", fill="x")
             self.config.inventory_config = self.inventory_tab_widget.get_current_inventory_config()
         elif view == VIEW_QUEUE:
-            self.queue_container_frame.pack(fill="both", expand=True)
+            self.queue_container_frame.pack(side="bottom", fill="both", expand=True)
             self._refresh_queue_display()
         elif view == VIEW_TEMPLATES:
             self.templates_view.pack(fill="both", expand=True)
         elif view == VIEW_SETTINGS:
             self.settings_view.pack(fill="both", expand=True)
+
+        if view in (VIEW_TEXT, VIEW_BIN):
+            self.preview_widget.pack(side="top", fill="both", expand=True, pady=(0, 8))
+        elif view == VIEW_QUEUE:
+            self.preview_widget.pack(side="top", fill="x", pady=(0, 8))
 
         self._update_action_bar()
         self._trigger_render()

@@ -56,12 +56,13 @@ class TapePreviewWidget(ctk.CTkFrame):
         self.zoom_seg.set("Fit")
         self.zoom_seg.pack(side="right")
 
-        self.canvas = tk.Canvas(self, bg=CANVAS_BG, highlightthickness=0, bd=0, height=190)
+        # Metrics are packed before the canvas so the canvas is what shrinks on small windows
+        self.metrics_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.metrics_frame.pack(side="bottom", fill="x", padx=10, pady=(0, 8))
+
+        self.canvas = tk.Canvas(self, bg=CANVAS_BG, highlightthickness=0, bd=0, height=150)
         self.canvas.pack(fill="both", expand=True, padx=10, pady=6)
         self.canvas.bind("<Configure>", lambda e: self._redraw())
-
-        self.metrics_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.metrics_frame.pack(fill="x", padx=10, pady=(0, 8))
 
         self.length_label = ctk.CTkLabel(self.metrics_frame, text="", font=ctk.CTkFont(size=12, weight="bold"))
         self.length_label.pack(side="left", padx=4)

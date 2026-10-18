@@ -37,8 +37,8 @@ class SettingsView(ctk.CTkFrame):
         lang_card = self._card("Bin label language")
         ctk.CTkLabel(
             lang_card,
-            text="Language for the category names and presets printed on bin labels. "
-                 "Text you have already typed is not changed.",
+            text="Language for the suggested names on bin labels, like Screws or Bearings. "
+                 "Names you have already typed are not changed.",
             anchor="w",
             justify="left",
             wraplength=560,
