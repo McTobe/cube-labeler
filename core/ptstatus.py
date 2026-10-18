@@ -126,6 +126,9 @@ STATUS_TYPE = {
     0x06: "Phase change",
 }
 
+STATUS_PRINTING_COMPLETED = 0x01
+STATUS_ERROR_OCCURRED = 0x02
+
 NOTIFICATIONS = {
     0x00: 'N/A',
     0x01: 'Cover open',
@@ -179,6 +182,8 @@ class PrinterStatus:
     notification_name: str
     is_ready: bool
     tape_loaded: bool
+    # False when a print was sent but the printer never confirmed completion before the timeout
+    completion_confirmed: bool = True
 
 
 def describe_code(code: int, table: dict) -> str:
@@ -202,6 +207,12 @@ def describe_flags(flagset: int, descset: dict) -> List[str]:
 def unpack_status(bytes_: bytes) -> StatusRegister:
     if len(bytes_) != 32:
         raise ValueError(f'Status must be exactly 32 bytes long, received {len(bytes_)} bytes.')
+    # Brother status packets start with print head mark 0x80 and packet size 0x20
+    if bytes_[0] != 0x80 or bytes_[1] != 0x20:
+        raise ValueError(
+            'Response is not a Brother printer status packet. '
+            'Check that the selected COM port is the printer.'
+        )
     status = StatusRegister()
     ctypes.memmove(ctypes.addressof(status), bytes_, ctypes.sizeof(status))
     return status

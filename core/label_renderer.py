@@ -12,6 +12,14 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 import qrcode
 
 from core.font_manager import font_manager
+from core.specs import (
+    DOT_PITCH_MM,
+    INVENTORY_TAPE_WIDTH_MM,
+    PRINTHEAD_DOTS,
+    TAPE_LEAD_MM,
+    TAPE_SPECS,
+    get_tape_spec,
+)
 
 
 @dataclass
@@ -56,7 +64,6 @@ class LabelConfig:
     
     # Sizing & Stretching
     fixed_width_mm: Optional[float] = None
-    stretch_text_mm: Optional[float] = None
     end_margin: int = 0  # dots
     
     # QR Code & Barcode
@@ -75,7 +82,7 @@ class LabelConfig:
     threshold: int = 100
     
     # Colors & Tape Physical Attributes
-    tape_width_mm: int = 12
+    tape_width_mm: float = 12.0
     tape_bg_color: str = "#FFFFFF"  # Background color for preview
     tape_fg_color: str = "#000000"  # Text/drawing color
     show_guides: bool = False  # Show printable area and tape guides
@@ -94,22 +101,16 @@ class LabelConfig:
 class LabelRenderer:
     """Core renderer for Brother PT-P300BT labels."""
 
-    DOT_PITCH_MM = 0.149  # ~170-180 DPI (0.149 mm per dot)
-    PRINTHEAD_DOTS = 128   # Brother PT-P300BT printhead total width
-
-    # Height specifications based on tape width
-    TAPE_SPECS = {
-        12: {"printable_height": 64, "tape_height": 86, "canvas_height": 88},
-        9:  {"printable_height": 48, "tape_height": 66, "canvas_height": 70},
-        6:  {"printable_height": 32, "tape_height": 46, "canvas_height": 50},
-        3.5:{"printable_height": 24, "tape_height": 32, "canvas_height": 36},
-    }
+    DOT_PITCH_MM = DOT_PITCH_MM
+    PRINTHEAD_DOTS = PRINTHEAD_DOTS
+    TAPE_SPECS = TAPE_SPECS
+    MAX_TOTAL_LENGTH_MM = 499.0
 
     def __init__(self):
         pass
 
-    def _get_tape_spec(self, tape_width_mm: int) -> dict:
-        return self.TAPE_SPECS.get(tape_width_mm, self.TAPE_SPECS[12])
+    def _get_tape_spec(self, tape_width_mm: float) -> dict:
+        return get_tape_spec(tape_width_mm)
 
     def calculate_multiline_dims(
         self, lines: List[str], font: ImageFont.FreeTypeFont, line_spacing: float
@@ -210,21 +211,12 @@ class LabelRenderer:
         bg.paste(raw_img, (0, 0), raw_img)
         gray = bg.convert("L")
 
-        # Find content bounding box
-        w, h = gray.size
-        left, top, right, bottom = w, h, 0, 0
-        pixels = gray.load()
+        # Find content bounding box (pixels darker than white_level)
+        content_mask = gray.point(lambda p: 255 if p < white_level else 0)
+        bbox = content_mask.getbbox()
 
-        for y in range(h):
-            for x in range(w):
-                if pixels[x, y] < white_level:
-                    left = min(left, x)
-                    right = max(right, x)
-                    top = min(top, y)
-                    bottom = max(bottom, y)
-
-        if right > left and bottom > top:
-            cropped = gray.crop((left, top, right + 1, bottom + 1))
+        if bbox:
+            cropped = gray.crop(bbox)
             aspect = cropped.width / cropped.height
             new_h = int(target_height * scale)
             new_w = max(int(new_h * aspect), 1)
@@ -236,14 +228,17 @@ class LabelRenderer:
         self, config: LabelConfig
     ) -> Tuple[Image.Image, dict, int, int, int, int]:
         """Renders raw content onto grayscale base canvas without trailing cut lines."""
-        spec = self._get_tape_spec(config.tape_width_mm)
+        is_inventory = getattr(config, "inventory_config", None) is not None
+        self._last_text_overflow = False
+        # Hardware inventory layouts are designed for 64 printable dots, so they always use 12 mm tape
+        spec = self._get_tape_spec(INVENTORY_TAPE_WIDTH_MM if is_inventory else config.tape_width_mm)
         printable_h = spec["printable_height"]
         tape_h = spec["tape_height"]
         canvas_h = spec["canvas_height"]
         print_border = (canvas_h - printable_h) // 2
 
         # Hardware Inventory System V2 rendering
-        if getattr(config, "inventory_config", None) is not None:
+        if is_inventory:
             from core.inventory_renderer import inventory_renderer, FastenerLabelConfig
             if isinstance(config.inventory_config, FastenerLabelConfig):
                 inv_img = inventory_renderer.render_fastener(config.inventory_config)
@@ -276,6 +271,7 @@ class LabelRenderer:
             spacing = config.line_spacing
 
         text_w, text_h, _ = self.calculate_multiline_dims(lines, font, spacing)
+        self._last_text_overflow = text_h > printable_h
 
         # 3. Handle QR Code
         qr_img = None
@@ -426,12 +422,14 @@ class LabelRenderer:
         # 9. Metrics
         raster_lines = padded_128.size[1]
         print_len_mm = raster_lines * self.DOT_PITCH_MM
-        total_used_mm = print_len_mm + 26.0
+        total_used_mm = print_len_mm + TAPE_LEAD_MM
         print_dur = print_len_mm / 20.0
 
         warning = None
-        if total_used_mm > 499.0:
+        if total_used_mm > self.MAX_TOTAL_LENGTH_MM:
             warning = "Label exceeds maximum print length (49.9 cm / 19.6 in)"
+        elif getattr(self, "_last_text_overflow", False) and not config.auto_fit_font:
+            warning = "Text is taller than the printable area and will be clipped. Reduce the font size."
 
         metrics = LabelMetrics(
             content_width_dots=img_canvas.width,
@@ -525,12 +523,12 @@ class LabelRenderer:
         # Metrics & tape savings
         raster_lines = padded_128.size[1]
         print_len_mm = raster_lines * self.DOT_PITCH_MM
-        total_used_mm = print_len_mm + 26.0  # Only ONE lead-in + trail
-        tape_saved_mm = 25.0 * (len(configs) - 1)
+        total_used_mm = print_len_mm + TAPE_LEAD_MM  # Only ONE lead-in + trail
+        tape_saved_mm = TAPE_LEAD_MM * (len(configs) - 1)
         print_dur = print_len_mm / 20.0
 
         warning = None
-        if total_used_mm > 499.0:
+        if total_used_mm > self.MAX_TOTAL_LENGTH_MM:
             warning = "Batch chain exceeds 49.9 cm. You may need to split it into two batches."
 
         metrics = LabelMetrics(

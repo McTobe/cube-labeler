@@ -10,6 +10,7 @@ Provides:
 
 import os
 import sys
+import queue
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -564,20 +565,16 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         instructions = f"Style preference: {style}. {details}".strip()
         thick = self._get_selected_thickness()
 
-        def worker():
-            try:
-                ai_generator.api_key = api_key
-                raw_result = ai_generator.generate_from_image(
-                    self.source_image,
-                    custom_instructions=instructions,
-                    line_thickness=thick,
-                    return_raw=True,
-                )
-                self.after(0, lambda: self._on_generation_success(raw_result))
-            except Exception as e:
-                self.after(0, lambda err=str(e): self._on_generation_error(err))
-
-        threading.Thread(target=worker, daemon=True).start()
+        ai_generator.api_key = api_key
+        source = self.source_image
+        self._run_generation(
+            lambda: ai_generator.generate_from_image(
+                source,
+                custom_instructions=instructions,
+                line_thickness=thick,
+                return_raw=True,
+            )
+        )
 
     def _generate_from_text(self):
         prompt = self.entry_text_prompt.get("1.0", tk.END).strip()
@@ -599,19 +596,43 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         self._set_loading(True, "Generating wireframe from description with Gemini...")
         thick = self._get_selected_thickness()
 
+        ai_generator.api_key = api_key
+        self._run_generation(
+            lambda: ai_generator.generate_from_text(
+                prompt,
+                line_thickness=thick,
+                return_raw=True,
+            )
+        )
+
+    def _run_generation(self, generate: Callable[[], Image.Image]):
+        """
+        Runs a Gemini call on a worker thread. Tkinter is not thread-safe, so the worker only
+        puts its result on a queue and the Tk main loop polls it.
+        """
+        results: "queue.Queue" = queue.Queue()
+
         def worker():
             try:
-                ai_generator.api_key = api_key
-                raw_result = ai_generator.generate_from_text(
-                    prompt,
-                    line_thickness=thick,
-                    return_raw=True,
-                )
-                self.after(0, lambda: self._on_generation_success(raw_result))
+                results.put((True, generate()))
             except Exception as e:
-                self.after(0, lambda err=str(e): self._on_generation_error(err))
+                results.put((False, str(e)))
+
+        def poll():
+            if not self.winfo_exists():
+                return
+            try:
+                ok, value = results.get_nowait()
+            except queue.Empty:
+                self.after(100, poll)
+                return
+            if ok:
+                self._on_generation_success(value)
+            else:
+                self._on_generation_error(value)
 
         threading.Thread(target=worker, daemon=True).start()
+        self.after(100, poll)
 
     def _set_loading(self, loading: bool, message: str = ""):
         self.is_generating = loading

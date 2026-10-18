@@ -6,6 +6,7 @@ Allows direct command-line printing, querying status, feeding tape, and listing 
 
 import sys
 import os
+import re
 import argparse
 from typing import List, Optional
 
@@ -61,8 +62,11 @@ def feed_tape(port: str, mm: float = 25.0, virtual: bool = False) -> int:
     print(f"Feeding {mm}mm tape on {'Virtual Mock' if virtual else port}...")
     try:
         printer = MockBrotherPrinter() if virtual else BrotherPrinter(port)
-        printer.feed_tape(mm=mm)
-        print("Tape fed successfully.")
+        status = printer.feed_tape(length_mm=mm)
+        if status.completion_confirmed:
+            print("Tape fed successfully (confirmed by printer).")
+        else:
+            print("Feed sent, but the printer did not confirm completion.")
         return 0
     except Exception as e:
         print(f"Error feeding tape: {e}", file=sys.stderr)
@@ -82,10 +86,12 @@ def print_label(
     preview_only: bool = False,
     save_png: Optional[str] = None,
     virtual: bool = False,
+    width_mm: Optional[float] = None,
 ) -> int:
     """Renders and prints a label."""
     cfg = LabelConfig(
         text=text,
+        fixed_width_mm=width_mm,
         font_name=font_name,
         auto_fit_font=(font_size is None),
         fixed_font_size=font_size or 40,
@@ -104,6 +110,8 @@ def print_label(
         return 1
 
     print(f"Label metrics: {metrics.print_length_mm:.1f}mm length, {metrics.total_used_length_mm:.1f}mm tape used.")
+    if metrics.warning:
+        print(f"Warning: {metrics.warning}", file=sys.stderr)
 
     if save_png:
         try:
@@ -116,20 +124,32 @@ def print_label(
         print("Preview-only mode; skipping print.")
         return 0
 
+    if metrics.total_used_length_mm > LabelRenderer.MAX_TOTAL_LENGTH_MM:
+        print("Error: Label is longer than the printer allows; not printing.", file=sys.stderr)
+        return 1
+
     print(f"Sending print job to {'Virtual Mock' if virtual else port}...")
     try:
         printer = MockBrotherPrinter() if virtual else BrotherPrinter(port)
-        printer.print_raster_data(
+        status = printer.print_raster_data(
             raster_data=raster_bytes,
             no_feed=no_feed,
             auto_cut=auto_cut,
             end_margin=end_margin_dots,
         )
-        print("Print completed successfully!")
+        if status.completion_confirmed:
+            print("Print completed successfully (confirmed by printer).")
+        else:
+            print("Print sent, but the printer did not confirm completion. Check the label.")
         return 0
     except Exception as e:
         print(f"Print error: {e}", file=sys.stderr)
         return 1
+
+
+def _looks_like_port(value: str) -> bool:
+    """True for values such as COM4, /dev/rfcomm0 or a pyserial URL like loop://."""
+    return bool(re.match(r"^(COM\d+|/dev/\S+|\w+://.*)$", value.strip(), re.IGNORECASE))
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -150,15 +170,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Text to print (UTF-8). Use \\n for multi-line labels.",
     )
     parser.add_argument(
-        "--font", "-f_name",
+        "--font", "-f",
         default="Arial",
         help="Font family or .ttf/.otf file path (default: Arial).",
+    )
+    parser.add_argument(
+        "--width",
+        type=float,
+        default=None,
+        metavar="MM",
+        help="Minimum label length in millimetres (pads short labels to this length).",
     )
     parser.add_argument(
         "--font-size",
         type=int,
         default=None,
         help="Manual font size (pt). If omitted, automatically fits to tape height.",
+    )
+    parser.add_argument(
+        "--port", "-p",
+        default=None,
+        help="Printer COM port. Use this instead of the positional COMPORT, e.g. with --virtual.",
     )
     parser.add_argument(
         "--image", "-i",
@@ -233,6 +265,14 @@ def cli_main(args: Optional[List[str]] = None) -> int:
         gui_main()
         return 0
 
+    # The first positional is only a port if it looks like one; otherwise it is label text.
+    # This makes "PrintLabel -v Hello" and "PrintLabel --port COM4 Hello" work as expected.
+    if parsed.comport and (parsed.port or not _looks_like_port(parsed.comport)):
+        parsed.text = [parsed.comport] + list(parsed.text)
+        parsed.comport = None
+    if parsed.port:
+        parsed.comport = parsed.port
+
     if not parsed.comport and not parsed.virtual:
         # Check if text was passed as first arg or if no args given
         if not parsed.text and not parsed.status and parsed.feed is None:
@@ -267,6 +307,7 @@ def cli_main(args: Optional[List[str]] = None) -> int:
         preview_only=parsed.preview,
         save_png=parsed.save_png,
         virtual=parsed.virtual,
+        width_mm=parsed.width,
     )
 
 

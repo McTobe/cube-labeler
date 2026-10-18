@@ -1,0 +1,11 @@
+# Exact versions used for release builds (pip install -r requirements.txt -c constraints.txt).
+# Update deliberately and re-run the test suite when bumping.
+pyserial==3.5
+pillow==12.3.0
+customtkinter==5.2.2
+darkdetect==0.8.0
+packaging==26.2
+qrcode==8.2
+packbits==0.6
+colorama==0.4.6
+pyinstaller==6.22.2
