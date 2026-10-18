@@ -748,15 +748,8 @@ class PrintLabelApp(ctk.CTk):
         row3 = ctk.CTkFrame(container, fg_color="transparent")
         row3.pack(fill="x", pady=(10, 6))
 
-        self.chk_autocut_hw_var = ctk.BooleanVar(value=True)
-        self.chk_autocut_hw = ctk.CTkCheckBox(
-            row3,
-            text="Hardware Boundary Marks",
-            variable=self.chk_autocut_hw_var,
-            command=self._on_autocut_hw_toggle,
-            font=ctk.CTkFont(size=12, weight="bold"),
-        )
-        self.chk_autocut_hw.pack(side="left", padx=(0, 25))
+        # No auto-cut option: the PT-P300BT has a manual cutter and ignores the flag
+        # (checked on hardware), so labels keep the default config.auto_cut_hardware.
 
         # Reset Settings Button
         self.btn_reset_settings = ctk.CTkButton(
@@ -1319,7 +1312,6 @@ class PrintLabelApp(ctk.CTk):
 
             self.chk_guides_var.set(cfg.show_guides)
             self.chk_rulers_var.set(cfg.show_rulers)
-            self.chk_autocut_hw_var.set(cfg.auto_cut_hardware)
         finally:
             self._updating_ui_from_config = False
 
@@ -1727,9 +1719,6 @@ class PrintLabelApp(ctk.CTk):
         self._update_ui_from_config(self.config)
         self._trigger_render()
         self.action_status_label.configure(text="Settings reset to defaults.")
-
-    def _on_autocut_hw_toggle(self):
-        self.config.auto_cut_hardware = self.chk_autocut_hw_var.get()
 
     # -------------------------------------------------------------------------
     # TEMPLATES & PRESETS

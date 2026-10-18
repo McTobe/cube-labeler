@@ -102,7 +102,7 @@ def test_gui_queue():
     app.update()
     assert app.config.tape_bg_color == "#FFFFFF", "Tape background should reset to white"
     assert app.config.show_guides is False, "Guides should reset to False"
-    assert app.config.auto_cut_hardware is True, "Hardware boundary marks should remain True"
+    assert app.config.auto_cut_hardware is True, "Auto-cut flag should stay at its default"
     assert app.config.cut_line is False, "Cut guide lines should be False for single labels"
 
     # Save batch preview image to artifacts directory
