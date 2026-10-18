@@ -17,7 +17,8 @@ from core.inventory_renderer import (
     ComponentLabelConfig,
     inventory_renderer,
 )
-from core.label_renderer import LabelConfig, LabelRenderer
+from core.label_renderer import SINGLE_BIN_PADDING_MM, LabelConfig, LabelRenderer
+from core.specs import DOT_PITCH_MM
 from core.label_language import build_presets
 
 INVENTORY_PRESETS = {pid: p.config for pid, p in build_presets("en").items()}
@@ -120,7 +121,9 @@ class TestInventoryRenderer(unittest.TestCase):
 
         self.assertEqual(rast.size[0], 128)  # 128-dot Brother printhead width
         self.assertGreater(len(r_bytes), 1000)
-        self.assertAlmostEqual(metrics.print_length_mm, 38.0, delta=1.5)
+        # 38 mm label plus the blank tape left on each side of a single bin label
+        padding_mm = 2 * round(SINGLE_BIN_PADDING_MM / DOT_PITCH_MM) * DOT_PITCH_MM
+        self.assertAlmostEqual(metrics.print_length_mm, 38.0 + padding_mm, delta=1.5)
 
         # Batch rendering
         cfg_comp = LabelConfig(inventory_config=INVENTORY_PRESETS["B1"])

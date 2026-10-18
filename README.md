@@ -17,15 +17,15 @@ Based on the [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT) Python util
 - **Cut Guide Lines**:
   - Printed cut guide lines (dotted, tick marks, solid) placed precisely between queued labels and at margins
   - Easy manual cutting with scissors without guesswork
-- **Manual Tape Feed (`✂ Feed Tape`)**:
-  - 1-click on-demand tape advance (25mm) to feed printed tape past the cutter blade
+- **Manual Tape Feed**:
+  - Feed 25 mm of tape past the cutter blade from the "•••" menu next to Print
 - **Real-Time WYSIWYG Tape Preview**: Interactive canvas that accurately previews the printed label on realistic tape cartridge simulations (White, Yellow, Red, Blue, Green, Black, Clear, Gold).
 - **Auto-Fit Font Sizing**: Automatically maximizes text font size to fill the tape printable height (64 dots for 12mm tape) while respecting multi-line baselines.
 - **Rich Typography**:
   - System font discoverer (Arial, Segoe UI, Consolas, Calibri, Impact, etc.)
   - Custom `.ttf` / `.otf` font file importer
   - Font scaling, line spacing multiplier, text alignment (Left, Center, Right), text outline/stroke
-- **QR Code & Barcode Integration**:
+- **QR Codes**:
   - Generate crisp QR codes for URLs, inventory IDs, or plain text
   - Dedicated **WiFi Guest Login** QR code generator (`WIFI:S:...;P:...;;`)
   - Adjustable position (left/right) and scale
@@ -51,7 +51,7 @@ Based on the [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT) Python util
 - **📚 Built-in Icon Library & Gallery Browser**:
   - Over 30+ curated monochrome vector/line-art icons across 5 dedicated categories: *Fasteners*, *Engineering*, *Electronics*, *Tools*, and *Symbols*, plus persistent *My Icons*
   - Fast instant keyword search (Torx, Bearing, Gear, Socket, Wrench, Fuse, etc.) and category filtering
-  - Seamless 1-click icon assignment in both Custom Designer and Hardware & Bins Studio
+  - One-click icon assignment for both text labels and bin labels
   - Persistent user icon storage in `~/.printlabel/icons/` with direct "Open Custom Folder" integration
 - **✨ Gemini AI Wireframe Generator & Line-Art Studio**:
   - **Photo to Technical Wireframe**: Convert photos of workshop items/parts into pure black-and-white vector wireframes using Google Gemini multimodal AI (`gemini-2.5-flash-image`, `gemini-3.1-flash-image`)
@@ -100,11 +100,18 @@ python main.py
    - Select your **PT-P300BT** printer and pair it.
    - Windows will create an outgoing Serial Port (COMx).
 3. **In the App**:
-   - Uncheck **Simulation Mode** in the top bar.
-   - Click the **🔄** button to scan ports.
+   - Click the **printer chip** at the top right to open the printer panel.
+   - Turn off **Simulation** if it is on, and choose **Scan ports**.
    - Select your printer's COM port (e.g. `COM3` or `COM7`).
-   - Click **Check Status** to verify connection and read tape details.
-   - Click **PRINT LABEL** (or press `Ctrl+P`) to print!
+   - Choose **Check status**; the chip shows the model, loaded tape and battery.
+   - Click **Print** (or press `Ctrl+P`).
+
+### Finding your way around
+- **Text label**: type your text under the preview; font, QR code, icon, length and advanced options are in the panel on the right.
+- **Bin label**: screw, nut and component labels for storage bins (12 mm tape).
+- **Queue**: labels you add with **Add to queue** (`Ctrl+Enter`) print as one strip, saving about 25 mm of tape per extra label.
+- **Templates**: ready-made starting points, plus saving and opening your own templates.
+- **Settings**: bin label language (English or Swedish), Gemini API key, and simulation mode.
 
 ---
 
@@ -117,16 +124,22 @@ printlabel-ui/
 │   ├── ptstatus.py           # 32-byte printer status register unpacker & tables
 │   ├── font_manager.py       # Windows font registry discovery & TTF loader
 │   ├── label_renderer.py     # PIL rendering engine, auto-fit, QR codes & rasterization
-│   ├── inventory_renderer.py # Hardware & Bins procedural vector label generator & presets
+│   ├── inventory_renderer.py # Bin label procedural vector label generator
+│   ├── label_language.py     # Bin label text in English / Swedish and the bin label presets
+│   ├── specs.py              # Dot pitch, tape sizes and other printer constants
 │   ├── icon_manager.py       # Curated icon library manager, search index & user storage
 │   ├── ai_generator.py       # Gemini AI multimodal wireframe & thermal post-processing engine
 │   ├── config.py             # User persistent config (API keys, preferences)
 │   ├── printer.py            # Thread-safe serial communication driver & virtual mock
 │   └── cli.py                # Command-line interface driver
 ├── ui/
-│   ├── app.py                # CustomTkinter main application window & event wiring
-│   ├── tape_preview.py       # Interactive WYSIWYG canvas widget with zoom & metrics
-│   ├── inventory_tab.py      # Hardware & Bins Studio interactive workbench
+│   ├── app.py                # Main window: rail, views, text label panel, queue & printing
+│   ├── widgets.py            # Collapsible sections, labelled sliders and the left rail
+│   ├── printer_chip.py       # Header printer chip and its connection panel
+│   ├── templates_view.py     # Template cards with preview pictures
+│   ├── settings_view.py      # Settings: label language, Gemini key, simulation
+│   ├── tape_preview.py       # Preview canvas with tape strip, zoom & metrics
+│   ├── inventory_tab.py      # Bin label editor
 │   ├── icon_browser.py       # Icon Library modal gallery browser & search dialog
 │   ├── ai_generator_dialog.py# Gemini AI wireframe & Clean and Import dialog
 │   └── templates.py          # Built-in presets & JSON template import/export
@@ -137,7 +150,8 @@ printlabel-ui/
 │   ├── test_all.py           # Core printing & serialization unit tests
 │   ├── test_inventory.py     # Hardware inventory procedural engine unit tests
 │   ├── test_icons_and_ai.py  # Icon library discovery, search & AI processing tests
-│   └── test_gui_inventory.py # Headless GUI integration tests for hardware studio
+│   ├── test_gui_inventory.py # Headless GUI test for the bin label editor
+│   └── test_gui_queue.py     # Headless GUI test for text labels, the queue and views
 ├── main.py                   # Main entry point (launches GUI or CLI depending on args)
 ├── build.py                  # Automated PyInstaller build script for single portable .exe
 ├── printlabel.spec           # PyInstaller spec bundling all assets & dependencies

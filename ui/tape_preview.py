@@ -1,128 +1,86 @@
 #!/usr/bin/env python3
 """
 WYSIWYG Tape Preview Canvas widget for Brother PT-P300BT.
-Provides real-time interactive preview with zoom, rulers, and raster inspection.
+Shows the label on a strip of tape with its cut lines, with zoom and a print-dot view.
 """
 
 import tkinter as tk
 import customtkinter as ctk
-from PIL import Image, ImageTk, ImageDraw
-from typing import Optional
+from PIL import Image, ImageTk
+from typing import Optional, Tuple
 from core.label_renderer import LabelMetrics
+
+CANVAS_BG = "#1E1E1E"
+CUT_LINE_COLOR = "#9E9E9E"
+TAPE_LEAD_PX = 44  # Tape drawn before and after the label, so it reads as a strip
+
+
+def _blend(rgb: Tuple[int, int, int], other: Tuple[int, int, int], amount: float) -> str:
+    r, g, b = (int(c1 * (1 - amount) + c2 * amount) for c1, c2 in zip(rgb, other))
+    return f"#{r:02x}{g:02x}{b:02x}"
 
 
 class TapePreviewWidget(ctk.CTkFrame):
-    """Interactive preview canvas with tape realism, zoom, and raster view."""
+    """Preview canvas with zoom, a tape strip around the label, and a raster (print dots) view."""
 
     def __init__(self, master, **kwargs):
-        super().__init__(master, **kwargs)
+        super().__init__(master, corner_radius=10, **kwargs)
 
         self._preview_image: Optional[Image.Image] = None
         self._raster_image: Optional[Image.Image] = None
         self._metrics: Optional[LabelMetrics] = None
+        self._tape_spec: Optional[dict] = None
         self._photo_ref: Optional[ImageTk.PhotoImage] = None
 
-        self.zoom_mode = "fit"  # "fit", "1.0", "1.5", "2.0"
+        self.zoom_mode = "fit"  # "fit", "1.0", "1.5", "2.0", "3.0"
         self.view_mode = "tape"  # "tape" or "raster"
 
         self._setup_ui()
 
     def _setup_ui(self):
-        # Top toolbar for preview controls
         self.toolbar = ctk.CTkFrame(self, fg_color="transparent")
-        self.toolbar.pack(fill="x", padx=10, pady=(6, 4))
+        self.toolbar.pack(fill="x", padx=10, pady=(8, 2))
 
-        # Title / Mode
-        self.title_label = ctk.CTkLabel(
-            self.toolbar,
-            text="Tape Preview",
-            font=ctk.CTkFont(size=13, weight="bold"),
-        )
-        self.title_label.pack(side="left", padx=(4, 15))
+        self.title_label = ctk.CTkLabel(self.toolbar, text="Preview", font=ctk.CTkFont(size=13, weight="bold"))
+        self.title_label.pack(side="left", padx=(4, 12))
 
-        # View Mode Switch (Tape vs Raster)
         self.mode_seg = ctk.CTkSegmentedButton(
-            self.toolbar,
-            values=["Tape View", "Raster View (128-dot)"],
-            command=self._on_mode_change,
+            self.toolbar, values=["Label", "Print dots"], command=self._on_mode_change, height=24
         )
-        self.mode_seg.set("Tape View")
-        self.mode_seg.pack(side="left", padx=5)
+        self.mode_seg.set("Label")
+        self.mode_seg.pack(side="left")
 
-        # Zoom Segmented Button
         self.zoom_seg = ctk.CTkSegmentedButton(
-            self.toolbar,
-            values=["Fit", "100%", "150%", "200%", "300%"],
-            command=self._on_zoom_change,
+            self.toolbar, values=["Fit", "100%", "150%", "200%", "300%"], command=self._on_zoom_change, height=24
         )
         self.zoom_seg.set("Fit")
-        self.zoom_seg.pack(side="right", padx=5)
+        self.zoom_seg.pack(side="right")
 
-        # Canvas Frame with dark/light adaptive background
-        self.canvas_frame = ctk.CTkFrame(self, corner_radius=8, fg_color=("gray88", "gray17"))
-        self.canvas_frame.pack(fill="both", expand=True, padx=10, pady=4)
-
-        # Tkinter Canvas
-        self.canvas = tk.Canvas(
-            self.canvas_frame,
-            bg="#1E1E1E",
-            highlightthickness=0,
-            bd=0,
-            height=210,
-        )
-        self.canvas.pack(fill="both", expand=True, padx=6, pady=6)
+        self.canvas = tk.Canvas(self, bg=CANVAS_BG, highlightthickness=0, bd=0, height=190)
+        self.canvas.pack(fill="both", expand=True, padx=10, pady=6)
         self.canvas.bind("<Configure>", lambda e: self._redraw())
 
-        # Metrics Bar at bottom of canvas
         self.metrics_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.metrics_frame.pack(fill="x", padx=10, pady=(4, 6))
+        self.metrics_frame.pack(fill="x", padx=10, pady=(0, 8))
 
-        self.length_label = ctk.CTkLabel(
-            self.metrics_frame,
-            text="Label Length: -- mm",
-            font=ctk.CTkFont(size=12, weight="bold"),
-        )
-        self.length_label.pack(side="left", padx=8)
-
-        self.time_label = ctk.CTkLabel(
-            self.metrics_frame,
-            text="Print Time: -- s",
-            font=ctk.CTkFont(size=12),
-            text_color="gray",
-        )
-        self.time_label.pack(side="left", padx=8)
-
-        self.used_label = ctk.CTkLabel(
-            self.metrics_frame,
-            text="Total Tape Used: -- mm",
-            font=ctk.CTkFont(size=12),
-            text_color="gray",
-        )
+        self.length_label = ctk.CTkLabel(self.metrics_frame, text="", font=ctk.CTkFont(size=12, weight="bold"))
+        self.length_label.pack(side="left", padx=4)
+        self.used_label = ctk.CTkLabel(self.metrics_frame, text="", text_color=("gray40", "gray60"))
         self.used_label.pack(side="left", padx=8)
+        # Kept for callers that read it; the print time is part of used_label
+        self.time_label = self.used_label
 
         self.warning_label = ctk.CTkLabel(
-            self.metrics_frame,
-            text="",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#E63946",
+            self.metrics_frame, text="", font=ctk.CTkFont(size=12, weight="bold"), text_color="#E63946"
         )
-        self.warning_label.pack(side="right", padx=8)
+        self.warning_label.pack(side="right", padx=4)
 
     def _on_mode_change(self, value: str):
-        self.view_mode = "raster" if "Raster" in value else "tape"
+        self.view_mode = "raster" if value == "Print dots" else "tape"
         self._redraw()
 
     def _on_zoom_change(self, value: str):
-        if value == "Fit":
-            self.zoom_mode = "fit"
-        elif value == "100%":
-            self.zoom_mode = "1.0"
-        elif value == "150%":
-            self.zoom_mode = "1.5"
-        elif value == "200%":
-            self.zoom_mode = "2.0"
-        elif value == "300%":
-            self.zoom_mode = "3.0"
+        self.zoom_mode = {"Fit": "fit", "100%": "1.0", "150%": "1.5", "200%": "2.0", "300%": "3.0"}[value]
         self._redraw()
 
     def update_content(
@@ -130,46 +88,31 @@ class TapePreviewWidget(ctk.CTkFrame):
         preview_img: Image.Image,
         raster_img: Image.Image,
         metrics: LabelMetrics,
+        tape_spec: Optional[dict] = None,
     ):
-        """Updates the canvas with new rendered label and metrics."""
+        """Updates the canvas with a newly rendered label and its metrics."""
         self._preview_image = preview_img
         self._raster_image = raster_img
         self._metrics = metrics
+        self._tape_spec = tape_spec
 
-        # Update metrics labels
         if metrics.label_count > 1:
             self.length_label.configure(
-                text=f"Batch Length ({metrics.label_count} labels): {metrics.print_length_mm:.1f} mm ({metrics.print_length_in:.2f} in)"
+                text=f"{metrics.label_count} labels · {metrics.print_length_mm:.1f} mm"
             )
         else:
-            self.length_label.configure(
-                text=f"Label Length: {metrics.print_length_mm:.1f} mm ({metrics.print_length_cm:.1f} cm / {metrics.print_length_in:.2f} in)"
-            )
-        self.time_label.configure(text=f"Print Time: ~{metrics.print_duration_sec:.1f} s")
-        
-        if metrics.tape_saved_mm > 0:
-            self.used_label.configure(
-                text=f"Total tape: {metrics.total_used_length_mm:.1f} mm",
-                text_color="gray",
-            )
-        else:
-            self.used_label.configure(
-                text=f"Total tape: {metrics.total_used_length_mm:.1f} mm",
-                text_color="gray",
-            )
-
-        if metrics.warning:
-            self.warning_label.configure(text=f"⚠ {metrics.warning}")
-        else:
-            self.warning_label.configure(text="")
+            self.length_label.configure(text=f"{metrics.print_length_mm:.1f} mm label")
+        self.used_label.configure(
+            text=f"{metrics.total_used_length_mm:.0f} mm of tape · about {max(metrics.print_duration_sec, 1):.0f} s to print"
+        )
+        self.warning_label.configure(text=metrics.warning or "")
 
         self._redraw()
 
     def _redraw(self):
-        """Draws the active image centered and scaled on canvas."""
+        """Draws the label centred and scaled, on a strip of tape with cut lines at both ends."""
         self.canvas.delete("all")
         active_img = self._raster_image if self.view_mode == "raster" else self._preview_image
-
         if active_img is None:
             return
 
@@ -178,52 +121,61 @@ class TapePreviewWidget(ctk.CTkFrame):
         if cw <= 10 or ch <= 10:
             return
 
-        # Determine target scaling factor
         img_w, img_h = active_img.size
+        lead = TAPE_LEAD_PX if self.view_mode == "tape" else 0
 
         if self.zoom_mode == "fit":
-            # Leave 24px margin horizontally and 16px vertically
-            max_w = max(cw - 24, 80)
-            max_h = max(ch - 16, 40)
-            scale = min(max_w / img_w, max_h / img_h, 4.0)
-            scale = max(scale, 0.4)
+            max_w = max(cw - 2 * lead - 24, 80)
+            max_h = max(ch - 28, 40)
+            scale = max(min(max_w / img_w, max_h / img_h, 4.0), 0.4)
         else:
             scale = float(self.zoom_mode)
 
         disp_w = max(int(img_w * scale), 1)
         disp_h = max(int(img_h * scale), 1)
 
-        # Scale image with crisp resampling
         if self.view_mode == "raster":
             resized = active_img.convert("RGB").resize((disp_w, disp_h), Image.Resampling.NEAREST)
         else:
             resized = active_img.resize((disp_w, disp_h), Image.Resampling.LANCZOS)
 
-        # Center in canvas
-        x = max((cw - disp_w) // 2, 20)
-        y = max((ch - disp_h) // 2, 15)
+        x = max((cw - disp_w) // 2, lead + 12)
+        y = max((ch - disp_h) // 2, 14)
 
-        # Draw subtle tape drop shadow
-        shadow_box = [x - 2, y + 2, x + disp_w + 3, y + disp_h + 4]
-        self.canvas.create_rectangle(
-            shadow_box[0], shadow_box[1], shadow_box[2], shadow_box[3],
-            fill="#0A0A0A", outline="", width=0
-        )
+        if self.view_mode == "tape":
+            self._draw_tape_strip(x, y, disp_w, disp_h, active_img, scale)
 
-        # Render image
         self._photo_ref = ImageTk.PhotoImage(resized)
         self.canvas.create_image(x, y, anchor="nw", image=self._photo_ref)
 
-        # Draw tape border box
-        border_color = "#444444" if self.view_mode == "raster" else "#888888"
-        self.canvas.create_rectangle(
-            x - 1, y - 1, x + disp_w, y + disp_h,
-            outline=border_color, width=1
-        )
+        if self.view_mode == "raster":
+            self.canvas.create_rectangle(x - 1, y - 1, x + disp_w, y + disp_h, outline="#444444", width=1)
+        else:
+            self._draw_cut_lines(x, y, disp_w, disp_h)
 
-        # Draw subtle cut position marker above the edge
-        if self.view_mode != "raster":
-            self.canvas.create_text(
-                x + disp_w - 2, max(y - 8, 4),
-                text="✂ Cut", fill="#888888", font=("Segoe UI", 9)
-            )
+    def _draw_tape_strip(self, x: int, y: int, disp_w: int, disp_h: int, img: Image.Image, scale: float):
+        """Unprinted tape before and after the label, dimmed so the label stands out."""
+        try:
+            tape_rgb = img.convert("RGB").getpixel((0, 0))
+        except Exception:
+            tape_rgb = (255, 255, 255)
+        dim = _blend(tape_rgb, (30, 30, 30), 0.45)
+
+        top, bottom = y, y + disp_h
+        if self._tape_spec:
+            # The rendered canvas is slightly taller than the tape; trim to the tape itself
+            margin = (self._tape_spec["canvas_height"] - self._tape_spec["tape_height"]) / 2 * scale
+            top, bottom = y + margin, y + disp_h - margin
+
+        self.canvas.create_rectangle(x - TAPE_LEAD_PX, top, x, bottom, fill=dim, outline="")
+        self.canvas.create_rectangle(x + disp_w, top, x + disp_w + TAPE_LEAD_PX, bottom, fill=dim, outline="")
+
+    def _draw_cut_lines(self, x: int, y: int, disp_w: int, disp_h: int):
+        ch = self.canvas.winfo_height()
+        for cx in (x, x + disp_w):
+            self.canvas.create_line(cx, y - 6, cx, y + disp_h + 6, fill=CUT_LINE_COLOR, dash=(4, 3))
+        # Scissors under the end cut, kept inside the canvas
+        self.canvas.create_text(
+            x + disp_w, min(y + disp_h + 8, ch - 2), text="✂", anchor="n" if y + disp_h + 20 < ch else "s",
+            fill=CUT_LINE_COLOR, font=("Segoe UI Symbol", 10),
+        )
