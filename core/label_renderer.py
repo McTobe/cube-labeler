@@ -404,6 +404,14 @@ class LabelRenderer:
         img_canvas, spec, print_border, printable_h, canvas_h, effective_size = (
             self._render_base_canvas(config)
         )
+
+        # Bin labels are drawn border to border; leave the same tape around them as in a queue
+        if getattr(config, "inventory_config", None) is not None:
+            pad = BATCH_GAP_DOTS // 2
+            padded = Image.new("RGB", (img_canvas.width + 2 * pad, img_canvas.height), "white")
+            padded.paste(img_canvas, (pad, 0))
+            img_canvas = padded
+
         draw = ImageDraw.Draw(img_canvas)
 
         # Draw cut guide lines if enabled

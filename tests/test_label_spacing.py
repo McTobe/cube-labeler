@@ -31,6 +31,14 @@ class TestLabelSpacing(unittest.TestCase):
             left, _, right, _ = _ink_bbox(canvas)
             self.assertLessEqual(abs(left - (canvas.width - right)), 1, text)
 
+    def test_single_bin_label_has_side_padding(self):
+        cfg = LabelConfig(inventory_config=build_presets("en")["A2"].config)
+        preview = self.renderer.render(cfg)[0]
+        left, _, right, _ = _ink_bbox(preview)
+        margin = BATCH_GAP_DOTS // 2
+        self.assertGreaterEqual(left, margin)
+        self.assertGreaterEqual(preview.width - right, margin)
+
     def test_every_queued_label_has_equal_cut_margins(self):
         configs = [
             LabelConfig(text="Test"),
