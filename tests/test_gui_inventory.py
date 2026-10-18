@@ -32,8 +32,7 @@ def test_gui_inventory():
     assert app.design_bar_frame.winfo_manager() == "pack", "Design bar should be visible in Hardware Studio"
 
     # 2. Select Preset A2: Socket Cap 2-Bin (M3 x30 x35)
-    app.inventory_tab_widget.preset_combo.set("A2: Socket Cap 2-Bin (M3 x30 x35)")
-    app.inventory_tab_widget._on_preset_selected("A2: Socket Cap 2-Bin (M3 x30 x35)")
+    app.inventory_tab_widget._on_preset_selected("A2")
     app.update()
 
     assert app.config.inventory_config.thread_size == "M3"
@@ -51,12 +50,13 @@ def test_gui_inventory():
     assert len(app.label_queue) == 1, f"Expected 1 item, got {len(app.label_queue)}"
 
     # 3. Select Preset B1: Ball Bearings (KULLAGER 608ZZ)
-    app.inventory_tab_widget.preset_combo.set("B1: Ball Bearings (KULLAGER 608ZZ)")
-    app.inventory_tab_widget._on_preset_selected("B1: Ball Bearings (KULLAGER 608ZZ)")
+    app.inventory_tab_widget._on_preset_selected("B1")
+    # Banner text depends on the user's label language setting
+    expected_banner = app.inventory_tab_widget.presets["B1"].config.category_banner
     app.update()
 
     assert isinstance(app.config.inventory_config, ComponentLabelConfig)
-    assert app.config.inventory_config.category_banner == "KULLAGER"
+    assert app.config.inventory_config.category_banner == expected_banner
     assert app.config.inventory_config.spec_primary == "608ZZ"
 
     if os.path.isdir(artifact_dir):
@@ -68,8 +68,7 @@ def test_gui_inventory():
     assert len(app.label_queue) == 2, f"Expected 2 items, got {len(app.label_queue)}"
 
     # 4. Add Preset B2: WAGO 221-413
-    app.inventory_tab_widget.preset_combo.set("B2: WAGO 3-Way Splicing (WAGO 221-413)")
-    app.inventory_tab_widget._on_preset_selected("B2: WAGO 3-Way Splicing (WAGO 221-413)")
+    app.inventory_tab_widget._on_preset_selected("B2")
     app.update()
     app._on_add_to_queue()
     app.update()
@@ -96,7 +95,7 @@ def test_gui_inventory():
 
     assert app.studio_mode_seg.get() == "🔩 Hardware & Bins Studio", f"Expected mode '🔩 Hardware & Bins Studio', got '{app.studio_mode_seg.get()}'"
     assert app.inventory_tab_widget.active_archetype == "component"
-    assert app.inventory_tab_widget.entry_banner_b.get() == "KULLAGER"
+    assert app.inventory_tab_widget.entry_banner_b.get() == expected_banner
     assert app.inventory_tab_widget.entry_spec_pri.get() == "608ZZ"
 
     # 7. Test custom component icon

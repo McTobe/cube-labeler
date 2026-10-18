@@ -14,8 +14,18 @@ from typing import Callable, Optional
 from core.inventory_renderer import (
     FastenerLabelConfig,
     ComponentLabelConfig,
-    INVENTORY_PRESETS,
 )
+from core.label_language import (
+    LANGUAGES,
+    build_presets,
+    component_categories,
+    fastener_categories,
+    get_label_language,
+    set_label_language,
+)
+
+TYPE_FASTENER = "Screws and nuts"
+TYPE_COMPONENT = "Components"
 from ui.icon_browser import IconBrowserDialog
 from ui.ai_generator_dialog import AIGeneratorDialog
 
@@ -30,8 +40,10 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.on_add_queue = on_add_queue
 
         self.active_archetype = "fastener"  # "fastener" (Archetype A) or "component" (Archetype B)
-        self.fastener_cfg = copy.deepcopy(INVENTORY_PRESETS["A2: Socket Cap 2-Bin (M3 x30 x35)"])
-        self.component_cfg = copy.deepcopy(INVENTORY_PRESETS["B1: Ball Bearings (KULLAGER 608ZZ)"])
+        self.language = get_label_language()
+        self.presets = build_presets(self.language)
+        self.fastener_cfg = copy.deepcopy(self.presets["A2"].config)
+        self.component_cfg = copy.deepcopy(self.presets["B1"].config)
 
         self._updating_ui = False
         self._setup_ui()
@@ -51,13 +63,13 @@ class HardwareInventoryTab(ctk.CTkFrame):
             if isinstance(cfg, FastenerLabelConfig):
                 self.active_archetype = "fastener"
                 self.fastener_cfg = copy.deepcopy(cfg)
-                self.archetype_seg.set("🔩 Threaded Fasteners (Type A)")
+                self.archetype_seg.set(TYPE_FASTENER)
                 self.frame_component.pack_forget()
                 self.frame_fastener.pack(fill="both", expand=True, padx=12, pady=10)
             elif isinstance(cfg, ComponentLabelConfig):
                 self.active_archetype = "component"
                 self.component_cfg = copy.deepcopy(cfg)
-                self.archetype_seg.set("⚡ Components & Electrical (Type B)")
+                self.archetype_seg.set(TYPE_COMPONENT)
                 self.frame_fastener.pack_forget()
                 self.frame_component.pack(fill="both", expand=True, padx=12, pady=10)
             self._update_form_values()
@@ -71,26 +83,36 @@ class HardwareInventoryTab(ctk.CTkFrame):
         top_bar.pack(fill="x", padx=12, pady=(8, 10))
 
         # Archetype Switcher
-        ctk.CTkLabel(top_bar, text="Archetype:", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(top_bar, text="Label type", font=ctk.CTkFont(size=12, weight="bold")).pack(side="left", padx=(0, 6))
         self.archetype_seg = ctk.CTkSegmentedButton(
             top_bar,
-            values=["🔩 Threaded Fasteners (Type A)", "⚡ Components & Electrical (Type B)"],
+            values=[TYPE_FASTENER, TYPE_COMPONENT],
             command=self._on_archetype_switch,
         )
-        self.archetype_seg.set("🔩 Threaded Fasteners (Type A)")
+        self.archetype_seg.set(TYPE_FASTENER)
         self.archetype_seg.pack(side="left", padx=4)
 
         # Preset Quick-Loader
-        ctk.CTkLabel(top_bar, text="Catalog Presets:").pack(side="left", padx=(25, 6))
-        preset_names = list(INVENTORY_PRESETS.keys())
+        ctk.CTkLabel(top_bar, text="Presets").pack(side="left", padx=(25, 6))
         self.preset_combo = ctk.CTkComboBox(
             top_bar,
-            values=preset_names,
-            width=260,
+            values=[p.name for p in self.presets.values()],
+            width=270,
             command=self._on_preset_selected,
         )
-        self.preset_combo.set("A2: Socket Cap 2-Bin (M3 x30 x35)")
+        self.preset_combo.set(self.presets["A2"].name)
         self.preset_combo.pack(side="left", padx=4)
+
+        # Language of the printed label text (the app itself stays English)
+        self.language_combo = ctk.CTkComboBox(
+            top_bar,
+            values=list(LANGUAGES.values()),
+            width=110,
+            command=self._on_language_changed,
+        )
+        self.language_combo.set(LANGUAGES[self.language])
+        self.language_combo.pack(side="right", padx=4)
+        ctk.CTkLabel(top_bar, text="Label language").pack(side="right", padx=(25, 6))
 
         # 2. Form Container Frame
         self.form_frame = ctk.CTkFrame(self, corner_radius=8)
@@ -117,7 +139,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         r1 = ctk.CTkFrame(f, fg_color="transparent")
         r1.pack(fill="x", pady=4)
 
-        ctk.CTkLabel(r1, text="Thread Anchor (Solid Inverted):", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(r1, text="Size", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
         self.entry_thread = ctk.CTkComboBox(
             r1,
             values=["M2", "M2.5", "M3", "M4", "M5", "M6", "M8", "M10", "M12", "1/4\"", "#6-32"],
@@ -128,18 +150,18 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.entry_thread.pack(side="left", padx=4)
         self.entry_thread.bind("<KeyRelease>", lambda e: self._on_field_change())
 
-        ctk.CTkLabel(r1, text="Category Header:").pack(side="left", padx=(20, 6))
+        ctk.CTkLabel(r1, text="Category").pack(side="left", padx=(20, 6))
         self.entry_cat = ctk.CTkComboBox(
             r1,
-            values=["SKRUV", "MUTTER", "BRICKOR", "GÄNGSTÅNG", "SKRUV & MUTTER", "WOOD SCREW", "BOLTS"],
+            values=fastener_categories(self.language),
             width=150,
             command=lambda v: self._on_field_change(),
         )
-        self.entry_cat.set("SKRUV")
+        self.entry_cat.set(fastener_categories(self.language)[0])
         self.entry_cat.pack(side="left", padx=4)
         self.entry_cat.bind("<KeyRelease>", lambda e: self._on_field_change())
 
-        ctk.CTkLabel(r1, text="Bin Width (mm):").pack(side="left", padx=(20, 6))
+        ctk.CTkLabel(r1, text="Label length (mm)").pack(side="left", padx=(20, 6))
         self.entry_width_a = ctk.CTkEntry(r1, width=70)
         self.entry_width_a.insert(0, "38")
         self.entry_width_a.pack(side="left", padx=4)
@@ -149,7 +171,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         r2 = ctk.CTkFrame(f, fg_color="transparent")
         r2.pack(fill="x", pady=(10, 4))
 
-        ctk.CTkLabel(r2, text="Compartment Layout:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(r2, text="Layout", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
         self.mode_seg = ctk.CTkSegmentedButton(
             r2,
             values=["Single Size", "2-Bin (Dual)", "4-Bin (2×2 Grid)", "Assortment Text"],
@@ -166,7 +188,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         r4 = ctk.CTkFrame(f, fg_color="transparent")
         r4.pack(fill="x", pady=(8, 4))
 
-        ctk.CTkLabel(r4, text="Tool Drive Badge:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(r4, text="Tool icon", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
 
         self.btn_pick_tool_icon = ctk.CTkButton(
             r4,
@@ -202,7 +224,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         )
         self.btn_clear_tool_icon.pack(side="left", padx=(4, 16))
 
-        ctk.CTkLabel(r4, text="Tool Size:").pack(side="left", padx=(0, 4))
+        ctk.CTkLabel(r4, text="Tool size").pack(side="left", padx=(0, 4))
         self.entry_tool_size = ctk.CTkEntry(r4, width=65)
         self.entry_tool_size.insert(0, "2.5")
         self.entry_tool_size.pack(side="left", padx=4)
@@ -297,18 +319,18 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.r1_comp.pack(fill="x", pady=4)
         r1 = self.r1_comp
 
-        ctk.CTkLabel(r1, text="Category Banner (Inverted Strip):", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(r1, text="Category", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
         self.entry_banner_b = ctk.CTkComboBox(
             r1,
-            values=["KULLAGER", "WAGO", "SÄKRINGSHÅLLARE", "RELÄ", "MOTSTÅND", "KONDENSATOR", "DIOD", "CONNECTORS"],
+            values=component_categories(self.language),
             width=180,
             command=lambda v: self._on_field_change(),
         )
-        self.entry_banner_b.set("KULLAGER")
+        self.entry_banner_b.set(component_categories(self.language)[0])
         self.entry_banner_b.pack(side="left", padx=4)
         self.entry_banner_b.bind("<KeyRelease>", lambda e: self._on_field_change())
 
-        ctk.CTkLabel(r1, text="Width (mm):").pack(side="left", padx=(20, 6))
+        ctk.CTkLabel(r1, text="Label length (mm)").pack(side="left", padx=(20, 6))
         self.entry_width_b = ctk.CTkEntry(r1, width=70)
         self.entry_width_b.insert(0, "38")
         self.entry_width_b.pack(side="left", padx=4)
@@ -318,7 +340,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         r_icon = ctk.CTkFrame(f, fg_color="transparent")
         r_icon.pack(fill="x", pady=(4, 6))
 
-        ctk.CTkLabel(r_icon, text="Right Icon Frame:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
+        ctk.CTkLabel(r_icon, text="Icon", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 8))
 
         self.btn_pick_comp_icon = ctk.CTkButton(
             r_icon,
@@ -358,7 +380,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         r2 = ctk.CTkFrame(f, fg_color="transparent")
         r2.pack(fill="x", pady=(10, 4))
 
-        ctk.CTkLabel(r2, text="Primary Spec / Model Code:", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(r2, text="Part or model", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(0, 6))
         self.entry_spec_pri = ctk.CTkEntry(r2, width=280)
         self.entry_spec_pri.insert(0, "608ZZ")
         self.entry_spec_pri.pack(side="left", padx=4)
@@ -368,7 +390,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         r3 = ctk.CTkFrame(f, fg_color="transparent")
         r3.pack(fill="x", pady=(6, 4))
 
-        ctk.CTkLabel(r3, text="Secondary Notes / Subtitle:").pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(r3, text="Notes").pack(side="left", padx=(0, 6))
         self.entry_spec_sec = ctk.CTkEntry(r3, width=280, placeholder_text="Optional (e.g. 0.2 - 4.0 mm² / Inline Type)")
         self.entry_spec_sec.pack(side="left", padx=4)
         self.entry_spec_sec.bind("<KeyRelease>", lambda e: self._on_field_change())
@@ -378,7 +400,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
     # =========================================================================
 
     def _on_archetype_switch(self, value: str):
-        if "Fasteners" in value:
+        if value == TYPE_FASTENER:
             self.active_archetype = "fastener"
             self.frame_component.pack_forget()
             self.frame_fastener.pack(fill="both", expand=True, padx=12, pady=10)
@@ -389,23 +411,46 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self._collect_form_values()
         self.on_change()
 
-    def _on_preset_selected(self, name: str):
-        preset = INVENTORY_PRESETS.get(name)
-        if not preset:
+    def _find_preset(self, id_or_name: str):
+        """Accepts a preset id ("A2") or the name shown in the dropdown."""
+        if id_or_name in self.presets:
+            return self.presets[id_or_name]
+        for p in self.presets.values():
+            if p.name == id_or_name:
+                return p
+        return None
+
+    def _on_language_changed(self, display_name: str):
+        lang = next((code for code, name in LANGUAGES.items() if name == display_name), None)
+        if not lang or lang == self.language:
             return
+        set_label_language(lang)
+        self.language = lang
+        self.presets = build_presets(lang)
+        # Only the suggestions change; text already on the current label stays as typed
+        self.preset_combo.configure(values=[p.name for p in self.presets.values()])
+        self.entry_cat.configure(values=fastener_categories(lang))
+        self.entry_banner_b.configure(values=component_categories(lang))
+
+    def _on_preset_selected(self, name: str):
+        found = self._find_preset(name)
+        if not found:
+            return
+        preset = found.config
+        self.preset_combo.set(found.name)
 
         self._updating_ui = True
         try:
             if isinstance(preset, FastenerLabelConfig):
                 self.active_archetype = "fastener"
                 self.fastener_cfg = copy.deepcopy(preset)
-                self.archetype_seg.set("🔩 Threaded Fasteners (Type A)")
+                self.archetype_seg.set(TYPE_FASTENER)
                 self.frame_component.pack_forget()
                 self.frame_fastener.pack(fill="both", expand=True, padx=12, pady=10)
             else:
                 self.active_archetype = "component"
                 self.component_cfg = copy.deepcopy(preset)
-                self.archetype_seg.set("⚡ Components & Electrical (Type B)")
+                self.archetype_seg.set(TYPE_COMPONENT)
                 self.frame_fastener.pack_forget()
                 self.frame_component.pack(fill="both", expand=True, padx=12, pady=10)
 
@@ -511,7 +556,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         """Reads widget values into active configuration object."""
         if self.active_archetype == "fastener":
             self.fastener_cfg.thread_size = self.entry_thread.get().strip() or "M3"
-            self.fastener_cfg.category = self.entry_cat.get().strip() or "SKRUV"
+            self.fastener_cfg.category = self.entry_cat.get().strip() or fastener_categories(self.language)[0]
             try:
                 self.fastener_cfg.label_width_mm = float(self.entry_width_a.get().strip())
             except ValueError:
@@ -548,7 +593,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
                     self.fastener_cfg.assortment_line2 = self.entry_assort_2.get()
 
         else:
-            self.component_cfg.category_banner = self.entry_banner_b.get().strip() or "KULLAGER"
+            self.component_cfg.category_banner = self.entry_banner_b.get().strip() or component_categories(self.language)[0]
             self.component_cfg.spec_primary = self.entry_spec_pri.get().strip() or "608ZZ"
             self.component_cfg.spec_secondary = self.entry_spec_sec.get().strip()
             try:

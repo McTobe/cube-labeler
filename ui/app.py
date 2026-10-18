@@ -34,6 +34,13 @@ from core.specs import (
 )
 
 TAPE_WIDTH_OPTIONS = [format_tape_width(w) for w in TAPE_SPECS]
+
+# Custom Designer tab names
+TAB_TEXT = "Text"
+TAB_QR = "QR code"
+TAB_IMAGE = "Images and icons"
+TAB_TAPE = "Tape and length"
+TAB_TEMPLATES = "Templates"
 FEED_LENGTH_MM = 25.0
 from ui.tape_preview import TapePreviewWidget
 from ui.templates import (
@@ -276,11 +283,11 @@ class PrintLabelApp(ctk.CTk):
 
         # Tabview for Custom Designer Mode (Modular layer tabs only)
         self.tabview = ctk.CTkTabview(self.editor_container, command=self._on_tab_changed)
-        self.tab_text = self.tabview.add("Text & Typography")
-        self.tab_qr = self.tabview.add("QR & Barcode")
-        self.tab_image = self.tabview.add("Images & Icons")
-        self.tab_tape = self.tabview.add("Tape & Hardware")
-        self.tab_templates = self.tabview.add("Templates & Presets")
+        self.tab_text = self.tabview.add(TAB_TEXT)
+        self.tab_qr = self.tabview.add(TAB_QR)
+        self.tab_image = self.tabview.add(TAB_IMAGE)
+        self.tab_tape = self.tabview.add(TAB_TAPE)
+        self.tab_templates = self.tabview.add(TAB_TEMPLATES)
 
         # Container for Hardware & Bins Studio Mode
         self.inventory_studio_frame = ctk.CTkFrame(self.editor_container, fg_color="transparent")
@@ -311,10 +318,10 @@ class PrintLabelApp(ctk.CTk):
         left_col.pack(side="left", fill="both", expand=True, padx=(0, 8), pady=4)
 
         ctk.CTkLabel(
-            left_col, text="Label Text (supports multiline, \\n, or Enter):", font=ctk.CTkFont(size=12, weight="bold")
+            left_col, text="Label text (press Enter for a new line)", font=ctk.CTkFont(size=12, weight="bold")
         ).pack(anchor="w", pady=(0, 2))
 
-        self.text_editor = ctk.CTkTextbox(left_col, height=110, font=("Segoe UI", 13))
+        self.text_editor = ctk.CTkTextbox(left_col, height=110, font=("Segoe UI", 13), undo=True)
         self.text_editor.pack(fill="both", expand=True, pady=(0, 6))
         self.text_editor.insert("1.0", "HELLO WORLD\nBrother PT-P300BT")
         self.text_editor.bind("<KeyRelease>", lambda e: self._on_text_changed())
@@ -370,20 +377,20 @@ class PrintLabelApp(ctk.CTk):
         self.auto_fit_var = ctk.BooleanVar(value=True)
         self.chk_autofit = ctk.CTkCheckBox(
             size_row,
-            text="Auto-Fit to Tape Height",
+            text="Fit to tape height",
             variable=self.auto_fit_var,
             command=self._on_autofit_toggle,
         )
         self.chk_autofit.pack(side="left", padx=(0, 10))
 
-        self.fixed_size_label = ctk.CTkLabel(size_row, text="Size:")
+        self.fixed_size_label = ctk.CTkLabel(size_row, text="Size")
         self.fixed_size_label.pack(side="left", padx=(10, 4))
         self.fixed_size_slider = ctk.CTkSlider(
             size_row, from_=8, to=80, number_of_steps=72, width=130, command=self._on_fixed_size_slide
         )
         self.fixed_size_slider.set(36)
         self.fixed_size_slider.pack(side="left", padx=4)
-        self.fixed_size_val_label = ctk.CTkLabel(size_row, text="36 pt", width=45)
+        self.fixed_size_val_label = ctk.CTkLabel(size_row, text="36 pt", width=90, anchor="w")
         self.fixed_size_val_label.pack(side="left")
 
         # Font Scaling & Line Spacing
@@ -555,7 +562,7 @@ class PrintLabelApp(ctk.CTk):
         self.qr_enable_var = ctk.BooleanVar(value=False)
         self.chk_qr_enable = ctk.CTkSwitch(
             container,
-            text="Enable QR Code on Label",
+            text="Add a QR code",
             variable=self.qr_enable_var,
             command=self._on_qr_toggle,
             font=ctk.CTkFont(size=13, weight="bold"),
@@ -563,12 +570,11 @@ class PrintLabelApp(ctk.CTk):
         self.chk_qr_enable.pack(anchor="w", pady=(0, 10))
 
         # QR Data Entry
-        ctk.CTkLabel(container, text="QR Code Payload (URL, Text, WiFi):").pack(anchor="w", pady=(4, 2))
+        ctk.CTkLabel(container, text="QR code content (a link, text, or Wi-Fi details)").pack(anchor="w", pady=(4, 2))
         self.qr_data_entry = ctk.CTkEntry(
             container, placeholder_text="https://example.com or WIFI:S:MyNet;P:Secret;;", width=500
         )
         self.qr_data_entry.pack(fill="x", pady=(0, 10))
-        self.qr_data_entry.insert(0, "https://github.com/Ircama/PT-P300BT")
         self.qr_data_entry.bind("<KeyRelease>", lambda e: self._on_qr_data_changed())
 
         # QR Settings Controls
@@ -616,7 +622,7 @@ class PrintLabelApp(ctk.CTk):
         file_row.pack(fill="x", pady=(0, 10))
 
         self.btn_pick_img = ctk.CTkButton(
-            file_row, text="🖼 Choose File...", width=130, command=self._on_browse_image
+            file_row, text="Choose image…", width=130, command=self._on_browse_image
         )
         self.btn_pick_img.pack(side="left", padx=(0, 6))
 
@@ -664,7 +670,7 @@ class PrintLabelApp(ctk.CTk):
         self.img_scale_label.grid(row=0, column=4, sticky="w")
 
         # Threshold Slider (monochrome cutoff)
-        ctk.CTkLabel(img_ctrl_grid, text="Binarization Threshold:").grid(row=1, column=0, sticky="w", pady=6)
+        ctk.CTkLabel(img_ctrl_grid, text="Darkness cutoff").grid(row=1, column=0, sticky="w", pady=6)
         self.threshold_slider = ctk.CTkSlider(
             img_ctrl_grid, from_=20, to=220, number_of_steps=40, width=160, command=self._on_threshold_slide
         )
@@ -720,7 +726,7 @@ class PrintLabelApp(ctk.CTk):
         row2.pack(fill="x", pady=8)
 
         # Fixed Length override
-        ctk.CTkLabel(row2, text="Fixed Width (mm):").pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(row2, text="Fixed length (mm)").pack(side="left", padx=(0, 6))
         self.fixed_width_entry = ctk.CTkEntry(row2, width=80, placeholder_text="Auto")
         self.fixed_width_entry.pack(side="left", padx=4)
         self.fixed_width_entry.bind("<KeyRelease>", lambda e: self._on_fixed_width_changed())
@@ -728,7 +734,7 @@ class PrintLabelApp(ctk.CTk):
         # Guides & Rulers checkboxes
         self.chk_guides_var = ctk.BooleanVar(value=False)
         self.chk_guides = ctk.CTkCheckBox(
-            row2, text="Print Area Guides", variable=self.chk_guides_var, command=self._on_guides_toggle
+            row2, text="Show printable area", variable=self.chk_guides_var, command=self._on_guides_toggle
         )
         self.chk_guides.pack(side="left", padx=(30, 10))
 
@@ -755,7 +761,7 @@ class PrintLabelApp(ctk.CTk):
         # Reset Settings Button
         self.btn_reset_settings = ctk.CTkButton(
             row3,
-            text="↺ Reset Settings to Default",
+            text="Reset settings",
             font=ctk.CTkFont(size=12),
             height=32,
             width=200,
@@ -774,7 +780,7 @@ class PrintLabelApp(ctk.CTk):
         container = ctk.CTkFrame(tab, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=12, pady=10)
 
-        ctk.CTkLabel(container, text="1-Click Label Presets:", font=ctk.CTkFont(size=12, weight="bold")).pack(
+        ctk.CTkLabel(container, text="Presets", font=ctk.CTkFont(size=12, weight="bold")).pack(
             anchor="w", pady=(0, 6)
         )
 
@@ -799,12 +805,12 @@ class PrintLabelApp(ctk.CTk):
         io_row.pack(fill="x", pady=(10, 0))
 
         self.btn_save_template = ctk.CTkButton(
-            io_row, text="💾 Save Current Design to JSON...", command=self._on_save_template
+            io_row, text="Save template…", command=self._on_save_template
         )
         self.btn_save_template.pack(side="left", padx=6)
 
         self.btn_load_template = ctk.CTkButton(
-            io_row, text="📂 Open Design from JSON...", command=self._on_load_template
+            io_row, text="Open template…", command=self._on_load_template
         )
         self.btn_load_template.pack(side="left", padx=6)
 
@@ -841,9 +847,9 @@ class PrintLabelApp(ctk.CTk):
 
         self.queue_saved_badge = ctk.CTkLabel(
             stats_box,
-            text="🎉 Tape Saved: 0.0 mm (Add 2+ labels to batch & eliminate wasted lead-in tape!)",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color="#4CAF50",
+            text="Labels in the queue print as one strip, saving about 25 mm of tape per extra label.",
+            font=ctk.CTkFont(size=12),
+            text_color="gray",
             anchor="w",
         )
         self.queue_saved_badge.pack(fill="x", pady=(4, 0))
@@ -917,8 +923,8 @@ class PrintLabelApp(ctk.CTk):
             self.queue_count_label.configure(text="Queue: 0 Labels")
             self.queue_stats_label.configure(text="Total Chain Length: 0.0 mm | Est. Duration: 0.0 s")
             self.queue_saved_badge.configure(
-                text="🎉 Tape Saved: 0.0 mm (Add 2+ labels to batch & eliminate wasted lead-in tape!)",
-                text_color="#4CAF50",
+                text="Labels in the queue print as one strip, saving about 25 mm of tape per extra label.",
+                text_color="gray",
             )
 
             # Empty state widget
@@ -933,14 +939,14 @@ class PrintLabelApp(ctk.CTk):
 
             ctk.CTkLabel(
                 empty_frame,
-                text="Your Print Queue is Empty",
+                text="Your print queue is empty",
                 font=ctk.CTkFont(size=15, weight="bold"),
             ).pack(pady=2)
 
             ctk.CTkLabel(
                 empty_frame,
-                text="Design a label in any tab, then click '➕ Add to Queue' or press Ctrl+Enter.\n"
-                     "All queued labels print as one continuous strip with dotted cut lines, saving ~25mm of tape per label!",
+                text="Design a label, then choose Add to queue or press Ctrl+Enter.\n"
+                     "Queued labels print as one strip with dotted cut lines between them.",
                 font=ctk.CTkFont(size=12),
                 text_color="gray",
                 justify="center",
@@ -974,19 +980,18 @@ class PrintLabelApp(ctk.CTk):
         try:
             _, _, _, b_metrics = self.renderer.render_batch(self.label_queue)
             saved = b_metrics.tape_saved_mm
-            saved_in = saved / 25.4
             self.queue_count_label.configure(text=f"Queue: {count} Labels")
             self.queue_stats_label.configure(
                 text=f"Total Chain: {b_metrics.print_length_mm:.1f} mm ({b_metrics.print_length_in:.2f} in)  |  Est. Print Duration: ~{b_metrics.print_duration_sec:.1f} s"
             )
             if saved > 0:
                 self.queue_saved_badge.configure(
-                    text=f"🎉 Tape Saved: {saved:.1f} mm (~{saved_in:.2f} in) — avoided {count - 1} blank feed cycles!",
+                    text=f"Saves {saved:.1f} mm of tape compared with printing {count} labels separately.",
                     text_color="#4CAF50",
                 )
             else:
                 self.queue_saved_badge.configure(
-                    text="Add 1 more label to start saving tape on this batch!",
+                    text="Add another label to start saving tape.",
                     text_color="gray",
                 )
         except Exception:
@@ -1163,9 +1168,9 @@ class PrintLabelApp(ctk.CTk):
             first_line = first_line[:22] + "..."
 
         if q_len > 1:
-            msg = f"Added #{q_len} '{first_line}' to queue! 🎉 Total tape saved so far: {tape_saved:.1f} mm"
+            msg = f"Added '{first_line}' to the queue ({q_len} labels, saves {tape_saved:.0f} mm of tape)"
         else:
-            msg = f"Added #{q_len} '{first_line}' to queue. Add more labels to eliminate wasted tape!"
+            msg = f"Added '{first_line}' to the queue"
 
         self.action_status_label.configure(text=msg)
 
@@ -1252,7 +1257,7 @@ class PrintLabelApp(ctk.CTk):
                 self._show_custom_designer()
                 self.config = cfg
                 self._update_ui_from_config(cfg)
-                self.tabview.set("Text & Typography")
+                self.tabview.set(TAB_TEXT)
                 self._on_tab_changed()
             self._preview_mode = "current"
             self.btn_preview_mode.configure(text="👁 Preview Chain", fg_color="#1976D2")
@@ -1500,6 +1505,8 @@ class PrintLabelApp(ctk.CTk):
             self._current_metrics = metrics
 
             self.preview_widget.update_content(prev_img, rast_img, metrics)
+            if getattr(self.config, "inventory_config", None) is None:
+                self._sync_size_controls()
         except Exception as e:
             self.action_status_label.configure(text=f"Render error: {e}")
 
@@ -1534,6 +1541,18 @@ class PrintLabelApp(ctk.CTk):
     def _on_autofit_toggle(self):
         self.config.auto_fit_font = self.auto_fit_var.get()
         self._trigger_render()
+
+    def _sync_size_controls(self):
+        """The size slider only applies when auto-fit is off; say so instead of ignoring it."""
+        if not hasattr(self, "fixed_size_slider"):
+            return
+        if self.config.auto_fit_font:
+            self.fixed_size_slider.configure(state="disabled")
+            size = self._current_metrics.effective_font_size if self._current_metrics else None
+            self.fixed_size_val_label.configure(text=f"Auto ({size} pt)" if size else "Auto")
+        else:
+            self.fixed_size_slider.configure(state="normal")
+            self.fixed_size_val_label.configure(text=f"{self.config.fixed_font_size} pt")
 
     def _on_fixed_size_slide(self, value):
         val = int(value)
@@ -1691,8 +1710,14 @@ class PrintLabelApp(ctk.CTk):
         self.config.show_rulers = self.chk_rulers_var.get()
         self._trigger_render()
 
-    def _on_reset_settings(self):
-        """Resets all configuration settings back to defaults."""
+    def _on_reset_settings(self, confirm: bool = True):
+        """Resets all configuration settings back to defaults (keeps the label text)."""
+        if confirm and not messagebox.askyesno(
+            "Reset settings",
+            "Reset font, size, QR code, image and tape settings to their defaults? "
+            "Your label text is kept.",
+        ):
+            return
         cur_text = self.text_editor.get("1.0", "end-1c")
         self.config = LabelConfig(
             text=cur_text,
@@ -1865,7 +1890,7 @@ class PrintLabelApp(ctk.CTk):
         is_virt = self.virtual_mode_var.get()
         if is_virt:
             self.status_badge.configure(text="● Simulation Mode", text_color="#00B0FF")
-            self.action_status_label.configure(text="Operating in Virtual Simulation Mode.")
+            self.action_status_label.configure(text="Ready (simulation)")
         else:
             self.status_badge.configure(text="● Connecting...", text_color="#FDD835")
             self.action_status_label.configure(text="Physical Mode: Connecting to printer...")
@@ -2107,7 +2132,7 @@ class PrintLabelApp(ctk.CTk):
         self._set_busy(False)
         self.progress_bar.set(1.0)
         if status.completion_confirmed:
-            self.action_status_label.configure(text="Print job completed successfully!")
+            self.action_status_label.configure(text="Printed")
         else:
             self.action_status_label.configure(
                 text="Print sent, but the printer did not confirm completion. Check the label."
@@ -2172,14 +2197,13 @@ class PrintLabelApp(ctk.CTk):
             )
             return
 
-        success_msg = f"🎉 Batch printed {count} labels successfully! Eliminated {tape_saved:.1f} mm of wasted tape."
+        success_msg = f"Printed {count} labels"
         self.action_status_label.configure(text=success_msg)
 
         if messagebox.askyesno(
-            "Batch Print Complete",
-            f"Successfully printed batch of {count} labels!\n\n"
-            f"Eliminated {tape_saved:.1f} mm (~{tape_saved/25.4:.2f} in) of wasted tape.\n\n"
-            "Would you like to clear the print queue now?"
+            "Queue printed",
+            f"Printed {count} labels as one strip.\n\n"
+            "Clear the print queue?"
         ):
             self.label_queue.clear()
             self._refresh_queue_display()
