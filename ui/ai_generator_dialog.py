@@ -96,65 +96,20 @@ class AIGeneratorDialog(ctk.CTkToplevel):
         # Open on the free, offline option; the Gemini tabs need a paid API key
         self.tabview.set("📥 Clean & Import Image")
 
-        # --- API Key Section below tabs ---
-        api_frame = ctk.CTkFrame(left_frame)
-        api_frame.pack(fill="x", padx=8, pady=(0, 8))
-
-        api_top = ctk.CTkFrame(api_frame, fg_color="transparent")
-        api_top.pack(fill="x", padx=10, pady=(6, 2))
-
-        ctk.CTkLabel(
-            api_top,
-            text="Google Gemini API Key:",
-            font=ctk.CTkFont(size=12, weight="bold"),
-        ).pack(side="left")
-
-        btn_get_key = ctk.CTkButton(
-            api_top,
-            text="Get Free Key ↗",
-            width=90,
-            height=20,
-            fg_color="transparent",
-            text_color="#38BDF8",
-            hover_color="gray25",
-            font=ctk.CTkFont(size=11, underline=True),
-            command=self._open_ai_studio_link,
+        # The Gemini key lives in Settings; just say whether it's set
+        key_note = (
+            "Gemini options use the API key saved in Settings."
+            if config_manager.gemini_api_key
+            else "Gemini options need an API key. Add one in Settings in the main window."
         )
-        btn_get_key.pack(side="right")
-
-        api_input_row = ctk.CTkFrame(api_frame, fg_color="transparent")
-        api_input_row.pack(fill="x", padx=10, pady=(0, 6))
-
-        self.entry_api_key = ctk.CTkEntry(
-            api_input_row,
-            placeholder_text="Enter Gemini API Key (saved locally in ~/.printlabel/config.json)",
-            show="•",
-            font=ctk.CTkFont(size=12),
+        self.lbl_key_note = ctk.CTkLabel(
+            left_frame, text=key_note, anchor="w", text_color="gray60", font=ctk.CTkFont(size=11)
         )
-        self.entry_api_key.pack(side="left", fill="x", expand=True, padx=(0, 6))
-        if config_manager.gemini_api_key:
-            self.entry_api_key.insert(0, config_manager.gemini_api_key)
-
-        btn_save_key = ctk.CTkButton(
-            api_input_row,
-            text="Save Key",
-            width=75,
-            command=self._save_api_key,
-        )
-        btn_save_key.pack(side="right")
+        self.lbl_key_note.pack(fill="x", padx=12, pady=(0, 8))
 
         # --- Right Side: Preview & Save ---
         self._build_preview_panel(right_frame)
 
-    def _open_ai_studio_link(self):
-        import webbrowser
-        webbrowser.open("https://aistudio.google.com/app/apikey")
-
-    def _save_api_key(self):
-        key = self.entry_api_key.get().strip()
-        config_manager.gemini_api_key = key
-        ai_generator.api_key = key
-        messagebox.showinfo("Gemini API", "API key saved successfully!", parent=self)
 
     def _build_tab_photo(self):
         # 1. Source Image Picker
@@ -550,15 +505,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             messagebox.showwarning("Missing Photo", "Please select a component photo first.", parent=self)
             return
 
-        api_key = self.entry_api_key.get().strip()
+        api_key = self._api_key_or_warn()
         if not api_key:
-            messagebox.showwarning(
-                "Missing Gemini API Key",
-                "Please enter your Google Gemini API Key below.\n\n"
-                "You can get an API key from Google AI Studio (click 'Get Free Key ↗').\n"
-                "Or generate with Gemini Web Chat (gemini.google.com) and use the 'Clean & Import Image' tab.",
-                parent=self,
-            )
             return
 
         self._set_loading(True, "Contacting Gemini API & generating wireframe...")
@@ -584,15 +532,8 @@ class AIGeneratorDialog(ctk.CTkToplevel):
             messagebox.showwarning("Missing Description", "Please enter a component description.", parent=self)
             return
 
-        api_key = self.entry_api_key.get().strip()
+        api_key = self._api_key_or_warn()
         if not api_key:
-            messagebox.showwarning(
-                "Missing API Key",
-                "Please enter your Google Gemini API Key below.\n\n"
-                "You can get an API key from Google AI Studio (click 'Get Free Key ↗').\n"
-                "Or generate with Gemini Web Chat (gemini.google.com) and use the 'Clean & Import Image' tab.",
-                parent=self,
-            )
             return
 
         self._set_loading(True, "Generating wireframe from description with Gemini...")
@@ -606,6 +547,17 @@ class AIGeneratorDialog(ctk.CTkToplevel):
                 return_raw=True,
             )
         )
+
+    def _api_key_or_warn(self) -> str:
+        key = config_manager.gemini_api_key
+        if not key:
+            messagebox.showwarning(
+                "Add a Gemini API key",
+                "Gemini needs an API key. Add one under Settings in the main window.\n\n"
+                "Or make the icon in Gemini on the web and bring it in with 'Clean & Import Image'.",
+                parent=self,
+            )
+        return key
 
     def _run_generation(self, generate: Callable[[], Image.Image]):
         """

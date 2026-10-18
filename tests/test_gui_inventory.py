@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Headless GUI test for V2 Hardware Inventory Tab, Catalog Presets, and Batch Queue Integration.
+Headless GUI test for the bin label editor, its presets, and queue integration.
 """
 
 import os
@@ -13,8 +13,9 @@ if BASE_DIR not in sys.path:
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from ui.app import PrintLabelApp
+from ui.app import PrintLabelApp, VIEW_BIN, VIEW_QUEUE
 from core.inventory_renderer import FastenerLabelConfig, ComponentLabelConfig
+
 
 def test_gui_inventory():
     app = PrintLabelApp()
@@ -22,83 +23,72 @@ def test_gui_inventory():
     app.update_idletasks()
     app.update()
 
-    # 1. Switch to Hardware & Bins Studio Mode
-    app.studio_mode_seg.set("🔩 Hardware & Bins Studio")
-    app._on_studio_mode_changed("🔩 Hardware & Bins Studio")
+    # 1. Switch to the bin label view from the rail
+    app.sidebar.buttons[VIEW_BIN].invoke()
     app.update()
 
-    assert app.config.inventory_config is not None, "inventory_config should be active in Hardware & Bins Studio"
+    assert app._view == VIEW_BIN
+    assert app.config.inventory_config is not None, "inventory_config should be active for bin labels"
     assert isinstance(app.config.inventory_config, FastenerLabelConfig), "Default should be FastenerLabelConfig"
-    assert app.design_bar_frame.winfo_manager() == "pack", "Design bar should be visible in Hardware Studio"
+    assert app.btn_print.winfo_ismapped() and app.btn_add_queue.winfo_ismapped()
+    assert not app.designer_panel.winfo_ismapped(), "Text settings panel should hide for bin labels"
 
-    # 2. Select Preset A2: Socket Cap 2-Bin (M3 x30 x35)
+    # 2. Preset A2: socket cap, 2 bins
     app.inventory_tab_widget._on_preset_selected("A2")
     app.update()
-
     assert app.config.inventory_config.thread_size == "M3"
     assert app.config.inventory_config.compartment_mode == "dual"
 
-    # Save preview image
     # Optional: set PRINTLABEL_TEST_ARTIFACTS to a folder to keep preview images
     artifact_dir = os.environ.get("PRINTLABEL_TEST_ARTIFACTS", "")
     if os.path.isdir(artifact_dir):
         app._current_preview.save(os.path.join(artifact_dir, "test_gui_inventory_a2.png"))
 
-    # Add to Queue
     app._on_add_to_queue()
     app.update()
     assert len(app.label_queue) == 1, f"Expected 1 item, got {len(app.label_queue)}"
 
-    # 3. Select Preset B1: Ball Bearings (KULLAGER 608ZZ)
+    # 3. Preset B1: ball bearings
     app.inventory_tab_widget._on_preset_selected("B1")
     # Banner text depends on the user's label language setting
     expected_banner = app.inventory_tab_widget.presets["B1"].config.category_banner
     app.update()
-
     assert isinstance(app.config.inventory_config, ComponentLabelConfig)
     assert app.config.inventory_config.category_banner == expected_banner
     assert app.config.inventory_config.spec_primary == "608ZZ"
 
-    if os.path.isdir(artifact_dir):
-        app._current_preview.save(os.path.join(artifact_dir, "test_gui_inventory_b1.png"))
-
-    # Add to Queue via the action bar button
+    # Add to queue via the action bar button
     app.btn_add_queue.invoke()
     app.update()
     assert len(app.label_queue) == 2, f"Expected 2 items, got {len(app.label_queue)}"
 
-    # 4. Add Preset B2: WAGO 221-413
+    # 4. Preset B2: WAGO
     app.inventory_tab_widget._on_preset_selected("B2")
     app.update()
     app._on_add_to_queue()
     app.update()
     assert len(app.label_queue) == 3, f"Expected 3 items, got {len(app.label_queue)}"
 
-    # 5. Switch to Print Queue tab via mode bar button
-    app._open_queue_tab()
+    # 5. Queue view
+    app.sidebar.buttons[VIEW_QUEUE].invoke()
     app.update()
-
     saved_text = app.queue_saved_badge.cget("text")
     print("Queue Saved Badge:", saved_text)
     assert "50.0 mm" in saved_text
+    assert app.btn_print.cget("text") == "Print queue (3)"
 
-    assert app.design_bar_frame.winfo_manager() == "", "Design bar should hide on Print Queue tab"
-    assert app.queue_bar_frame.winfo_manager() == "pack", "Queue bar should show on Print Queue tab"
-
-    # Verify batch chain preview
     if os.path.isdir(artifact_dir):
         app._current_preview.save(os.path.join(artifact_dir, "test_gui_inventory_queue_batch.png"))
 
-    # 6. Test Loading Item #2 (Component B1) back into editor
+    # 6. Edit queued item 2 (component B1): opens the bin label editor
     app._on_load_queue_item(1)
     app.update()
-
-    assert app.studio_mode_seg.get() == "🔩 Hardware & Bins Studio", f"Expected mode '🔩 Hardware & Bins Studio', got '{app.studio_mode_seg.get()}'"
+    assert app._view == VIEW_BIN
     assert app.inventory_tab_widget.active_archetype == "component"
     assert app.inventory_tab_widget.entry_banner_b.get() == expected_banner
     assert app.inventory_tab_widget.entry_spec_pri.get() == "608ZZ"
 
-    # 7. Test custom component icon
+    # 7. Custom component icon
     custom_icon_path = os.path.join(artifact_dir, "scratch", "sample_custom_icon.png")
     if os.path.exists(custom_icon_path):
         app.inventory_tab_widget._set_comp_icon_path(custom_icon_path)
@@ -108,6 +98,7 @@ def test_gui_inventory():
 
     print("SUCCESS: Headless GUI Hardware Inventory tests passed!")
     app.destroy()
+
 
 if __name__ == "__main__":
     test_gui_inventory()

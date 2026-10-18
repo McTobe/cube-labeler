@@ -103,17 +103,6 @@ class HardwareInventoryTab(ctk.CTkFrame):
         self.preset_combo.set(self.presets["A2"].name)
         self.preset_combo.pack(side="left", padx=4)
 
-        # Language of the printed label text (the app itself stays English)
-        self.language_combo = ctk.CTkComboBox(
-            top_bar,
-            values=list(LANGUAGES.values()),
-            width=110,
-            command=self._on_language_changed,
-        )
-        self.language_combo.set(LANGUAGES[self.language])
-        self.language_combo.pack(side="right", padx=4)
-        ctk.CTkLabel(top_bar, text="Label language").pack(side="right", padx=(25, 6))
-
         # 2. Form Container Frame
         self.form_frame = ctk.CTkFrame(self, corner_radius=8)
         self.form_frame.pack(fill="both", expand=True, padx=12, pady=(0, 8))
@@ -420,9 +409,9 @@ class HardwareInventoryTab(ctk.CTkFrame):
                 return p
         return None
 
-    def _on_language_changed(self, display_name: str):
-        lang = next((code for code, name in LANGUAGES.items() if name == display_name), None)
-        if not lang or lang == self.language:
+    def set_language(self, lang: str):
+        """Switches the language of category suggestions and presets (set in Settings)."""
+        if lang not in LANGUAGES or lang == self.language:
             return
         set_label_language(lang)
         self.language = lang

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """
-Headless GUI test for Queue System & Tape Waste Reduction.
+Headless GUI test for the text label editor, the print queue, and view switching.
 """
 
 import os
 import sys
-import time
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
@@ -14,8 +13,17 @@ if BASE_DIR not in sys.path:
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
-from ui.app import PrintLabelApp
-from core.label_renderer import LabelConfig
+from ui.app import PrintLabelApp, VIEW_QUEUE, VIEW_SETTINGS, VIEW_TEMPLATES, VIEW_TEXT
+
+
+def _add_text_label(app, text, **config):
+    app.text_editor.delete("1.0", "end")
+    app.text_editor.insert("1.0", text)
+    for key, value in config.items():
+        setattr(app.config, key, value)
+    app._on_add_to_queue()
+    app.update()
+
 
 def test_gui_queue():
     app = PrintLabelApp()
@@ -23,79 +31,69 @@ def test_gui_queue():
     app.update_idletasks()
     app.update()
 
-    # 1. Add Label 1 to Queue
-    app.text_editor.delete("1.0", "end")
-    app.text_editor.insert("1.0", "1. KITCHEN - BASIL")
-    app.config.tape_bg_color = "#FFFFFF"
-    app.config.tape_fg_color = "#000000"
-    app._on_add_to_queue()
-    app.update()
+    # Starts on the text label view with the settings panel showing
+    assert app._view == VIEW_TEXT
+    assert app.sidebar.active == VIEW_TEXT
+    assert app.designer_panel.winfo_ismapped(), "Settings panel should show for text labels"
+    assert app.btn_print.cget("text") == "Print"
 
-    assert len(app.label_queue) == 1, f"Expected 1 item, got {len(app.label_queue)}"
-
-    # 2. Add Label 2 to Queue
-    app.text_editor.delete("1.0", "end")
-    app.text_editor.insert("1.0", "2. KITCHEN - PAPRIKA")
-    app.config.tape_bg_color = "#FDD835"  # Yellow tape
-    app.config.tape_fg_color = "#000000"
-    app._on_add_to_queue()
-    app.update()
-
-    assert len(app.label_queue) == 2, f"Expected 2 items, got {len(app.label_queue)}"
-
-    # 3. Add Label 3 to Queue
-    app.text_editor.delete("1.0", "end")
-    app.text_editor.insert("1.0", "3. KITCHEN - ROSEMARY")
-    app.config.tape_bg_color = "#FFFFFF"
-    app.config.tape_fg_color = "#000000"
-    app.config.qr_enabled = True
-    app.config.qr_data = "https://example.com/recipe/rosemary"
-    app._on_add_to_queue()
-    app.update()
-
+    # Add three labels
+    _add_text_label(app, "1. KITCHEN - BASIL", tape_bg_color="#FFFFFF", tape_fg_color="#000000")
+    _add_text_label(app, "2. KITCHEN - PAPRIKA", tape_bg_color="#FDD835", tape_fg_color="#000000")
+    _add_text_label(
+        app,
+        "3. KITCHEN - ROSEMARY",
+        tape_bg_color="#FFFFFF",
+        qr_enabled=True,
+        qr_data="https://example.com/recipe/rosemary",
+    )
     assert len(app.label_queue) == 3, f"Expected 3 items, got {len(app.label_queue)}"
+    assert app.sidebar.buttons[VIEW_QUEUE].cget("text").endswith("3"), "Rail should show the queue count"
 
-    # Switch to Print Queue view via top bar button
-    app._open_queue_tab()
+    # Queue view: whole-strip preview, one main button, no settings panel
+    app.sidebar.buttons[VIEW_QUEUE].invoke()
     app.update()
-
-    # Verify metrics
+    assert app._view == VIEW_QUEUE
+    assert not app.designer_panel.winfo_ismapped(), "Settings panel should hide in the queue view"
+    assert app._current_metrics.label_count == 3, "Queue view should preview the whole strip"
     saved_text = app.queue_saved_badge.cget("text")
     print("Queue Saved Badge:", saved_text)
     assert "50.0 mm" in saved_text, f"Expected 50.0 mm in badge, got: {saved_text}"
+    assert app.btn_print.cget("text") == "Print queue (3)"
+    assert app.btn_print.cget("state") == "normal"
+    assert not app.btn_add_queue.winfo_ismapped(), "Add to queue should hide in the queue view"
 
-    # Verify dynamic action bar switching to Queue Bar
-    assert app.design_bar_frame.winfo_manager() == "", "Design bar should be hidden on Print Queue tab"
-    assert app.queue_bar_frame.winfo_manager() == "pack", "Queue bar should be packed on Print Queue tab"
-    assert app.btn_print_batch.cget("state") == "normal"
-    assert "PRINT QUEUE" in app.btn_print_batch.cget("text")
-    assert app.btn_clear_queue.cget("state") == "normal"
-    assert app.btn_preview_mode.cget("state") == "normal"
-
-    # Test Preview Chain toggle button
-    app._toggle_preview_mode()
-    app.update()
-    print("Preview mode after toggle:", app._preview_mode)
-
-    # Test Reordering (Move item 2 down)
+    # Reorder: move item 1 down
     app._on_move_queue_item(0, 1)
     app.update()
     assert "PAPRIKA" in app.label_queue[0].text
 
-    # Test Load button (Load queue item 0 into editor)
+    # Edit a queued label: opens the text editor with its text
     app._on_load_queue_item(0)
     app.update()
     loaded_text = app.text_editor.get("1.0", "end-1c")
-    print(f"Loaded item into editor: '{loaded_text}', active tab: '{app.tabview.get()}'")
+    print(f"Loaded item into editor: '{loaded_text}', view: '{app._view}'")
     assert "PAPRIKA" in loaded_text, f"Expected PAPRIKA in text editor, got {loaded_text}"
-    assert app.tabview.get() == "Text"
+    assert app._view == VIEW_TEXT
+    assert app.btn_add_queue.winfo_ismapped(), "Add to queue should be back in the editor"
+    assert app.action_frame.winfo_ismapped(), "Action bar must stay visible at the bottom"
 
-    # Verify action bar switched back to Design Bar
-    assert app.design_bar_frame.winfo_manager() == "pack", "Design bar should be packed on Text & Typography tab"
-    assert app.queue_bar_frame.winfo_manager() == "", "Queue bar should be hidden on Text & Typography tab"
-    assert app.action_frame.winfo_ismapped(), "Action frame must remain mapped and visible at bottom"
+    # Templates and Settings have nothing to print
+    for view in (VIEW_TEMPLATES, VIEW_SETTINGS):
+        app.sidebar.buttons[view].invoke()
+        app.update()
+        assert app._view == view
+        assert not app.btn_print.winfo_ismapped(), f"Print should hide in the {view} view"
+        assert not app.preview_widget.winfo_ismapped(), f"Preview should hide in the {view} view"
 
-    # Test Reset Settings button
+    # Applying a template opens it in the text editor
+    first_template = next(iter(app.templates_view.cards))
+    app._apply_preset_and_edit(first_template)
+    app.update()
+    assert app._view == VIEW_TEXT
+    assert app.btn_print.winfo_ismapped()
+
+    # Reset settings
     app.config.tape_bg_color = "#E53935"
     app.config.show_guides = True
     app._on_reset_settings(confirm=False)
@@ -105,16 +103,24 @@ def test_gui_queue():
     assert app.config.auto_cut_hardware is True, "Auto-cut flag should stay at its default"
     assert app.config.cut_line is False, "Cut guide lines should be False for single labels"
 
-    # Save batch preview image to artifacts directory
+    # Printer panel opens and closes from the chip
+    app.printer_chip.invoke()
+    app.update()
+    assert app.printer_panel.winfo_ismapped()
+    app._hide_printer_panel()
+    app.update()
+    assert not app.printer_panel.winfo_ismapped()
+
     # Optional: set PRINTLABEL_TEST_ARTIFACTS to a folder to keep preview images
     artifact_dir = os.environ.get("PRINTLABEL_TEST_ARTIFACTS", "")
     if app._current_preview and os.path.isdir(artifact_dir):
         out_img_path = os.path.join(artifact_dir, "batch_queue_tape_preview.png")
         app._current_preview.save(out_img_path)
-        print(f"Saved batch queue preview to: {out_img_path}")
+        print(f"Saved preview to: {out_img_path}")
 
     app.destroy()
     print("SUCCESS: Headless GUI queue tests passed!")
+
 
 if __name__ == "__main__":
     test_gui_queue()
