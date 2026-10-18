@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from core.font_manager import font_manager
+from core.specs import DOT_PITCH_MM, INVENTORY_TAPE_WIDTH_MM, get_tape_spec
 
 
 @dataclass
@@ -73,8 +74,9 @@ class InventoryRenderer:
     Outputs 1-bit base canvas (64 dots height for 12mm tape) ready for thermal printing.
     """
 
-    DOT_PITCH_MM = 0.149  # ~180 DPI
-    PRINTABLE_HEIGHT = 64  # dots for 12mm tape
+    DOT_PITCH_MM = DOT_PITCH_MM
+    # Layouts are designed for 12 mm tape only; see core.specs.INVENTORY_TAPE_WIDTH_MM
+    PRINTABLE_HEIGHT = get_tape_spec(INVENTORY_TAPE_WIDTH_MM)["printable_height"]
     SUPERSAMPLE = 4        # 4x internal rendering for crisp geometric vector drawing
 
     def __init__(self):

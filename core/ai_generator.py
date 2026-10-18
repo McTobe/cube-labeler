@@ -15,7 +15,7 @@ import json
 import base64
 import urllib.request
 import urllib.error
-from typing import Tuple, Optional
+from typing import List, Optional, Tuple
 from PIL import Image, ImageFilter, ImageOps
 
 from core.config import config_manager
@@ -178,6 +178,19 @@ def local_edge_filter(
     return post_process_thermal(line_art, line_thickness=line_thickness)
 
 
+# Tried in order after the configured model, but only when a model does not exist (HTTP 404)
+FALLBACK_IMAGE_MODELS = [
+    "gemini-3.1-flash-image",
+    "gemini-3.1-flash-lite-image",
+    "gemini-2.5-flash-image",
+    "gemini-3-pro-image",
+]
+
+
+class ModelNotFoundError(RuntimeError):
+    """Raised when the requested Gemini model does not exist for this API key."""
+
+
 class GeminiWireframeGenerator:
     """Client for Google Gemini & Imagen API to generate monochrome line art."""
 
@@ -189,7 +202,8 @@ class GeminiWireframeGenerator:
         if not key:
             raise ValueError("Gemini API key is not set. Please enter your API key in settings.")
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+        # The key goes in a header, never the URL, so it cannot leak through logs or proxies
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         data = json.dumps(payload).encode("utf-8")
 
         req = urllib.request.Request(
@@ -198,6 +212,7 @@ class GeminiWireframeGenerator:
             headers={
                 "Content-Type": "application/json",
                 "User-Agent": "PrintLabel-Studio/2.0",
+                "x-goog-api-key": key,
             },
             method="POST",
         )
@@ -222,6 +237,8 @@ class GeminiWireframeGenerator:
                     msg = err_json.get("error", {}).get("message", err_body)
                 except Exception:
                     msg = err_body
+            if e.code == 404:
+                raise ModelNotFoundError(f"Gemini model '{model}' was not found: {msg}")
             raise RuntimeError(f"Gemini API Error ({e.code}): {msg}")
         except Exception as e:
             raise RuntimeError(f"Network error calling Gemini API: {e}")
@@ -230,7 +247,7 @@ class GeminiWireframeGenerator:
         self,
         input_image: Image.Image,
         custom_instructions: str = "",
-        model: str = "gemini-3.1-flash-image",
+        model: Optional[str] = None,
         line_thickness: int = 1,
         return_raw: bool = False,
     ) -> Image.Image:
@@ -278,49 +295,12 @@ class GeminiWireframeGenerator:
             },
         }
 
-        # Try active image generation models in Google AI Studio
-        models_to_try = [m for m in [model, "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-3-pro-image"] if m]
-        # Deduplicate while preserving order
-        seen = set()
-        dedup_models = []
-        for m in models_to_try:
-            if m not in seen:
-                seen.add(m)
-                dedup_models.append(m)
-        models_to_try = dedup_models
-        last_err = None
-
-        for m in models_to_try:
-            try:
-                res = self._call_gemini_rest(m, payload)
-                candidates = res.get("candidates", [])
-                if not candidates:
-                    raise RuntimeError(f"No candidate received from {m}.")
-
-                parts = candidates[0].get("content", {}).get("parts", [])
-                for part in parts:
-                    if "inlineData" in part:
-                        img_bytes = base64.b64decode(part["inlineData"]["data"])
-                        raw_result = Image.open(io.BytesIO(img_bytes))
-                        if return_raw:
-                            return raw_result
-                        return post_process_thermal(raw_result, line_thickness=line_thickness)
-
-                text_content = " ".join(p.get("text", "") for p in parts)
-                raise RuntimeError(f"Model returned text instead of image: {text_content[:200]}")
-            except Exception as e:
-                last_err = e
-                # If it's a quota or auth error, don't try other models that will fail identically
-                if "Quota Limit" in str(e) or "API Error (400)" in str(e) or "API Error (403)" in str(e):
-                    raise e
-                continue
-
-        raise last_err or RuntimeError("Failed to generate wireframe image with Gemini.")
+        return self._generate_image(payload, model, line_thickness, return_raw)
 
     def generate_from_text(
         self,
         prompt: str,
-        model: str = "gemini-3.1-flash-image",
+        model: Optional[str] = None,
         line_thickness: int = 1,
         return_raw: bool = False,
     ) -> Image.Image:
@@ -344,41 +324,46 @@ class GeminiWireframeGenerator:
             },
         }
 
-        models_to_try = [m for m in [model, "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image", "gemini-2.5-flash-image", "gemini-3-pro-image"] if m]
-        seen = set()
-        dedup_models = []
-        for m in models_to_try:
-            if m not in seen:
-                seen.add(m)
-                dedup_models.append(m)
-        models_to_try = dedup_models
-        last_err = None
+        return self._generate_image(payload, model, line_thickness, return_raw)
 
-        for m in models_to_try:
+    @staticmethod
+    def _models_to_try(model: Optional[str]) -> List[str]:
+        preferred = model or config_manager.gemini_model
+        ordered = [preferred] + FALLBACK_IMAGE_MODELS
+        return list(dict.fromkeys(m for m in ordered if m))
+
+    def _generate_image(
+        self, payload: dict, model: Optional[str], line_thickness: int, return_raw: bool
+    ) -> Image.Image:
+        """
+        Calls the preferred model and returns its image. Falls back to the next model only
+        when a model does not exist, so a real failure is never retried (and billed) again.
+        """
+        last_err: Optional[Exception] = None
+        for m in self._models_to_try(model):
             try:
                 res = self._call_gemini_rest(m, payload)
-                candidates = res.get("candidates", [])
-                if not candidates:
-                    raise RuntimeError(f"No candidate received from {m}.")
-
-                parts = candidates[0].get("content", {}).get("parts", [])
-                for part in parts:
-                    if "inlineData" in part:
-                        img_bytes = base64.b64decode(part["inlineData"]["data"])
-                        raw_result = Image.open(io.BytesIO(img_bytes))
-                        if return_raw:
-                            return raw_result
-                        return post_process_thermal(raw_result, line_thickness=line_thickness)
-
-                text_content = " ".join(p.get("text", "") for p in parts)
-                raise RuntimeError(f"Model returned text instead of image: {text_content[:200]}")
-            except Exception as e:
+            except ModelNotFoundError as e:
                 last_err = e
-                if "Quota Limit" in str(e) or "API Error (400)" in str(e) or "API Error (403)" in str(e):
-                    raise e
                 continue
 
-        raise last_err or RuntimeError("Failed to generate wireframe image from text with Gemini.")
+            candidates = res.get("candidates", [])
+            if not candidates:
+                raise RuntimeError(f"No candidate received from {m}.")
+
+            parts = candidates[0].get("content", {}).get("parts", [])
+            for part in parts:
+                if "inlineData" in part:
+                    img_bytes = base64.b64decode(part["inlineData"]["data"])
+                    raw_result = Image.open(io.BytesIO(img_bytes))
+                    if return_raw:
+                        return raw_result
+                    return post_process_thermal(raw_result, line_thickness=line_thickness)
+
+            text_content = " ".join(p.get("text", "") for p in parts)
+            raise RuntimeError(f"Model {m} returned text instead of an image: {text_content[:200]}")
+
+        raise last_err or RuntimeError("Failed to generate wireframe image with Gemini.")
 
 
 # Global generator instance

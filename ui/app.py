@@ -9,8 +9,10 @@ import sys
 import copy
 import queue
 import threading
+import traceback
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from typing import Callable, List, Optional
 import customtkinter as ctk
 from PIL import Image
 
@@ -23,13 +25,22 @@ from core.printer import (
 )
 from core.ptstatus import PrinterStatus
 from core.config import config_manager
+from core.specs import (
+    INVENTORY_TAPE_WIDTH_MM,
+    TAPE_SPECS,
+    format_tape_width,
+    tape_width_from_status,
+)
+
+TAPE_WIDTH_OPTIONS = [format_tape_width(w) for w in TAPE_SPECS]
+FEED_LENGTH_MM = 25.0
 from ui.tape_preview import TapePreviewWidget
 from ui.templates import (
     BUILTIN_PRESETS,
     get_preset_names,
     load_preset,
     export_config_to_json,
-    import_config_from_json,
+    load_config_from_json,
 )
 from ui.inventory_tab import HardwareInventoryTab
 from ui.icon_browser import IconBrowserDialog
@@ -102,14 +113,18 @@ class PrintLabelApp(ctk.CTk):
 
     def _process_task_queue(self):
         """Periodically processes callbacks posted by worker threads."""
-        try:
-            while True:
+        while True:
+            try:
                 cb = self._task_queue.get_nowait()
+            except queue.Empty:
+                break
+            try:
                 cb()
-        except queue.Empty:
-            pass
-        except Exception:
-            pass
+            except Exception:
+                # Keep processing later callbacks; never let one failure stall the UI silently.
+                # sys.stderr is None in the windowed .exe build.
+                if sys.stderr:
+                    traceback.print_exc()
         try:
             self.after(40, self._process_task_queue)
         except Exception:
@@ -506,6 +521,13 @@ class PrintLabelApp(ctk.CTk):
 
     def _build_inventory_studio(self):
         """Constructs the dedicated Hardware Inventory Studio."""
+        ctk.CTkLabel(
+            self.inventory_studio_frame,
+            text="Hardware labels are designed for 12 mm tape and always print at 12 mm.",
+            font=ctk.CTkFont(size=11),
+            text_color="gray60",
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(4, 0))
         self.inventory_tab_widget = HardwareInventoryTab(
             self.inventory_studio_frame,
             on_change=self._on_inventory_field_changed,
@@ -666,7 +688,7 @@ class PrintLabelApp(ctk.CTk):
         ctk.CTkLabel(row1, text="Tape Width:").pack(side="left", padx=(0, 8))
         self.tape_width_seg = ctk.CTkSegmentedButton(
             row1,
-            values=["12mm", "9mm", "6mm", "3.5mm"],
+            values=TAPE_WIDTH_OPTIONS,
             command=self._on_tape_width_changed,
         )
         self.tape_width_seg.set("12mm")
@@ -993,7 +1015,7 @@ class PrintLabelApp(ctk.CTk):
                     mode_str = inv.compartment_mode.capitalize()
                     tool_str = inv.tool_type.replace("_", " ").upper()
                     details = [
-                        f"Tape: {cfg.tape_width_mm}mm",
+                        f"Tape: {format_tape_width(cfg.tape_width_mm)}",
                         f"Type: Fastener ({mode_str})",
                         f"Drive: {tool_str}",
                         f"Width: {inv.label_width_mm}mm",
@@ -1002,7 +1024,7 @@ class PrintLabelApp(ctk.CTk):
                     card_title = f"📦 {inv.category_banner}: {inv.spec_primary}"
                     icon_str = inv.icon_type.replace("_", " ").upper()
                     details = [
-                        f"Tape: {cfg.tape_width_mm}mm",
+                        f"Tape: {format_tape_width(cfg.tape_width_mm)}",
                         f"Type: Component",
                         f"Icon: {icon_str}",
                         f"Width: {inv.label_width_mm}mm",
@@ -1013,7 +1035,7 @@ class PrintLabelApp(ctk.CTk):
                     first_line = first_line[:32] + "..."
                 card_title = first_line
                 details = [
-                    f"Tape: {cfg.tape_width_mm}mm",
+                    f"Tape: {format_tape_width(cfg.tape_width_mm)}",
                     f"Font: {cfg.font_name}",
                 ]
                 if cfg.qr_enabled and cfg.qr_data:
@@ -1109,6 +1131,7 @@ class PrintLabelApp(ctk.CTk):
             else:
                 label_summary = f"{inv.category_banner} {inv.spec_primary}"
             cfg_copy.text = label_summary
+            cfg_copy.tape_width_mm = INVENTORY_TAPE_WIDTH_MM
             first_line = label_summary
         else:
             raw_text = self.text_editor.get("1.0", "end-1c")
@@ -1117,6 +1140,18 @@ class PrintLabelApp(ctk.CTk):
                 return
             cfg_copy.text = raw_text
             first_line = raw_text.strip().splitlines()[0] if raw_text.strip() else "[Label]"
+
+        # A batch prints as one continuous strip, so every label must share one tape width
+        if self.label_queue:
+            queue_width = float(self.label_queue[0].tape_width_mm)
+            if float(cfg_copy.tape_width_mm) != queue_width:
+                messagebox.showwarning(
+                    "Different Tape Width",
+                    f"The print queue is for {format_tape_width(queue_width)} tape, but this label is "
+                    f"{format_tape_width(cfg_copy.tape_width_mm)}.\n\n"
+                    "Print or clear the queue before adding labels for a different tape.",
+                )
+                return
 
         self.label_queue.append(cfg_copy)
         self._refresh_queue_display()
@@ -1248,8 +1283,8 @@ class PrintLabelApp(ctk.CTk):
             self.qr_data_entry.insert(0, cfg.qr_data or "")
             self.qr_pos_seg.set("Left of Text" if cfg.qr_position == "left" else "Right of Text")
 
-            tw_str = f"{cfg.tape_width_mm}mm"
-            if tw_str in ["12mm", "9mm", "6mm", "3.5mm"]:
+            tw_str = format_tape_width(cfg.tape_width_mm)
+            if tw_str in TAPE_WIDTH_OPTIONS:
                 self.tape_width_seg.set(tw_str)
 
             self.config.tape_bg_color = cfg.tape_bg_color
@@ -1345,6 +1380,21 @@ class PrintLabelApp(ctk.CTk):
             command=self._on_export_png,
         )
         self.btn_export.pack(side="left", padx=4)
+
+        # Feed Tape Button (advances printed tape past the manual cutter)
+        self.btn_feed_tape = ctk.CTkButton(
+            self.design_bar_frame,
+            text="✂ Feed Tape",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            height=40,
+            width=110,
+            fg_color="#546E7A",
+            hover_color="#37474F",
+            text_color="white",
+            text_color_disabled="white",
+            command=self._on_feed_tape_clicked,
+        )
+        self.btn_feed_tape.pack(side="left", padx=4)
 
         # 2. Queue Mode Bar Buttons (Packed when viewing Print Queue)
         self.queue_bar_frame = ctk.CTkFrame(self.action_btn_container, fg_color="transparent")
@@ -1604,8 +1654,7 @@ class PrintLabelApp(ctk.CTk):
         self._trigger_render()
 
     def _on_tape_width_changed(self, value: str):
-        num = float(value.replace("mm", ""))
-        self.config.tape_width_mm = int(num)
+        self.config.tape_width_mm = float(value.replace("mm", ""))
         self._trigger_render()
 
     def _on_color_scheme_changed(self, value: str):
@@ -1725,12 +1774,21 @@ class PrintLabelApp(ctk.CTk):
             filetypes=[("JSON Files", "*.json")],
         )
         if p and os.path.isfile(p):
-            cfg = import_config_from_json(p)
-            if cfg:
+            try:
+                cfg = load_config_from_json(p)
+            except (OSError, ValueError) as e:
+                messagebox.showerror("Could Not Load Template", str(e))
+                return
+            if cfg.inventory_config is not None and hasattr(self, "inventory_tab_widget"):
+                self._show_hardware_studio()
+                self.config = cfg
+                self.inventory_tab_widget.load_inventory_config(cfg.inventory_config)
+            else:
+                self._show_custom_designer()
                 self.config = cfg
                 self._update_ui_from_config(cfg)
-                self._trigger_render()
-                messagebox.showinfo("Success", "Template loaded successfully.")
+            self._trigger_render()
+            messagebox.showinfo("Success", "Template loaded successfully.")
 
     # =========================================================================
     # PORT MANAGEMENT & TELEMETRY
@@ -1812,16 +1870,31 @@ class PrintLabelApp(ctk.CTk):
             self.action_status_label.configure(text="Physical Mode: Connecting to printer...")
             self._on_query_status()
 
-    def _on_query_status(self):
-        """Asynchronously queries printer hardware status."""
-        self.action_status_label.configure(text="Querying printer status...")
-
-        is_virt = self.virtual_mode_var.get()
+    def _get_selected_port(self) -> Optional[str]:
+        """Returns the selected COM port device, or None if no valid port is selected."""
         port = getattr(self, "_selected_port_device", None)
-        if not port and not is_virt:
+        if not port:
             cur_val = self.port_var.get()
             if cur_val and cur_val != "No Ports Found":
                 port = cur_val.split()[0]
+        return port
+
+    def _is_hardware_studio_active(self) -> bool:
+        return (
+            hasattr(self, "inventory_studio_frame")
+            and self.inventory_studio_frame.winfo_manager() == "pack"
+        )
+
+    def _on_query_status(self):
+        """Asynchronously queries printer hardware status."""
+        # Never open the port while a print job owns it
+        if self.is_printing:
+            return
+
+        self.action_status_label.configure(text="Querying printer status...")
+
+        is_virt = self.virtual_mode_var.get()
+        port = None if is_virt else self._get_selected_port()
 
         def _worker(virt_mode=is_virt, port_name=port):
             try:
@@ -1829,7 +1902,7 @@ class PrintLabelApp(ctk.CTk):
                     printer = MockBrotherPrinter()
                     status = printer.get_status()
                 else:
-                    if not port_name or port_name == "No Ports Found":
+                    if not port_name:
                         raise RuntimeError("Please select a valid COM port from the dropdown.")
                     printer = BrotherPrinter(port_name)
                     status = printer.get_status()
@@ -1843,26 +1916,46 @@ class PrintLabelApp(ctk.CTk):
 
     def _apply_telemetry(self, status: PrinterStatus):
         color = "#2E7D32" if status.is_ready else "#E63946"
-        stat_text = "● Ready" if status.is_ready else f"● {status.phase_name}"
+        if status.is_ready:
+            stat_text = "● Ready"
+        elif status.errors:
+            stat_text = f"● {status.errors[0]}"
+        elif not status.tape_loaded:
+            stat_text = "● No Tape"
+        else:
+            stat_text = f"● {status.phase_name}"
         self.status_badge.configure(text=stat_text, text_color=color)
 
+        loaded_width = tape_width_from_status(status.tape_width_mm)
         self.battery_badge.configure(text=f"Power: {status.power_status}")
         self.tape_badge.configure(
-            text=f"Tape: {status.tape_width_mm}mm ({status.bg_color_name}/{status.fg_color_name})"
+            text=f"Tape: {format_tape_width(loaded_width)} ({status.bg_color_name}/{status.fg_color_name})"
         )
 
         # Update tape width selector if matched
-        tw_str = f"{status.tape_width_mm}mm"
-        if tw_str in ["12mm", "9mm", "6mm", "3.5mm"]:
+        tw_str = format_tape_width(loaded_width)
+        if tw_str in TAPE_WIDTH_OPTIONS:
             self.tape_width_seg.set(tw_str)
-            self.config.tape_width_mm = status.tape_width_mm
+            self.config.tape_width_mm = loaded_width
 
         # Update colors
         self.config.tape_bg_color = status.bg_color_hex
         self.config.tape_fg_color = status.fg_color_hex
         self._trigger_render()
 
-        self.action_status_label.configure(text=f"Connected to {status.model_name}. Status: Ready.")
+        if status.is_ready:
+            msg = f"Connected to {status.model_name}. Status: Ready."
+        else:
+            problems = ", ".join(status.errors) if status.errors else (
+                "No tape loaded" if not status.tape_loaded else status.phase_name
+            )
+            msg = f"Connected to {status.model_name}. Not ready: {problems}."
+        if self._is_hardware_studio_active() and loaded_width != INVENTORY_TAPE_WIDTH_MM:
+            msg += (
+                f" Hardware labels need {format_tape_width(INVENTORY_TAPE_WIDTH_MM)} tape; "
+                f"{tw_str} is loaded."
+            )
+        self.action_status_label.configure(text=msg)
 
     def _handle_query_error(self, err: str):
         self.status_badge.configure(text="● Query Failed", text_color="#E63946")
@@ -1887,6 +1980,70 @@ class PrintLabelApp(ctk.CTk):
             except Exception as e:
                 messagebox.showerror("Export Failed", str(e))
 
+    def _exceeds_max_length(self, metrics: Optional[LabelMetrics]) -> bool:
+        """Shows an error and returns True if the label is longer than the printer allows."""
+        if metrics and metrics.total_used_length_mm > LabelRenderer.MAX_TOTAL_LENGTH_MM:
+            messagebox.showerror(
+                "Label Too Long",
+                f"This label needs {metrics.total_used_length_mm:.0f} mm of tape, but the printer's "
+                f"limit is {LabelRenderer.MAX_TOTAL_LENGTH_MM:.0f} mm. Shorten it or split the queue.",
+            )
+            return True
+        return False
+
+    def _set_busy(self, busy: bool):
+        """Enables or disables every printer action while a job is running."""
+        self.is_printing = busy
+        state = "disabled" if busy else "normal"
+        for name in ("btn_print", "btn_add_queue", "btn_feed_tape"):
+            if hasattr(self, name):
+                getattr(self, name).configure(state=state)
+        queue_state = "normal" if (not busy and self.label_queue) else "disabled"
+        for name in ("btn_print_batch", "btn_clear_queue", "btn_preview_mode"):
+            if hasattr(self, name):
+                getattr(self, name).configure(state=queue_state)
+
+    def _run_printer_job(
+        self,
+        job: Callable,
+        on_success: Callable[[PrinterStatus], None],
+        progress_text: Callable[[int, int], str],
+    ) -> bool:
+        """
+        Runs job(printer, progress_cb, status_cb) on a worker thread against the selected
+        printer, posting results back to the Tk main loop. Returns False if it did not start.
+        """
+        if self.is_printing:
+            return False
+
+        is_virt = self.virtual_mode_var.get()
+        port = None if is_virt else self._get_selected_port()
+        if not is_virt and not port:
+            messagebox.showerror("No Printer", "No serial COM port selected. Check Bluetooth pairing.")
+            return False
+
+        self._set_busy(True)
+        self.progress_bar.set(0.0)
+
+        def _prog(cur, total):
+            pct = cur / total if total else 1.0
+            self._post_to_main(lambda p=pct, m=progress_text(cur, total): self._update_progress(p, m))
+
+        def _stat(msg):
+            self._post_to_main(lambda m=msg: self.action_status_label.configure(text=m))
+
+        def _worker():
+            try:
+                printer = MockBrotherPrinter() if is_virt else BrotherPrinter(port)
+                status = job(printer, _prog, _stat)
+                self._post_to_main(lambda s=status: on_success(s))
+            except Exception as e:
+                err_msg = str(e)
+                self._post_to_main(lambda m=err_msg: self._print_failure(m))
+
+        threading.Thread(target=_worker, daemon=True).start()
+        return True
+
     def _on_print_clicked(self):
         # If in batch preview mode or in Print Queue view, print batch
         if self._preview_mode == "batch" or self._is_queue_view_active():
@@ -1901,86 +2058,62 @@ class PrintLabelApp(ctk.CTk):
             messagebox.showwarning("Warning", "No label data to print.")
             return
 
-        self.is_printing = True
-        self.btn_print.configure(state="disabled")
-        if hasattr(self, "btn_add_queue"):
-            self.btn_add_queue.configure(state="disabled")
-        if hasattr(self, "btn_feed_tape"):
-            self.btn_feed_tape.configure(state="disabled")
-        if hasattr(self, "btn_print_batch"):
-            self.btn_print_batch.configure(state="disabled")
-        self.progress_bar.set(0.0)
-
-        is_virt = self.virtual_mode_var.get()
-        port = getattr(self, "_selected_port_device", None)
-        if not port and not is_virt:
-            cur_val = self.port_var.get()
-            if cur_val and cur_val != "No Ports Found":
-                port = cur_val.split()[0]
+        if self._exceeds_max_length(self._current_metrics):
+            return
 
         auto_cut = self.config.auto_cut_hardware
         data = self._current_raster_bytes
+        required_width = (
+            INVENTORY_TAPE_WIDTH_MM if getattr(self.config, "inventory_config", None) is not None else None
+        )
 
-        def _print_worker(virt_mode=is_virt, port_name=port, do_cut=auto_cut, raster=data):
-            try:
-                if virt_mode:
-                    printer = MockBrotherPrinter()
-                else:
-                    if not port_name or port_name == "No Ports Found":
-                        raise RuntimeError("No serial COM port selected. Check Bluetooth pairing.")
-                    printer = BrotherPrinter(port_name)
+        def _job(printer, prog, stat):
+            return printer.print_raster_data(
+                data,
+                auto_cut=auto_cut,
+                progress_callback=prog,
+                status_callback=stat,
+                required_tape_width_mm=required_width,
+            )
 
-                def _prog(cur, total):
-                    pct = cur / total
-                    self._post_to_main(lambda p=pct, c=cur, t=total: self._update_progress(p, f"Sending data: {c}/{t} lines..."))
+        self._run_printer_job(
+            _job,
+            on_success=self._print_success,
+            progress_text=lambda c, t: f"Sending data: {c}/{t} lines...",
+        )
 
-                def _stat(msg):
-                    self._post_to_main(lambda m=msg: self.action_status_label.configure(text=m))
+    def _on_feed_tape_clicked(self):
+        """Advances the tape past the manual cutter blade."""
+        def _job(printer, prog, stat):
+            return printer.feed_tape(FEED_LENGTH_MM, status_callback=stat)
 
-                final_status = printer.print_raster_data(
-                    raster,
-                    auto_cut=do_cut,
-                    progress_callback=_prog,
-                    status_callback=_stat,
-                )
-                self._post_to_main(lambda s=final_status: self._print_success(s))
-            except Exception as e:
-                err_msg = str(e)
-                self._post_to_main(lambda m=err_msg: self._print_failure(m))
-
-        threading.Thread(target=_print_worker, daemon=True).start()
+        self._run_printer_job(
+            _job,
+            on_success=self._feed_success,
+            progress_text=lambda c, t: f"Feeding tape: {c}/{t}...",
+        )
 
     def _update_progress(self, pct: float, msg: str):
         self.progress_bar.set(pct)
         self.action_status_label.configure(text=msg)
 
-    def _print_success(self, status: PrinterStatus):
-        self.is_printing = False
-        self.btn_print.configure(state="normal")
-        if hasattr(self, "btn_add_queue"):
-            self.btn_add_queue.configure(state="normal")
-        has_q = bool(self.label_queue)
-        if hasattr(self, "btn_print_batch"):
-            self.btn_print_batch.configure(state="normal" if has_q else "disabled")
-        if hasattr(self, "btn_clear_queue"):
-            self.btn_clear_queue.configure(state="normal" if has_q else "disabled")
-        if hasattr(self, "btn_preview_mode"):
-            self.btn_preview_mode.configure(state="normal" if has_q else "disabled")
+    def _feed_success(self, status: PrinterStatus):
+        self._set_busy(False)
         self.progress_bar.set(1.0)
-        self.action_status_label.configure(text="Print job completed successfully!")
+        self.action_status_label.configure(text=f"Fed {FEED_LENGTH_MM:.0f} mm of tape to the cutter.")
+
+    def _print_success(self, status: PrinterStatus):
+        self._set_busy(False)
+        self.progress_bar.set(1.0)
+        if status.completion_confirmed:
+            self.action_status_label.configure(text="Print job completed successfully!")
+        else:
+            self.action_status_label.configure(
+                text="Print sent, but the printer did not confirm completion. Check the label."
+            )
 
     def _print_failure(self, err_msg: str):
-        self.is_printing = False
-        self.btn_print.configure(state="normal")
-        if hasattr(self, "btn_add_queue"):
-            self.btn_add_queue.configure(state="normal")
-        has_q = bool(self.label_queue)
-        if hasattr(self, "btn_print_batch"):
-            self.btn_print_batch.configure(state="normal" if has_q else "disabled")
-        if hasattr(self, "btn_clear_queue"):
-            self.btn_clear_queue.configure(state="normal" if has_q else "disabled")
-        if hasattr(self, "btn_preview_mode"):
-            self.btn_preview_mode.configure(state="normal" if has_q else "disabled")
+        self._set_busy(False)
         self.progress_bar.set(0.0)
         self.action_status_label.configure(text=f"Print failed: {err_msg}")
         messagebox.showerror("Printing Error", err_msg)
@@ -1994,81 +2127,49 @@ class PrintLabelApp(ctk.CTk):
         if self.is_printing:
             return
 
-        self.is_printing = True
-        self.btn_print.configure(state="disabled")
-        if hasattr(self, "btn_add_queue"):
-            self.btn_add_queue.configure(state="disabled")
-        if hasattr(self, "btn_print_batch"):
-            self.btn_print_batch.configure(state="disabled")
-        if hasattr(self, "btn_clear_queue"):
-            self.btn_clear_queue.configure(state="disabled")
-        if hasattr(self, "btn_preview_mode"):
-            self.btn_preview_mode.configure(state="disabled")
-        self.progress_bar.set(0.0)
-
-        is_virt = self.virtual_mode_var.get()
-        port = getattr(self, "_selected_port_device", None)
-        if not port and not is_virt:
-            cur_val = self.port_var.get()
-            if cur_val and cur_val != "No Ports Found":
-                port = cur_val.split()[0]
-
         try:
             prev_img, rast_img, r_bytes, metrics = self.renderer.render_batch(self.label_queue)
         except Exception as e:
-            self.is_printing = False
-            self.btn_print.configure(state="normal")
-            if hasattr(self, "btn_add_queue"):
-                self.btn_add_queue.configure(state="normal")
-            has_q = bool(self.label_queue)
-            if hasattr(self, "btn_print_batch"):
-                self.btn_print_batch.configure(state="normal" if has_q else "disabled")
-            if hasattr(self, "btn_clear_queue"):
-                self.btn_clear_queue.configure(state="normal" if has_q else "disabled")
-            if hasattr(self, "btn_preview_mode"):
-                self.btn_preview_mode.configure(state="normal" if has_q else "disabled")
             messagebox.showerror("Render Error", f"Failed to generate batch raster data: {e}")
             return
 
-        auto_cut = self.label_queue[-1].auto_cut_hardware
+        if self._exceeds_max_length(metrics):
+            return
+
+        # The batch is one strip with one cut at the end, so it follows the current auto-cut setting
+        auto_cut = self.config.auto_cut_hardware
         label_count = len(self.label_queue)
         tape_saved_mm = metrics.tape_saved_mm
+        required_width = (
+            INVENTORY_TAPE_WIDTH_MM
+            if any(getattr(c, "inventory_config", None) is not None for c in self.label_queue)
+            else None
+        )
 
-        def _batch_print_worker(virt_mode=is_virt, port_name=port, do_cut=auto_cut, raster=r_bytes, count=label_count, saved=tape_saved_mm):
-            try:
-                if virt_mode:
-                    printer = MockBrotherPrinter()
-                else:
-                    if not port_name or port_name == "No Ports Found":
-                        raise RuntimeError("No serial COM port selected. Check Bluetooth pairing.")
-                    printer = BrotherPrinter(port_name)
+        def _job(printer, prog, stat):
+            return printer.print_raster_data(
+                r_bytes,
+                auto_cut=auto_cut,
+                progress_callback=prog,
+                status_callback=stat,
+                required_tape_width_mm=required_width,
+            )
 
-                def _prog(cur, total):
-                    pct = cur / total
-                    self._post_to_main(lambda p=pct, c=cur, t=total: self._update_progress(p, f"Printing batch ({count} labels): {c}/{t} lines..."))
-
-                def _stat(msg):
-                    self._post_to_main(lambda m=msg: self.action_status_label.configure(text=m))
-
-                final_status = printer.print_raster_data(
-                    raster,
-                    auto_cut=do_cut,
-                    progress_callback=_prog,
-                    status_callback=_stat,
-                )
-                self._post_to_main(lambda s=final_status, c=count, sv=saved: self._batch_print_success(s, c, sv))
-            except Exception as e:
-                err_msg = str(e)
-                self._post_to_main(lambda m=err_msg: self._print_failure(m))
-
-        threading.Thread(target=_batch_print_worker, daemon=True).start()
+        self._run_printer_job(
+            _job,
+            on_success=lambda s: self._batch_print_success(s, label_count, tape_saved_mm),
+            progress_text=lambda c, t: f"Printing batch ({label_count} labels): {c}/{t} lines...",
+        )
 
     def _batch_print_success(self, status: PrinterStatus, count: int, tape_saved: float):
-        self.is_printing = False
-        self.btn_print.configure(state="normal")
-        if hasattr(self, "btn_add_queue"):
-            self.btn_add_queue.configure(state="normal")
+        self._set_busy(False)
         self.progress_bar.set(1.0)
+
+        if not status.completion_confirmed:
+            self.action_status_label.configure(
+                text=f"Batch of {count} labels sent, but the printer did not confirm completion."
+            )
+            return
 
         success_msg = f"🎉 Batch printed {count} labels successfully! Eliminated {tape_saved:.1f} mm of wasted tape."
         self.action_status_label.configure(text=success_msg)
@@ -2082,15 +2183,8 @@ class PrintLabelApp(ctk.CTk):
             self.label_queue.clear()
             self._refresh_queue_display()
             self._preview_mode = "current"
+            self._set_busy(False)
             self._trigger_render()
-        else:
-            has_q = bool(self.label_queue)
-            if hasattr(self, "btn_print_batch"):
-                self.btn_print_batch.configure(state="normal" if has_q else "disabled")
-            if hasattr(self, "btn_clear_queue"):
-                self.btn_clear_queue.configure(state="normal" if has_q else "disabled")
-            if hasattr(self, "btn_preview_mode"):
-                self.btn_preview_mode.configure(state="normal" if has_q else "disabled")
 
 
 def main():

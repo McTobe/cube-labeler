@@ -40,7 +40,8 @@ def test_gui_inventory():
     assert app.config.inventory_config.compartment_mode == "dual"
 
     # Save preview image
-    artifact_dir = r"C:\Users\Tobia\.gemini\antigravity\brain\3fb00a9f-a78e-4343-83af-9edbb0a62f47"
+    # Optional: set PRINTLABEL_TEST_ARTIFACTS to a folder to keep preview images
+    artifact_dir = os.environ.get("PRINTLABEL_TEST_ARTIFACTS", "")
     if os.path.isdir(artifact_dir):
         app._current_preview.save(os.path.join(artifact_dir, "test_gui_inventory_a2.png"))
 

@@ -54,10 +54,14 @@ except ImportError:
             i += 1
             if 0 <= b <= 127:
                 count = b + 1
+                if i + count > n:
+                    raise ValueError(f'Truncated PackBits literal run at offset {i - 1}')
                 out.extend(data[i:i + count])
                 i += count
             elif -127 <= b <= -1:
                 count = 1 - b
+                if i >= n:
+                    raise ValueError(f'Truncated PackBits repeat run at offset {i - 1}')
                 out.extend(bytes([data[i]]) * count)
                 i += 1
         return bytes(out)

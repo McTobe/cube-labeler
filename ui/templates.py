@@ -4,9 +4,15 @@ Label templates and preset library for Brother PT-P300BT.
 """
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, fields
 from typing import Dict, List, Optional
 from core.label_renderer import LabelConfig
+from core.inventory_renderer import ComponentLabelConfig, FastenerLabelConfig
+
+_INVENTORY_TYPES = {
+    "fastener": FastenerLabelConfig,
+    "component": ComponentLabelConfig,
+}
 
 BUILTIN_PRESETS: Dict[str, dict] = {
     "Storage Box": {
@@ -124,20 +130,67 @@ def load_preset(name: str) -> Optional[dict]:
     return None
 
 
+def _known_fields(cls, data: dict) -> dict:
+    """Keeps only the keys that are fields of the dataclass, so newer or older files still load."""
+    names = {f.name for f in fields(cls)}
+    return {k: v for k, v in data.items() if k in names}
+
+
+def config_to_dict(config: LabelConfig) -> dict:
+    data = asdict(config)
+    inv = config.inventory_config
+    if inv is not None:
+        data["inventory_type"] = "fastener" if isinstance(inv, FastenerLabelConfig) else "component"
+    return data
+
+
+def config_from_dict(data: dict) -> LabelConfig:
+    """Rebuilds a LabelConfig, including its typed inventory config. Raises ValueError on bad data."""
+    if not isinstance(data, dict):
+        raise ValueError("Template file does not contain a label configuration object.")
+    data = dict(data)
+    inv_data = data.pop("inventory_config", None)
+    inv_type = data.pop("inventory_type", None)
+
+    cfg = LabelConfig(**_known_fields(LabelConfig, data))
+
+    if inv_data is not None:
+        if not isinstance(inv_data, dict):
+            raise ValueError("Template has an invalid hardware label section.")
+        if inv_type is None:
+            # Files saved before the type tag existed: fasteners always have a thread size
+            inv_type = "fastener" if "thread_size" in inv_data else "component"
+        inv_cls = _INVENTORY_TYPES.get(inv_type)
+        if inv_cls is None:
+            raise ValueError(f"Unknown hardware label type '{inv_type}'.")
+        cfg.inventory_config = inv_cls(**_known_fields(inv_cls, inv_data))
+    return cfg
+
+
 def export_config_to_json(config: LabelConfig, file_path: str) -> bool:
     try:
-        data = asdict(config)
         with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+            json.dump(config_to_dict(config), f, indent=2)
         return True
     except Exception:
         return False
 
 
+def load_config_from_json(file_path: str) -> LabelConfig:
+    """Loads a template file. Raises OSError or ValueError with a readable message on failure."""
+    with open(file_path, "r", encoding="utf-8") as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Template is not valid JSON: {e}") from e
+    try:
+        return config_from_dict(data)
+    except TypeError as e:
+        raise ValueError(f"Template has invalid values: {e}") from e
+
+
 def import_config_from_json(file_path: str) -> Optional[LabelConfig]:
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return LabelConfig(**data)
+        return load_config_from_json(file_path)
     except Exception:
         return None

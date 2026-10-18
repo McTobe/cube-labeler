@@ -6,7 +6,8 @@ Supports both physical Bluetooth serial connections and simulated virtual mode.
 
 import time
 import threading
-from typing import Callable, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Tuple
 import serial
 from serial.tools import list_ports
 
@@ -26,10 +27,10 @@ from core.ptstatus import (
     PrinterStatus,
     unpack_status,
     parse_printer_status,
+    STATUS_ERROR_OCCURRED,
+    STATUS_PRINTING_COMPLETED,
 )
-
-
-from dataclasses import dataclass
+from core.specs import DOT_PITCH_MM, PRINTHEAD_DOTS, format_tape_width, tape_width_from_status
 
 
 @dataclass
@@ -94,14 +95,46 @@ def list_serial_ports() -> List[PortOption]:
     return ports
 
 
+class PrinterBusyError(RuntimeError):
+    """Raised when another job is already using the printer's serial port."""
+
+
+_port_locks: Dict[str, threading.Lock] = {}
+_port_locks_guard = threading.Lock()
+
+
+def _get_port_lock(port: str) -> threading.Lock:
+    """Returns the process-wide lock that serializes access to one serial port."""
+    key = (port or "").upper()
+    with _port_locks_guard:
+        lock = _port_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _port_locks[key] = lock
+        return lock
+
+
 class BrotherPrinter:
     """Manages serial communication with a physical Brother PT-P300BT label printer."""
+
+    # Approximate tape speed, used to size the completion timeout
+    PRINT_SPEED_MM_PER_SEC = 20.0
+    COMPLETION_TIMEOUT_BASE_SEC = 10.0
 
     def __init__(self, port: str, baudrate: int = 9600, timeout: float = 3.0):
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
         self._ser: Optional[serial.Serial] = None
+        self._lock = _get_port_lock(port)
+
+    def _acquire(self, wait_sec: float) -> None:
+        if wait_sec <= 0:
+            acquired = self._lock.acquire(blocking=False)
+        else:
+            acquired = self._lock.acquire(timeout=wait_sec)
+        if not acquired:
+            raise PrinterBusyError(f"Printer on {self.port} is busy with another job.")
 
     def connect(self) -> None:
         """Opens the serial connection, with 1 retry for Bluetooth sleep wakeup."""
@@ -120,7 +153,7 @@ class BrotherPrinter:
             raise last_err
 
     def disconnect(self) -> None:
-        """Closes the serial connection."""
+        """Resets the printer and closes the serial connection."""
         if self._ser and self._ser.is_open:
             try:
                 self.reset()
@@ -144,27 +177,64 @@ class BrotherPrinter:
         self._ser.write(serialize_control('use_command_set', CommandSet.ptcbp))
         self._ser.flush()
 
+    def _query_status(self) -> PrinterStatus:
+        """Resets the printer and reads one status packet. Requires an open connection."""
+        self.reset()
+        # ESC i S : Request status
+        self._ser.write(serialize_control('get_status'))
+        self._ser.flush()
+        raw_bytes = self._ser.read(32)
+        if len(raw_bytes) != 32:
+            raise TimeoutError(
+                f"Expected 32 bytes status response, received {len(raw_bytes)} bytes. "
+                "Is the printer switched on and paired?"
+            )
+        return parse_printer_status(unpack_status(raw_bytes))
+
+    def _wait_for_completion(self, timeout_sec: float, fallback: PrinterStatus) -> PrinterStatus:
+        """
+        Reads status packets until the printer reports completion or an error.
+        Phase-change and notification packets are skipped. Raises on a reported error;
+        returns the last status with completion_confirmed=False if the timeout expires.
+        """
+        deadline = time.monotonic() + timeout_sec
+        last_status = fallback
+        while time.monotonic() < deadline:
+            raw = self._ser.read(32)
+            if len(raw) != 32:
+                continue
+            try:
+                status = parse_printer_status(unpack_status(raw))
+            except ValueError:
+                continue
+            last_status = status
+            if status.raw_status.status_type == STATUS_ERROR_OCCURRED:
+                err = ", ".join(status.errors) if status.errors else status.phase_name
+                raise RuntimeError(f"Printer reported an error: {err}")
+            if status.raw_status.status_type == STATUS_PRINTING_COMPLETED:
+                return status
+        last_status.completion_confirmed = False
+        return last_status
+
+    def _completion_timeout(self, raster_lines: int) -> float:
+        length_mm = raster_lines * DOT_PITCH_MM
+        return self.COMPLETION_TIMEOUT_BASE_SEC + 2.0 * length_mm / self.PRINT_SPEED_MM_PER_SEC
+
     def get_status(self) -> PrinterStatus:
         """Queries the 32-byte hardware status register from the printer."""
-        was_open = self._ser is not None and self._ser.is_open
-        if not was_open:
-            self.connect()
-
+        # Status queries never wait: if a print is running, report busy instead of blocking it
+        self._acquire(wait_sec=0)
         try:
-            self.reset()
-            # ESC i S : Request status
-            self._ser.write(serialize_control('get_status'))
-            self._ser.flush()
-
-            raw_bytes = self._ser.read(32)
-            if len(raw_bytes) != 32:
-                raise TimeoutError(f"Expected 32 bytes status response, received {len(raw_bytes)} bytes.")
-
-            raw_reg = unpack_status(raw_bytes)
-            return parse_printer_status(raw_reg)
-        finally:
+            was_open = self._ser is not None and self._ser.is_open
             if not was_open:
-                self.disconnect()
+                self.connect()
+            try:
+                return self._query_status()
+            finally:
+                if not was_open:
+                    self.disconnect()
+        finally:
+            self._lock.release()
 
     def configure_printer(
         self,
@@ -224,96 +294,103 @@ class BrotherPrinter:
         nocomp: bool = False,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         status_callback: Optional[Callable[[str], None]] = None,
+        required_tape_width_mm: Optional[float] = None,
     ) -> PrinterStatus:
         """
         Executes a complete print job:
-        1. Checks status
+        1. Checks status (and the loaded tape width, if required_tape_width_mm is given)
         2. Configures media parameters
         3. Streams 128-dot raster lines
-        4. Triggers print and returns final status
+        4. Triggers print and waits for the printer to confirm completion
         """
-        if status_callback:
-            status_callback("Connecting to printer...")
-        self.connect()
-
-        try:
-            if status_callback:
-                status_callback("Querying printer status...")
-            self.reset()
-            self._ser.write(serialize_control('get_status'))
-            self._ser.flush()
-            initial_bytes = self._ser.read(32)
-            if len(initial_bytes) != 32:
-                raise RuntimeError("Failed to receive status from printer.")
-            status = parse_printer_status(unpack_status(initial_bytes))
-
-            if not status.is_ready:
-                err_msg = ", ".join(status.errors) if status.errors else status.phase_name
-                raise RuntimeError(f"Printer is not ready: {err_msg}")
-
-            raster_lines = len(raster_data) // 16
-            if status_callback:
-                status_callback(f"Configuring printer ({raster_lines} lines)...")
-
-            self.configure_printer(
-                raster_lines=raster_lines,
-                tape_dim=(
-                    status.raw_status.tape_type,
-                    status.raw_status.tape_width,
-                    status.raw_status.tape_length,
-                ),
-                compress=not nocomp,
-                chaining=no_feed,
-                auto_cut=auto_cut,
-                end_margin=end_margin,
+        chunk_size = PRINTHEAD_DOTS // 8
+        if not raster_data or len(raster_data) % chunk_size != 0:
+            raise ValueError(
+                f"Raster data must be a non-empty multiple of {chunk_size} bytes, got {len(raster_data)}."
             )
 
-            # Stream raster lines (128 px = 16 bytes per line)
-            chunk_size = 16
-            zero_chunk = bytearray(b"\x00" * chunk_size)
-            total_chunks = len(raster_data) // chunk_size
-
+        self._acquire(wait_sec=5.0)
+        try:
             if status_callback:
-                status_callback("Sending raster image data...")
+                status_callback("Connecting to printer...")
+            self.connect()
 
-            for i in range(0, len(raster_data), chunk_size):
-                chunk = raster_data[i : i + chunk_size]
-                if chunk == zero_chunk:
-                    line = serialize_control('zerofill')
-                else:
-                    line = serialize_data(chunk, 'none' if nocomp else 'rle')
-                self._ser.write(line)
-
-                chunk_idx = (i // chunk_size) + 1
-                if progress_callback and (chunk_idx % 5 == 0 or chunk_idx == total_chunks):
-                    progress_callback(chunk_idx, total_chunks)
-
-            self._ser.flush()
-
-            if status_callback:
-                status_callback("Printing label...")
-
-            # Send Print command
-            self._ser.write(serialize_control('print'))
-            self._ser.flush()
-
-            # Read completion status
-            done_bytes = self._ser.read(32)
-            if len(done_bytes) == 32:
-                final_status = parse_printer_status(unpack_status(done_bytes))
-            else:
-                final_status = status
-
-            if status_callback:
-                status_callback("Print complete!")
-
-            return final_status
-        finally:
             try:
-                self.reset()
-            except Exception:
-                pass
-            self.disconnect()
+                if status_callback:
+                    status_callback("Querying printer status...")
+                status = self._query_status()
+
+                if not status.is_ready:
+                    err_msg = ", ".join(status.errors) if status.errors else status.phase_name
+                    raise RuntimeError(f"Printer is not ready: {err_msg}")
+
+                if required_tape_width_mm is not None:
+                    loaded = tape_width_from_status(status.tape_width_mm)
+                    if loaded != float(required_tape_width_mm):
+                        raise RuntimeError(
+                            f"This label needs {format_tape_width(required_tape_width_mm)} tape; "
+                            f"{format_tape_width(loaded)} is loaded."
+                        )
+
+                raster_lines = len(raster_data) // chunk_size
+                if status_callback:
+                    status_callback(f"Configuring printer ({raster_lines} lines)...")
+
+                self.configure_printer(
+                    raster_lines=raster_lines,
+                    tape_dim=(
+                        status.raw_status.tape_type,
+                        status.raw_status.tape_width,
+                        status.raw_status.tape_length,
+                    ),
+                    compress=not nocomp,
+                    chaining=no_feed,
+                    auto_cut=auto_cut,
+                    end_margin=end_margin,
+                )
+
+                # Stream raster lines (128 px = 16 bytes per line)
+                zero_chunk = bytes(chunk_size)
+
+                if status_callback:
+                    status_callback("Sending raster image data...")
+
+                for i in range(0, len(raster_data), chunk_size):
+                    chunk = raster_data[i : i + chunk_size]
+                    if chunk == zero_chunk:
+                        line = serialize_control('zerofill')
+                    else:
+                        line = serialize_data(chunk, 'none' if nocomp else 'rle')
+                    self._ser.write(line)
+
+                    chunk_idx = (i // chunk_size) + 1
+                    if progress_callback and (chunk_idx % 5 == 0 or chunk_idx == raster_lines):
+                        progress_callback(chunk_idx, raster_lines)
+
+                self._ser.flush()
+
+                if status_callback:
+                    status_callback("Printing label...")
+
+                # Send Print command
+                self._ser.write(serialize_control('print'))
+                self._ser.flush()
+
+                final_status = self._wait_for_completion(
+                    self._completion_timeout(raster_lines), fallback=status
+                )
+
+                if status_callback:
+                    if final_status.completion_confirmed:
+                        status_callback("Print complete!")
+                    else:
+                        status_callback("Print sent, but the printer did not confirm completion.")
+
+                return final_status
+            finally:
+                self.disconnect()
+        finally:
+            self._lock.release()
 
     def feed_tape(
         self,
@@ -321,63 +398,58 @@ class BrotherPrinter:
         status_callback: Optional[Callable[[str], None]] = None,
     ) -> PrinterStatus:
         """Advances tape by length_mm so the label emerges past the manual cutter blade."""
-        if status_callback:
-            status_callback("Connecting to printer to feed tape...")
-        self.connect()
+        self._acquire(wait_sec=5.0)
         try:
             if status_callback:
-                status_callback("Checking printer status...")
-            self.reset()
-            self._ser.write(serialize_control('get_status'))
-            self._ser.flush()
-            raw_bytes = self._ser.read(32)
-            if len(raw_bytes) != 32:
-                raise RuntimeError("Failed to receive status from printer.")
-            status = parse_printer_status(unpack_status(raw_bytes))
-
-            # 0.149mm per dot -> dots needed for feed
-            dots_to_feed = max(int(round(length_mm / 0.149)), 60)
-
-            if status_callback:
-                status_callback(f"Feeding {length_mm:.1f}mm of tape...")
-
-            self.configure_printer(
-                raster_lines=dots_to_feed,
-                tape_dim=(
-                    status.raw_status.tape_type,
-                    status.raw_status.tape_width,
-                    status.raw_status.tape_length,
-                ),
-                compress=False,
-                chaining=False,
-                auto_cut=False,
-                end_margin=0,
-            )
-
-            # Send zerofill lines to advance tape
-            zero_line = serialize_control('zerofill')
-            for _ in range(dots_to_feed):
-                self._ser.write(zero_line)
-            self._ser.flush()
-
-            self._ser.write(serialize_control('print'))
-            self._ser.flush()
-
-            done_bytes = self._ser.read(32)
-            if len(done_bytes) == 32:
-                final_status = parse_printer_status(unpack_status(done_bytes))
-            else:
-                final_status = status
-
-            if status_callback:
-                status_callback("Tape fed successfully to cutter!")
-            return final_status
-        finally:
+                status_callback("Connecting to printer to feed tape...")
+            self.connect()
             try:
-                self.reset()
-            except Exception:
-                pass
-            self.disconnect()
+                if status_callback:
+                    status_callback("Checking printer status...")
+                status = self._query_status()
+
+                if not status.is_ready:
+                    err_msg = ", ".join(status.errors) if status.errors else status.phase_name
+                    raise RuntimeError(f"Printer is not ready: {err_msg}")
+
+                dots_to_feed = max(int(round(length_mm / DOT_PITCH_MM)), 60)
+
+                if status_callback:
+                    status_callback(f"Feeding {length_mm:.1f}mm of tape...")
+
+                self.configure_printer(
+                    raster_lines=dots_to_feed,
+                    tape_dim=(
+                        status.raw_status.tape_type,
+                        status.raw_status.tape_width,
+                        status.raw_status.tape_length,
+                    ),
+                    compress=False,
+                    chaining=False,
+                    auto_cut=False,
+                    end_margin=0,
+                )
+
+                # Send zerofill lines to advance tape
+                zero_line = serialize_control('zerofill')
+                for _ in range(dots_to_feed):
+                    self._ser.write(zero_line)
+                self._ser.flush()
+
+                self._ser.write(serialize_control('print'))
+                self._ser.flush()
+
+                final_status = self._wait_for_completion(
+                    self._completion_timeout(dots_to_feed), fallback=status
+                )
+
+                if status_callback:
+                    status_callback("Tape fed successfully to cutter!")
+                return final_status
+            finally:
+                self.disconnect()
+        finally:
+            self._lock.release()
 
 
 class MockBrotherPrinter:
@@ -422,13 +494,23 @@ class MockBrotherPrinter:
         nocomp: bool = False,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         status_callback: Optional[Callable[[str], None]] = None,
+        required_tape_width_mm: Optional[float] = None,
     ) -> PrinterStatus:
         """Simulates printing with realistic progress feedback."""
         if status_callback:
             status_callback("[Virtual] Connecting to simulated PT-P300BT...")
         time.sleep(0.3)
 
-        chunk_size = 16
+        status = self.get_status()
+        if required_tape_width_mm is not None:
+            loaded = tape_width_from_status(status.tape_width_mm)
+            if loaded != float(required_tape_width_mm):
+                raise RuntimeError(
+                    f"This label needs {format_tape_width(required_tape_width_mm)} tape; "
+                    f"{format_tape_width(loaded)} is loaded."
+                )
+
+        chunk_size = PRINTHEAD_DOTS // 8
         total_chunks = max(len(raster_data) // chunk_size, 1)
 
         if status_callback:
@@ -449,7 +531,7 @@ class MockBrotherPrinter:
         if status_callback:
             status_callback("[Virtual] Label printed successfully!")
 
-        return self.get_status()
+        return status
 
     def feed_tape(
         self,

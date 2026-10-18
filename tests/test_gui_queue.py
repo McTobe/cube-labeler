@@ -106,8 +106,9 @@ def test_gui_queue():
     assert app.config.cut_line is False, "Cut guide lines should be False for single labels"
 
     # Save batch preview image to artifacts directory
-    artifact_dir = r"C:\Users\Tobia\.gemini\antigravity\brain\3fb00a9f-a78e-4343-83af-9edbb0a62f47"
-    if app._current_preview:
+    # Optional: set PRINTLABEL_TEST_ARTIFACTS to a folder to keep preview images
+    artifact_dir = os.environ.get("PRINTLABEL_TEST_ARTIFACTS", "")
+    if app._current_preview and os.path.isdir(artifact_dir):
         out_img_path = os.path.join(artifact_dir, "batch_queue_tape_preview.png")
         app._current_preview.save(out_img_path)
         print(f"Saved batch queue preview to: {out_img_path}")

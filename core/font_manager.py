@@ -5,7 +5,6 @@ Font discovery, management and caching for Brother PT-P300BT label designer.
 
 import os
 import sys
-import winreg
 from typing import Dict, List, Optional
 from PIL import ImageFont
 
@@ -35,36 +34,18 @@ class FontManager:
     def _scan_system_fonts(self):
         """Scans Windows Registry and C:\\Windows\\Fonts for available fonts."""
         fonts_dir = os.path.join(os.environ.get("WINDIR", "C:\\Windows"), "Fonts")
-        
-        # 1. Try Windows Registry
-        try:
-            reg_key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+
+        # 1. Windows Registry: machine-wide fonts, then fonts installed for the current user only
+        if sys.platform == "win32":
+            import winreg
+            user_fonts_dir = os.path.join(
+                os.environ.get("LOCALAPPDATA", ""), "Microsoft", "Windows", "Fonts"
             )
-            count = winreg.QueryInfoKey(reg_key)[1]
-            for i in range(count):
-                try:
-                    font_name, font_file, _ = winreg.EnumValue(reg_key, i)
-                    # Clean up name: "Arial (TrueType)" -> "Arial"
-                    clean_name = font_name
-                    for suffix in [" (TrueType)", " (OpenType)", " (All type)", " (PostScript)"]:
-                        clean_name = clean_name.replace(suffix, "").strip()
-
-                    # Resolve path
-                    if not os.path.isabs(font_file):
-                        font_path = os.path.join(fonts_dir, font_file)
-                    else:
-                        font_path = font_file
-
-                    if os.path.isfile(font_path) and font_path.lower().endswith(('.ttf', '.otf', '.ttc')):
-                        if clean_name not in self._font_cache:
-                            self._font_cache[clean_name] = font_path
-                except OSError:
-                    continue
-            winreg.CloseKey(reg_key)
-        except Exception:
-            pass
+            for hive, base_dir in (
+                (winreg.HKEY_LOCAL_MACHINE, fonts_dir),
+                (winreg.HKEY_CURRENT_USER, user_fonts_dir),
+            ):
+                self._scan_registry_fonts(winreg, hive, base_dir)
 
         # 2. Check font directory directly for standard fonts if registry had gaps
         if os.path.isdir(fonts_dir):
@@ -90,6 +71,32 @@ class FontManager:
                 p = os.path.join(fonts_dir, filename)
                 if os.path.isfile(p) and name not in self._font_cache:
                     self._font_cache[name] = p
+
+    def _scan_registry_fonts(self, winreg, hive, base_dir: str):
+        """Adds fonts listed under one registry hive, resolving relative paths against base_dir."""
+        try:
+            reg_key = winreg.OpenKey(hive, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")
+        except OSError:
+            return
+        try:
+            count = winreg.QueryInfoKey(reg_key)[1]
+            for i in range(count):
+                try:
+                    font_name, font_file, _ = winreg.EnumValue(reg_key, i)
+                except OSError:
+                    continue
+                # Clean up name: "Arial (TrueType)" -> "Arial"
+                clean_name = font_name
+                for suffix in [" (TrueType)", " (OpenType)", " (All type)", " (PostScript)"]:
+                    clean_name = clean_name.replace(suffix, "").strip()
+
+                font_path = font_file if os.path.isabs(font_file) else os.path.join(base_dir, font_file)
+
+                if os.path.isfile(font_path) and font_path.lower().endswith(('.ttf', '.otf', '.ttc')):
+                    if clean_name not in self._font_cache:
+                        self._font_cache[clean_name] = font_path
+        finally:
+            winreg.CloseKey(reg_key)
 
     def get_font_names(self) -> List[str]:
         """Returns sorted list of font display names, with common ones prioritized."""

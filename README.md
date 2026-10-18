@@ -169,6 +169,10 @@ printlabel-ui/
 
   # Feed tape by 25mm
   PrintLabel.exe COM4 --feed
+
+  # Name the port with --port, or try a label without hardware using --virtual
+  PrintLabel.exe --port COM4 "Storage Box #42"
+  PrintLabel.exe --virtual "Test Label" --preview --save-png test.png
   ```
 
 ### 🔨 Compiling From Source
