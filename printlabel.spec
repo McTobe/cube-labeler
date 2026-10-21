@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller specification for Brother PT-P300BT Label Studio (PrintLabel).
+PyInstaller specification for Cube Labeler (PrintLabel).
 Builds a single, standalone, portable executable bundled with all assets,
 themes, and dependencies.
 """

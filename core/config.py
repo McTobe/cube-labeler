@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Application configuration manager for Brother PT-P300BT Label Studio.
+Application configuration manager for Cube Labeler.
 Persists settings (Gemini API key, custom directories, defaults) to ~/.printlabel/config.json.
 """
 

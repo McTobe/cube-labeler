@@ -1,4 +1,4 @@
-# PrintLabel Studio
+# Cube Labeler
 
 [![Tests](https://github.com/McTobe/printlabel-ui/actions/workflows/tests.yml/badge.svg)](https://github.com/McTobe/printlabel-ui/actions/workflows/tests.yml)
 [![Latest release](https://img.shields.io/github/v/release/McTobe/printlabel-ui)](https://github.com/McTobe/printlabel-ui/releases/latest)
@@ -7,7 +7,7 @@
 
 A desktop app for designing and printing labels on the **Brother P-touch Cube (PT-P300BT)** over Bluetooth. It shows an exact preview of the printed tape, prints several labels as one strip to save tape, and has a dedicated editor for storage bin labels.
 
-PrintLabel Studio runs on Windows as a single portable `.exe`, with no Python install needed. It also has a command-line mode for printing from scripts.
+Cube Labeler runs on Windows as a single portable `.exe`, with no Python install needed. It also has a command-line mode for printing from scripts.
 
 ![Text label editor with live tape preview](docs/images/text-label.png)
 
@@ -47,7 +47,7 @@ Windows SmartScreen may warn you the first time because the file is not code-sig
 
 1. Turn the printer on. The power LED turns green.
 2. In Windows, open **Settings → Bluetooth & devices → Add device**, choose **Bluetooth** and pick **PT-P300BT**. Windows creates a serial (COM) port for it.
-3. In PrintLabel Studio, click the **printer chip** at the top right. Turn **Simulation** off, choose **Scan ports** and select the printer's port (for example `COM3`).
+3. In Cube Labeler, click the **printer chip** at the top right. Turn **Simulation** off, choose **Scan ports** and select the printer's port (for example `COM3`).
 4. Choose **Check status**. The chip shows the model, loaded tape and battery when the printer is ready.
 
 ## Usage
@@ -131,7 +131,7 @@ Bug reports and ideas are welcome in [Issues](https://github.com/McTobe/printlab
 
 ## Credits
 
-The printer protocol is based on [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT). Built with [customtkinter](https://github.com/TomSchimansky/CustomTkinter), [Pillow](https://python-pillow.org/), [pyserial](https://github.com/pyserial/pyserial) and [qrcode](https://github.com/lincolnloop/python-qrcode).
+Cube Labeler started as a GUI for `printlabel` from [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT), and its printer protocol code is based on that project. Built with [customtkinter](https://github.com/TomSchimansky/CustomTkinter), [Pillow](https://python-pillow.org/), [pyserial](https://github.com/pyserial/pyserial) and [qrcode](https://github.com/lincolnloop/python-qrcode).
 
 Brother and P-touch are trademarks of Brother Industries, Ltd. This project is not affiliated with or endorsed by Brother.
 

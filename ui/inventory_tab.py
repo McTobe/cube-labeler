@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Bin label editor for Brother PT-P300BT Label Studio.
+Bin label editor for Cube Labeler.
 
 Two kinds of bin label:
 - Fasteners: size block, a name, one/two/four bins of lengths, and a drive icon

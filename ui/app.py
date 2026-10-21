@@ -87,7 +87,7 @@ class PrintLabelApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Brother P-touch Cube (PT-P300BT) Label Studio")
+        self.title("Cube Labeler")
         self.geometry("1150x850")
         self.minsize(980, 680)
 
@@ -171,7 +171,7 @@ class PrintLabelApp(ctk.CTk):
 
         self.app_title = ctk.CTkLabel(
             self.header_frame,
-            text="P-Touch Studio",
+            text="Cube Labeler",
             font=ctk.CTkFont(size=17, weight="bold"),
         )
         self.app_title.pack(side="left", padx=14, pady=8)

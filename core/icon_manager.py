@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Icon Library Manager for Brother PT-P300BT Label Studio.
+Icon Library Manager for Cube Labeler.
 Indexes built-in and user-generated monochrome icons, providing categorization,
 search, and persistence across app sessions.
 """

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Interactive Icon Browser Dialog for Brother PT-P300BT Label Studio.
+Interactive Icon Browser Dialog for Cube Labeler.
 Provides category filtering, search, thumbnail grid, and integration
 with the AI Wireframe Generator.
 """
