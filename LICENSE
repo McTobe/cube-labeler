@@ -19,3 +19,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+-------------------------------------------------------------------------------
+
+Exception: code based on Ircama/PT-P300BT
+
+The following files are based on code from https://github.com/Ircama/PT-P300BT
+and are NOT covered by the MIT License above:
+
+  core/ptcbp.py
+  core/ptstatus.py
+
+Ircama/PT-P300BT does not state a license, so these files remain subject to
+the rights of their original author. They are credited and included here for
+compatibility with that project until its author adds a license.

@@ -138,4 +138,4 @@ Brother and P-touch are trademarks of Brother Industries, Ltd. This project is n
 
 ## License
 
-Cube Labeler is released under the [MIT License](LICENSE).
+Cube Labeler is released under the [MIT License](LICENSE), except `core/ptcbp.py` and `core/ptstatus.py`. Those two files are based on [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT), which doesn't state a license, so they are not covered by MIT. See [LICENSE](LICENSE) for details.

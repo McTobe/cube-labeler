@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 PT-P300BT status register decoder and helper tables.
+Based on the status decoding in Ircama/PT-P300BT (see LICENSE).
 Decodes the 32-byte status packet returned by Brother label printers.
 """
 
