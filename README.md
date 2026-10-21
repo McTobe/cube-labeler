@@ -39,7 +39,7 @@ Other Brother models are not tested. The printing code and the CLI also run on m
 
 ## Installation
 
-1. Download `PrintLabel.exe` from the [latest release](https://github.com/McTobe/printlabel-ui/releases/latest).
+1. Download `CubeLabeler.exe` from the [latest release](https://github.com/McTobe/printlabel-ui/releases/latest).
 2. Put it anywhere you like and double-click it. There is nothing to install.
 
 Windows SmartScreen may warn you the first time because the file is not code-signed. Choose **More info**, then **Run anyway**.
@@ -76,18 +76,18 @@ The preview can show the whole label (**Fit**) or zoom to 100–300%, where long
 
 ### Command line
 
-Run `PrintLabel.exe` with arguments to use it without the window:
+Run `CubeLabeler.exe` with arguments to use it without the window:
 
 ```powershell
-PrintLabel.exe --ports                        # list serial ports and find the printer
-PrintLabel.exe COM4 --status                  # battery, tape and errors
-PrintLabel.exe COM4 "Storage Box #42"         # print a label
-PrintLabel.exe COM4 "Line one\nLine two"      # two-line label
-PrintLabel.exe COM4 --feed                    # feed 25 mm of tape
-PrintLabel.exe --virtual "Test" --preview --save-png test.png   # no printer needed
+CubeLabeler.exe --ports                       # list serial ports and find the printer
+CubeLabeler.exe COM4 --status                 # battery, tape and errors
+CubeLabeler.exe COM4 "Storage Box #42"        # print a label
+CubeLabeler.exe COM4 "Line one\nLine two"     # two-line label
+CubeLabeler.exe COM4 --feed                   # feed 25 mm of tape
+CubeLabeler.exe --virtual "Test" --preview --save-png test.png  # no printer needed
 ```
 
-`PrintLabel.exe --help` lists every option, including `--font`, `--font-size`, `--width`, `--image`, `--cut-guide` and `--no-cut`.
+`CubeLabeler.exe --help` lists every option, including `--font`, `--font-size`, `--width`, `--image`, `--cut-guide` and `--no-cut`.
 
 ## Building from source
 
@@ -100,7 +100,7 @@ pip install -r requirements.txt -c constraints.txt
 python main.py          # or double-click run.bat
 ```
 
-To build the portable executable, install PyInstaller and run the build script. The result is `dist\PrintLabel.exe`.
+To build the portable executable, install PyInstaller and run the build script. The result is `dist\CubeLabeler.exe`.
 
 ```powershell
 pip install pyinstaller -c constraints.txt

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Automated build script for Cube Labeler.
-Compiles the application into a single portable executable (dist/PrintLabel.exe).
+Compiles the application into a single portable executable (dist/CubeLabeler.exe).
 """
 
 import sys
@@ -99,7 +99,7 @@ def run_pyinstaller():
 def verify_output():
     print("[4/4] Verifying generated executable...")
     dist_dir = os.path.join(PROJECT_ROOT, "dist")
-    exe_path = os.path.join(dist_dir, "PrintLabel.exe")
+    exe_path = os.path.join(dist_dir, "CubeLabeler.exe")
 
     if not os.path.isfile(exe_path):
         print(f"Error: Expected output file not found at {exe_path}")

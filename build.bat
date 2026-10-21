@@ -14,6 +14,6 @@ if %ERRORLEVEL% NEQ 0 (
 )
 echo.
 echo Build complete. The executable is located at:
-echo dist\PrintLabel.exe
+echo dist\CubeLabeler.exe
 echo.
 pause
