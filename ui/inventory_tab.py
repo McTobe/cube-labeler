@@ -94,14 +94,9 @@ def _short_name(path: str) -> str:
 
 
 def _to_editor_shape(cfg: FastenerLabelConfig) -> FastenerLabelConfig:
-    """Older labels used an "assortment" layout and two note lines; the editor uses one bin plus one note."""
+    """Older labels used two note lines; the editor has one note."""
     cfg = copy.deepcopy(cfg)
-    if cfg.compartment_mode == "assortment":
-        cfg.compartment_mode = "single"
-        cfg.length_single = cfg.assortment_line1
-        cfg.standard_line1 = cfg.assortment_line2
-        cfg.standard_line2 = ""
-    elif cfg.standard_line2.strip():
+    if cfg.compartment_mode != "assortment" and cfg.standard_line2.strip():
         cfg.standard_line1 = f"{cfg.standard_line1} {cfg.standard_line2}".strip()
         cfg.standard_line2 = ""
     return cfg
@@ -299,6 +294,14 @@ class HardwareInventoryTab(ctk.CTkFrame):
             self.entry_std_1.grid(row=0, column=1, padx=(8, 0))
             self._set_entry(self.entry_len_single, unformat_length(cfg.length_single))
             self._set_entry(self.entry_std_1, cfg.standard_line1)
+        elif mode == "assortment":
+            # Older labels: two lines of text instead of lengths; the Bins buttons switch away from it
+            self.entry_assort_1 = self._entry(self.comp_inputs_frame, 120, "Line 1")
+            self.entry_assort_1.grid(row=0, column=0)
+            self.entry_assort_2 = self._entry(self.comp_inputs_frame, 120, "Line 2")
+            self.entry_assort_2.grid(row=0, column=1, padx=(8, 0))
+            self._set_entry(self.entry_assort_1, cfg.assortment_line1)
+            self._set_entry(self.entry_assort_2, cfg.assortment_line2)
         elif mode == "quad":
             self.entry_len_q1 = self._entry(self.comp_inputs_frame, 70)
             self.entry_len_q2 = self._entry(self.comp_inputs_frame, 70)
@@ -485,6 +488,9 @@ class HardwareInventoryTab(ctk.CTkFrame):
                 cfg.length_quad_2 = format_length(self.entry_len_q2.get())
                 cfg.length_quad_3 = format_length(self.entry_len_q3.get())
                 cfg.length_quad_4 = format_length(self.entry_len_q4.get())
+            elif mode == "assortment" and hasattr(self, "entry_assort_1"):
+                cfg.assortment_line1 = self.entry_assort_1.get().strip()
+                cfg.assortment_line2 = self.entry_assort_2.get().strip()
         else:
             cfg = self.component_cfg
             cfg.category_banner = self.entry_banner_b.get().strip()
@@ -499,7 +505,9 @@ class HardwareInventoryTab(ctk.CTkFrame):
             self.entry_thread.set(cfg.thread_size)
             self.entry_cat.set(cfg.category)
             self._set_entry(self.entry_width, f"{cfg.label_width_mm:g}")
-            mode_name = next((n for n, m in BIN_MODES.items() if m == cfg.compartment_mode), "Two")
+            # An older assortment label has no Bins button, so none is selected
+            fallback = "" if cfg.compartment_mode == "assortment" else "Two"
+            mode_name = next((n for n, m in BIN_MODES.items() if m == cfg.compartment_mode), fallback)
             self.mode_seg.set(mode_name)
             self._render_length_inputs()
             self.drive_combo.configure(values=self._drive_values())
