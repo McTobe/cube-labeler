@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-"Make an icon" dialog for Brother PT-P300BT Label Studio.
+"Make an icon" dialog for Cube Labeler.
 Provides:
 1. Clean and import: tidy up an existing image for thermal printing (free, offline)
 2. From a photo: line-art from a photo using Gemini

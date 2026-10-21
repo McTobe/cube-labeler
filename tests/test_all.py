@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit and integration tests for Brother PT-P300BT Label Studio.
+Unit and integration tests for Cube Labeler.
 """
 
 import os

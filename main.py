@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Brother P-touch Cube PT-P300BT Label Studio & CLI Utility
+Cube Labeler: desktop app and CLI for the Brother P-touch Cube PT-P300BT
 Entrypoint script supporting both GUI and Command-Line Interface.
 """
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI Wireframe & Line-Art Icon Generator for Brother PT-P300BT Label Studio.
+AI Wireframe & Line-Art Icon Generator for Cube Labeler.
 Supports:
 1. Gemini API Image-to-Wireframe (photo of an object -> clean monochrome line-art icon)
 2. Gemini/Imagen Text-to-Wireframe (text description -> isometric wireframe icon)

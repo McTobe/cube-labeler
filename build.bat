@@ -1,8 +1,8 @@
 @echo off
-title Build Brother PT-P300BT Label Studio (Single Portable EXE)
+title Build Cube Labeler (Single Portable EXE)
 cd /d "%~dp0"
 echo =========================================================
-echo Compiling Brother PT-P300BT Label Studio to Single .exe
+echo Compiling Cube Labeler to Single .exe
 echo =========================================================
 echo.
 python build.py

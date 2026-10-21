@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PTCBP (Brother Raster Graphics Command Set) parser and serializer.
-Based on the PTCBP protocol implementation in Ircama/PT-P300BT.
+Based on the PTCBP protocol implementation in Ircama/PT-P300BT (see LICENSE).
 """
 
 import io

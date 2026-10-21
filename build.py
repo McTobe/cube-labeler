@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Automated build script for Brother PT-P300BT Label Studio.
+Automated build script for Cube Labeler.
 Compiles the application into a single portable executable (dist/PrintLabel.exe).
 """
 
@@ -117,7 +117,7 @@ def verify_output():
 
 
 def main():
-    print("=== Brother PT-P300BT Label Studio: Build Pipeline ===")
+    print("=== Cube Labeler: Build Pipeline ===")
     check_prerequisites()
     ensure_icon()
     run_pyinstaller()
