@@ -47,7 +47,8 @@ Based on the [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT) Python util
   - Test and design labels even when the printer is turned off or not yet paired
   - Full simulated raster streaming and progress bar feedback
 - **Template Library**:
-  - 1-click presets: *Storage Box*, *Cable Wrap / Flag*, *WiFi Guest QR*, *Kitchen Spice Jar*, *Asset Tag*, *Name Badge*
+  - Ready-made text label starting points in the **Templates** view: *Storage Box / Shelf*, *Cable Wrap / Wire Flag*, *WiFi Guest QR Login*, *Kitchen Spice Jar*, *Equipment Asset Tag*, *Name Badge / Shipping*
+  - Save the current label as a JSON template and open it again later
 - **📚 Built-in Icon Library & Gallery Browser**:
   - Over 30+ curated monochrome vector/line-art icons across 5 dedicated categories: *Fasteners*, *Engineering*, *Electronics*, *Tools*, and *Symbols*, plus persistent *My Icons*
   - Fast instant keyword search (Torx, Bearing, Gear, Socket, Wrench, Fuse, etc.) and category filtering
@@ -59,14 +60,17 @@ Based on the [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT) Python util
   - **Clean & Import Tool**: Auto-crops whitespace borders, removes background, strictly binarizes to 1-bit thermal monochrome, and centers imported web images or screenshots
   - **Reverse / Invert Colors**: 1-click black-and-white color flip to instantly correct inverted or white-on-black graphics
   - **Thermal Printhead Line-Thickening**: Morphological line thickness controls (Normal, Bold, Extra Bold, Heavy) optimized specifically for Brother thermal printheads (64-dot height) so strokes never fade or break
-- **🔩 Hardware & Bins Inventory Design System (V2)**:
-  - Professional procedural thermal label generator built according to the modular hardware inventory design standard
-  - **Archetype A (Threaded Fasteners)**: Solid black inverted size anchor block (`M3`, `M5`), upper category header (`SKRUV`, `MUTTER`, `BRICKOR`), 4 compartment modes (Single Size, 2-Bin Dual, 4-Bin 2×2 Grid, Assortment Text)
-  - **Horizontal Side-by-Side Tool Badge**: Bold drive size on the left (`2.5`, `8`, `10`, `T20`) with prominent vector silhouette icon on the right (`⬢` internal hex, `⬡` external wrench, `◉` washer, `✶` Torx, `✚` Phillips, or custom file/library icon) — dynamically sized so neither the text nor the icon ever shrinks or clips
-  - **Archetype B (Discrete Components & Electrical)**: Inverted 38% category banner strip, spacious spec & rating zone, and dedicated 25% square right icon frame (`◎` ball bearing, `⧉` WAGO splicing clip, `⊷` inline fuse, or custom file/library icon)
-  - **8 Pre-loaded Catalog Presets**: Instant loading for standard workshop drawer configs (DIN 912, countersunk DIN 7991, hex nuts DIN 934, washers DIN 125, 608ZZ bearings, WAGO 221, inline fuses)
-  - Streamlined UI controls with direct `Choose File...`, `Library...`, and `Clear` actions
-  - Seamless integration with the zero-waste batch print queue
+- **🔩 Bin Labels for Hardware Storage**:
+  - A dedicated **Bin label** editor (12 mm tape) with two kinds of label, picked under *Label for*:
+    - **Fasteners**: a solid black size block (`M3`, `M5`, or your own text such as `1/4"` or `#6-32`), a free-text name (with suggestions like *Screws*, *Nuts*, *Washers*, *Bolts*), **One / Two / Four** bins with length boxes laid out like the bins, and a drive icon
+    - **Parts**: a name banner, part number, an optional note and an icon (*Bearing*, *WAGO*, *Fuse*, or your own)
+  - Fields are listed in the same order they appear on the printed label
+  - Plain numbers in the length boxes print as `x30`; anything else prints as typed
+  - **Drive** dropdown: *Allen*, *Hex*, *PH*, *PZ*, *Torx*, *Slot* or *None*, drawn from the icon library; tick **Simple icon** for bold drawn shapes instead
+  - **Library…** and **File…** buttons next to the drive or part icon let you use your own icon (the dropdown then reads *Custom*)
+  - Set the **Label length** in mm to match your bin (38 mm by default, 10 mm minimum)
+  - The last bin label you made is remembered between sessions, so the next one starts from it
+  - Bin labels go into the same zero-waste batch print queue as text labels
 - **Exporting**:
   - Export high-resolution PNGs of your label designs
 
@@ -107,11 +111,17 @@ python main.py
    - Click **Print** (or press `Ctrl+P`).
 
 ### Finding your way around
-- **Text label**: type your text under the preview; font, QR code, icon, length and advanced options are in the panel on the right.
-- **Bin label**: screw, nut and component labels for storage bins (12 mm tape).
-- **Queue**: labels you add with **Add to queue** (`Ctrl+Enter`) print as one strip, saving about 25 mm of tape per extra label.
-- **Templates**: ready-made starting points, plus saving and opening your own templates.
-- **Settings**: bin label language (English or Swedish), Gemini API key, and simulation mode.
+
+The window has three parts: a **left rail** for switching views, the **tape preview** in the middle, and a **header** with the **printer chip** at the top right.
+
+- **Printer chip**: shows whether the printer is ready, has a problem, is connecting, is offline, or is in simulation, along with the model, loaded tape and battery. Click it to open the printer panel with the port list, **Scan ports**, **Check status** and the **Simulation** switch.
+- **Left rail**:
+  - **Text label**: type your text under the preview; font, QR code, icon, length and advanced options are in the panel on the right.
+  - **Bin label**: the bin label editor for fasteners and parts (see *Bin Labels* above).
+  - **Queue**: labels you add with **Add to queue** (`Ctrl+Enter`) print as one strip, saving about 25 mm of tape per extra label.
+  - **Templates**: ready-made starting points, plus saving and opening your own templates.
+  - **Settings** (at the bottom of the rail): bin label language (English or Swedish), Gemini API key, and simulation mode.
+- **Print** is the main button below the preview, next to **Add to queue**. The "•••" menu beside it has Export PNG (`Ctrl+S`) and Feed tape.
 
 ---
 
@@ -125,7 +135,7 @@ printlabel-ui/
 │   ├── font_manager.py       # Windows font registry discovery & TTF loader
 │   ├── label_renderer.py     # PIL rendering engine, auto-fit, QR codes & rasterization
 │   ├── inventory_renderer.py # Bin label procedural vector label generator
-│   ├── label_language.py     # Bin label text in English / Swedish and the bin label presets
+│   ├── label_language.py     # Bin label text in English / Swedish and the default bin labels
 │   ├── specs.py              # Dot pitch, tape sizes and other printer constants
 │   ├── icon_manager.py       # Curated icon library manager, search index & user storage
 │   ├── ai_generator.py       # Gemini AI multimodal wireframe & thermal post-processing engine
