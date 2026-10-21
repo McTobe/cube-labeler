@@ -121,6 +121,7 @@ The window has three parts: a **left rail** for switching views, the **tape prev
   - **Queue**: labels you add with **Add to queue** (`Ctrl+Enter`) print as one strip, saving about 25 mm of tape per extra label.
   - **Templates**: ready-made starting points, plus saving and opening your own templates.
   - **Settings** (at the bottom of the rail): bin label language (English or Swedish), Gemini API key, and simulation mode.
+- **Preview**: **Label** shows the label on its tape, **Print dots** shows the dots the printer will print. **Fit** always shows the whole label, however long; at 100–300% a label wider than the preview scrolls sideways with the scrollbar, the mouse wheel or by dragging it.
 - **Print** is the main button below the preview, next to **Add to queue**. The "•••" menu beside it has Export PNG (`Ctrl+S`) and Feed tape.
 
 ---

@@ -6,13 +6,15 @@ Shows the label on a strip of tape with its cut lines, with zoom and a print-dot
 
 import tkinter as tk
 import customtkinter as ctk
-from PIL import Image, ImageTk
+from PIL import Image, ImageOps, ImageTk
 from typing import Optional, Tuple
 from core.label_renderer import LabelMetrics
 
 CANVAS_BG = "#1E1E1E"
 CUT_LINE_COLOR = "#9E9E9E"
 TAPE_LEAD_PX = 44  # Tape drawn before and after the label, so it reads as a strip
+EDGE_PAD_PX = 12  # Space between the tape strip and the canvas edge
+WHEEL_STEP_PX = 60  # Horizontal scroll per mouse wheel notch
 
 
 def _blend(rgb: Tuple[int, int, int], other: Tuple[int, int, int], amount: float) -> str:
@@ -31,6 +33,8 @@ class TapePreviewWidget(ctk.CTkFrame):
         self._metrics: Optional[LabelMetrics] = None
         self._tape_spec: Optional[dict] = None
         self._photo_ref: Optional[ImageTk.PhotoImage] = None
+        # Where the label was last drawn (x, y, width, height), in canvas coordinates
+        self.label_bounds: Optional[Tuple[int, int, int, int]] = None
 
         self.zoom_mode = "fit"  # "fit", "1.0", "1.5", "2.0", "3.0"
         self.view_mode = "tape"  # "tape" or "raster"
@@ -60,9 +64,32 @@ class TapePreviewWidget(ctk.CTkFrame):
         self.metrics_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.metrics_frame.pack(side="bottom", fill="x", padx=10, pady=(0, 8))
 
-        self.canvas = tk.Canvas(self, bg=CANVAS_BG, highlightthickness=0, bd=0, height=150)
-        self.canvas.pack(fill="both", expand=True, padx=10, pady=6)
+        # Canvas plus a horizontal scrollbar that only shows when the label is wider than the view
+        self.canvas_frame = ctk.CTkFrame(self, fg_color=CANVAS_BG, corner_radius=0)
+        self.canvas_frame.pack(fill="both", expand=True, padx=10, pady=6)
+        self.canvas_frame.grid_rowconfigure(0, weight=1)
+        self.canvas_frame.grid_columnconfigure(0, weight=1)
+
+        self.canvas = tk.Canvas(self.canvas_frame, bg=CANVAS_BG, highlightthickness=0, bd=0, height=150)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
         self.canvas.bind("<Configure>", lambda e: self._redraw())
+
+        self.h_scrollbar = ctk.CTkScrollbar(
+            self.canvas_frame, orientation="horizontal", command=self.canvas.xview, height=14, fg_color=CANVAS_BG
+        )
+        self.h_scrollbar.grid(row=1, column=0, sticky="ew", padx=4, pady=(0, 2))
+        self.h_scrollbar.grid_remove()
+        self.canvas.configure(xscrollcommand=self.h_scrollbar.set)
+
+        # Wheel (with or without Shift) and dragging pan a label that is wider than the view
+        self.canvas.bind("<MouseWheel>", self._on_wheel)
+        self.canvas.bind("<Shift-MouseWheel>", self._on_wheel)
+        self.canvas.bind("<Button-4>", lambda e: self._scroll_by(-WHEEL_STEP_PX))
+        self.canvas.bind("<Button-5>", lambda e: self._scroll_by(WHEEL_STEP_PX))
+        self.canvas.bind("<Shift-Button-4>", lambda e: self._scroll_by(-WHEEL_STEP_PX))
+        self.canvas.bind("<Shift-Button-5>", lambda e: self._scroll_by(WHEEL_STEP_PX))
+        self.canvas.bind("<ButtonPress-1>", self._on_drag_start)
+        self.canvas.bind("<B1-Motion>", self._on_drag)
 
         self.length_label = ctk.CTkLabel(self.metrics_frame, text="", font=ctk.CTkFont(size=12, weight="bold"))
         self.length_label.pack(side="left", padx=4)
@@ -84,6 +111,30 @@ class TapePreviewWidget(ctk.CTkFrame):
         self.zoom_mode = {"Fit": "fit", "100%": "1.0", "150%": "1.5", "200%": "2.0", "300%": "3.0"}[value]
         self._redraw()
 
+    @property
+    def is_scrollable(self) -> bool:
+        """True when the label is wider than the view, so it can be scrolled sideways."""
+        return self.h_scrollbar.winfo_manager() == "grid"
+
+    def _scroll_by(self, pixels: int):
+        if not self.is_scrollable:
+            return
+        region_w = float(self.canvas.cget("scrollregion").split()[2])
+        self.canvas.xview_moveto(self.canvas.xview()[0] + pixels / region_w)
+
+    def _on_wheel(self, event):
+        # Windows reports 120 per notch, macOS reports small deltas
+        notches = event.delta / 120 if abs(event.delta) >= 120 else (1 if event.delta > 0 else -1)
+        self._scroll_by(int(-notches * WHEEL_STEP_PX))
+
+    def _on_drag_start(self, event):
+        if self.is_scrollable:
+            self.canvas.scan_mark(event.x, 0)
+
+    def _on_drag(self, event):
+        if self.is_scrollable:
+            self.canvas.scan_dragto(event.x, 0, gain=1)
+
     def update_content(
         self,
         preview_img: Image.Image,
@@ -93,7 +144,9 @@ class TapePreviewWidget(ctk.CTkFrame):
     ):
         """Updates the canvas with a newly rendered label and its metrics."""
         self._preview_image = preview_img
-        self._raster_image = raster_img
+        # The raster runs down the tape the way the printer feeds it; turn it back to read like the
+        # label, so both views line up and a long label scrolls sideways in either
+        self._raster_image = ImageOps.mirror(raster_img).rotate(90, expand=True)
         self._metrics = metrics
         self._tape_spec = tape_spec
 
@@ -113,8 +166,10 @@ class TapePreviewWidget(ctk.CTkFrame):
     def _redraw(self):
         """Draws the label centred and scaled, on a strip of tape with cut lines at both ends."""
         self.canvas.delete("all")
+        self.label_bounds = None
         active_img = self._raster_image if self.view_mode == "raster" else self._preview_image
         if active_img is None:
+            self._set_scrollable(False, 0, 0)
             return
 
         cw = self.canvas.winfo_width()
@@ -126,22 +181,29 @@ class TapePreviewWidget(ctk.CTkFrame):
         lead = TAPE_LEAD_PX if self.view_mode == "tape" else 0
 
         if self.zoom_mode == "fit":
-            max_w = max(cw - 2 * lead - 24, 80)
-            max_h = max(ch - 28, 40)
-            scale = max(min(max_w / img_w, max_h / img_h, 4.0), 0.4)
+            # Always the whole label, however long, so Fit works as the overview
+            max_w = max(cw - 2 * (lead + EDGE_PAD_PX), 20)
+            max_h = max(ch - 28, 20)
+            scale = min(max_w / img_w, max_h / img_h, 4.0)
         else:
             scale = float(self.zoom_mode)
 
         disp_w = max(int(img_w * scale), 1)
         disp_h = max(int(img_h * scale), 1)
 
+        # A label wider than the view scrolls sideways; otherwise it is centred
+        content_w = disp_w + 2 * (lead + EDGE_PAD_PX)
+        scrollable = content_w > cw
+        self._set_scrollable(scrollable, content_w, ch)
+
         if self.view_mode == "raster":
             resized = active_img.convert("RGB").resize((disp_w, disp_h), Image.Resampling.NEAREST)
         else:
             resized = active_img.resize((disp_w, disp_h), Image.Resampling.LANCZOS)
 
-        x = max((cw - disp_w) // 2, lead + 12)
+        x = lead + EDGE_PAD_PX if scrollable else max((cw - disp_w) // 2, lead + EDGE_PAD_PX)
         y = max((ch - disp_h) // 2, 14)
+        self.label_bounds = (x, y, disp_w, disp_h)
 
         if self.view_mode == "tape":
             self._draw_tape_strip(x, y, disp_w, disp_h, active_img, scale)
@@ -153,6 +215,26 @@ class TapePreviewWidget(ctk.CTkFrame):
             self.canvas.create_rectangle(x - 1, y - 1, x + disp_w, y + disp_h, outline="#444444", width=1)
         else:
             self._draw_cut_lines(x, y, disp_w, disp_h)
+
+    def _set_scrollable(self, scrollable: bool, content_w: int, ch: int):
+        """Shows or hides the scrollbar, keeping the middle of the view in place across redraws."""
+        self.canvas.configure(cursor="sb_h_double_arrow" if scrollable else "")
+        if not scrollable:
+            self.canvas.configure(scrollregion=(0, 0, max(self.canvas.winfo_width(), 1), max(ch, 1)))
+            self.canvas.xview_moveto(0)
+            if self.is_scrollable:
+                self.h_scrollbar.grid_remove()
+            return
+
+        first, last = self.canvas.xview() if self.is_scrollable else (0.0, 0.0)
+        middle = (first + last) / 2
+        self.canvas.configure(scrollregion=(0, 0, content_w, ch))
+        if not self.is_scrollable:
+            self.h_scrollbar.grid()
+            self.canvas.xview_moveto(0)  # Start at the beginning of the label
+        else:
+            visible = self.canvas.winfo_width() / content_w
+            self.canvas.xview_moveto(max(middle - visible / 2, 0.0))
 
     def _draw_tape_strip(self, x: int, y: int, disp_w: int, disp_h: int, img: Image.Image, scale: float):
         """Unprinted tape before and after the label, dimmed so the label stands out."""
