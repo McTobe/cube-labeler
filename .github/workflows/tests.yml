@@ -11,8 +11,12 @@ permissions:
 
 jobs:
   test:
-    name: Unit & GUI Tests
-    runs-on: windows-latest
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
 
     steps:
       - name: Checkout Repository
@@ -33,7 +37,9 @@ jobs:
         run: |
           python -m unittest discover tests
 
+      # The GUI tests open real windows, so they only run where there is a desktop
       - name: Run Headless GUI Integration Tests
+        if: runner.os == 'Windows'
         run: |
           python tests/test_gui_inventory.py
           python tests/test_gui_queue.py
