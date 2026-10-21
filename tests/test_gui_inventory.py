@@ -151,13 +151,23 @@ def test_gui_inventory():
     assert tab.entry_len_dual_1.get() == "30"
     assert tab.drive_combo.get() == "PZ"
 
-    # 7. Older labels: the "assortment" layout opens as one bin with a note
+    # 7. Older labels: the "assortment" layout keeps its two lines and stays an assortment
     tab.load_inventory_config(
         FastenerLabelConfig(compartment_mode="assortment", assortment_line1="Blandade", assortment_line2="sorter")
     )
     app.update()
-    assert tab.mode_seg.get() == "One"
-    assert (tab.entry_len_single.get(), tab.entry_std_1.get()) == ("Blandade", "sorter")
+    assert tab.mode_seg.get() == ""
+    assert (tab.entry_assort_1.get(), tab.entry_assort_2.get()) == ("Blandade", "sorter")
+    tab.entry_assort_2.insert("end", " M5")
+    tab._on_field_change()
+    inv = app.config.inventory_config
+    assert inv.compartment_mode == "assortment"
+    assert (inv.assortment_line1, inv.assortment_line2) == ("Blandade", "sorter M5")
+
+    # Choosing a Bins button switches it to an ordinary layout
+    tab.mode_seg.set("One", from_button_callback=True)
+    app.update()
+    assert app.config.inventory_config.compartment_mode == "single"
 
     # Optional: set PRINTLABEL_TEST_ARTIFACTS to a folder to keep preview images
     artifact_dir = os.environ.get("PRINTLABEL_TEST_ARTIFACTS", "")

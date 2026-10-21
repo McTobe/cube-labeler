@@ -163,7 +163,11 @@ def config_from_dict(data: dict) -> LabelConfig:
         inv_cls = _INVENTORY_TYPES.get(inv_type)
         if inv_cls is None:
             raise ValueError(f"Unknown hardware label type '{inv_type}'.")
-        cfg.inventory_config = inv_cls(**_known_fields(inv_cls, inv_data))
+        inv_fields = _known_fields(inv_cls, inv_data)
+        if inv_cls is FastenerLabelConfig and "simple_drive_icon" not in inv_data:
+            # Saved before drive icons came from the icon library: keep the drawn icon it was made with
+            inv_fields["simple_drive_icon"] = True
+        cfg.inventory_config = inv_cls(**inv_fields)
     return cfg
 
 

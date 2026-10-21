@@ -32,6 +32,14 @@ class TestLabelSpacing(unittest.TestCase):
             left, _, right, _ = _ink_bbox(canvas)
             self.assertLessEqual(abs(left - (canvas.width - right)), 1, text)
 
+    def test_leading_spaces_still_indent(self):
+        cfg = LabelConfig(text="Shelf A\n    Box 1", alignment="left", auto_fit_font=False, fixed_font_size=20)
+        canvas = self.renderer._render_base_canvas(cfg)[0]
+        half = canvas.height // 2
+        top = _ink_bbox(canvas.crop((0, 0, canvas.width, half)))
+        bottom = _ink_bbox(canvas.crop((0, half, canvas.width, canvas.height)))
+        self.assertGreater(bottom[0], top[0] + 10)
+
     def test_single_bin_label_has_side_padding(self):
         cfg = LabelConfig(inventory_config=build_presets("en")["A2"].config)
         preview = self.renderer.render(cfg)[0]

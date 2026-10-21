@@ -10,6 +10,7 @@ strict 8-10% interior safe zones, and 2-3px architectural divider hairlines.
 
 import math
 import os
+import re
 import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple, Union
@@ -29,14 +30,34 @@ DRIVE_LIBRARY_ICONS = {
 }
 
 
+def _bundled_icons_dir() -> str:
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, "assets", "icons")
+
+
 def drive_library_icon(tool_type: str) -> Optional[str]:
     """Path of the icon library picture for a drive, or None if there isn't one."""
     name = DRIVE_LIBRARY_ICONS.get(tool_type)
     if not name:
         return None
-    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    path = os.path.join(base, "assets", "icons", "fasteners", name)
+    path = os.path.join(_bundled_icons_dir(), "fasteners", name)
     return path if os.path.isfile(path) else None
+
+
+def resolve_icon_path(path: Optional[str]) -> Optional[str]:
+    """
+    Finds a saved icon again. The packaged app unpacks its icon library into a temporary
+    folder with a new name on every start, so a saved path into .../assets/icons/ from an
+    earlier run is looked up in the current icon library instead.
+    """
+    if not path or os.path.isfile(path):
+        return path
+    parts = [p for p in re.split(r"[\\/]+", path) if p]
+    for i in range(len(parts) - 2, 0, -1):
+        if parts[i].lower() == "icons" and parts[i - 1].lower() == "assets":
+            candidate = os.path.join(_bundled_icons_dir(), *parts[i + 1:])
+            return candidate if os.path.isfile(candidate) else path
+    return path
 
 
 @dataclass
@@ -143,6 +164,7 @@ class InventoryRenderer:
         scaled to fit within max_w x max_h preserving aspect ratio.
         Binarizes to crisp monochrome (0 on 255 background).
         """
+        image_path = resolve_icon_path(image_path)
         if not image_path or not os.path.isfile(image_path):
             return
         try:

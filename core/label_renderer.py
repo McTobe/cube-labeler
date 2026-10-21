@@ -136,7 +136,9 @@ class LabelRenderer:
         bbox = probe.getbbox()
         if not bbox:
             return 0, 0
-        return bbox[0] - pad, bbox[2] - pad
+        # Leading spaces are typed indentation, so they count as part of the line
+        indent = int(round(font.getlength(line[: len(line) - len(line.lstrip(" "))])))
+        return bbox[0] - pad - indent, bbox[2] - pad
 
     def calculate_multiline_dims(
         self, lines: List[str], font: ImageFont.FreeTypeFont, line_spacing: float, stroke_width: int = 0
