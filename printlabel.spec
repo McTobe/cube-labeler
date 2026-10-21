@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller specification for Cube Labeler (PrintLabel).
+PyInstaller specification for Cube Labeler (CubeLabeler.exe).
 Builds a single, standalone, portable executable bundled with all assets,
 themes, and dependencies.
 """
@@ -89,7 +89,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='PrintLabel',
+    name='CubeLabeler',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

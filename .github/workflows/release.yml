@@ -45,8 +45,8 @@ jobs:
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PrintLabel-Windows-x64
-          path: dist/PrintLabel.exe
+          name: CubeLabeler-Windows-x64
+          path: dist/CubeLabeler.exe
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
@@ -54,7 +54,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/PrintLabel.exe
+          files: dist/CubeLabeler.exe
           name: Cube Labeler ${{ github.ref_name }}
           draft: false
           prerelease: false
