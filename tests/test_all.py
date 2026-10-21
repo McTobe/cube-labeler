@@ -6,10 +6,14 @@ Unit and integration tests for Brother PT-P300BT Label Studio.
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
+
+# Font shipped with the tests so font handling can be checked on any OS
+TEST_FONTS_DIR = os.path.join(BASE_DIR, "tests", "fonts")
 
 from core.ptcbp import (
     serialize_control,
@@ -24,7 +28,7 @@ from core.ptstatus import (
     unpack_status,
     parse_printer_status,
 )
-from core.font_manager import font_manager
+from core.font_manager import FontManager, font_manager
 from core.label_renderer import LabelRenderer, LabelConfig
 from core.printer import MockBrotherPrinter, list_serial_ports
 from ui.templates import (
@@ -88,15 +92,44 @@ class TestPTStatus(unittest.TestCase):
         self.assertTrue(status.tape_loaded)
 
 
+def _font_manager_without_fonts():
+    """A FontManager that found no installed fonts, like a bare Linux box."""
+    mgr = object.__new__(FontManager)
+    mgr._font_cache = {}
+    mgr._loaded_fonts = {}
+    return mgr
+
+
 class TestFontManager(unittest.TestCase):
+    @unittest.skipUnless(sys.platform == "win32", "Arial is only guaranteed on Windows")
     def test_font_discovery(self):
         names = font_manager.get_font_names()
         self.assertGreater(len(names), 0)
         self.assertIn("Arial", names)
 
+    def test_font_dir_scan(self):
+        mgr = _font_manager_without_fonts()
+        mgr.scan_font_dir(TEST_FONTS_DIR)
+        self.assertIn("Roboto", mgr.get_font_names())
+        self.assertEqual(
+            mgr.resolve_font_path("roboto"), os.path.join(TEST_FONTS_DIR, "Roboto-Regular.ttf")
+        )
+
     def test_font_loading(self):
         font = font_manager.load_font("Arial", 24)
         self.assertIsNotNone(font)
+
+    def test_missing_font_still_scales(self):
+        mgr = _font_manager_without_fonts()
+        small = mgr.load_font("No Such Font", 10)
+        large = mgr.load_font("No Such Font", 60)
+        self.assertGreater(large.getbbox("Hg")[3], small.getbbox("Hg")[3] * 3)
+
+    def test_auto_fit_without_installed_fonts(self):
+        with patch("core.label_renderer.font_manager", _font_manager_without_fonts()):
+            config = LabelConfig(text="Line 1\nLine 2", auto_fit_font=True, tape_width_mm=12)
+            _, _, _, metrics = LabelRenderer().render(config)
+        self.assertGreater(metrics.effective_font_size, 20)
 
 
 class TestLabelRenderer(unittest.TestCase):

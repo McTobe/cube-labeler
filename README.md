@@ -206,3 +206,5 @@ Run the automated test suite:
 ```bash
 python -m unittest discover tests
 ```
+
+The suite also runs on macOS and Linux. There, fonts are found in the standard font folders (falling back to Pillow's built-in font), and the GUI tests are skipped when Python has no tkinter.

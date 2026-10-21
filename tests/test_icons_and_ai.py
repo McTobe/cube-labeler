@@ -3,6 +3,7 @@
 Unit tests for Icon Library, Config Manager, and AI Wireframe Generator.
 """
 
+import importlib.util
 import os
 import sys
 import unittest
@@ -20,6 +21,8 @@ from core.ai_generator import (
     THERMAL_WIREFRAME_SYSTEM_PROMPT,
 )
 
+HAS_TKINTER = importlib.util.find_spec("tkinter") is not None
+
 
 class TestConfigManager(unittest.TestCase):
     def test_config_defaults_and_keys(self):
@@ -31,12 +34,14 @@ class TestConfigManager(unittest.TestCase):
         self.assertTrue(os.path.isdir(user_dir))
         self.assertEqual(user_dir, os.path.normpath(user_dir))
 
+    @unittest.skipUnless(HAS_TKINTER, "tkinter is not installed")
     def test_open_custom_folder_logic(self):
         from unittest.mock import patch
         from ui.icon_browser import IconBrowserDialog
 
-        # Test that _open_custom_folder calls os.startfile on Windows without NameError or crash
-        with patch("os.startfile") as mock_startfile:
+        # Test that _open_custom_folder calls os.startfile on Windows without NameError or crash.
+        # Popen is patched too so no file manager opens on macOS or Linux.
+        with patch("os.startfile", create=True) as mock_startfile, patch("subprocess.Popen"):
             # We can create a dummy mock object with _open_custom_folder
             dummy = object.__new__(IconBrowserDialog)
             dummy._open_custom_folder()

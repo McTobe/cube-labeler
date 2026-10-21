@@ -3,8 +3,10 @@
 Headless GUI test for the text label editor, the print queue, and view switching.
 """
 
+import importlib.util
 import os
 import sys
+import unittest
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
@@ -12,6 +14,13 @@ if BASE_DIR not in sys.path:
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
+
+# The GUI needs tkinter, which many Linux Pythons leave out
+if importlib.util.find_spec("tkinter") is None:
+    if __name__ == "__main__":
+        print("SKIPPED: tkinter is not installed")
+        sys.exit(0)
+    raise unittest.SkipTest("tkinter is not installed")
 
 from ui.app import PrintLabelApp, VIEW_QUEUE, VIEW_SETTINGS, VIEW_TEMPLATES, VIEW_TEXT
 
