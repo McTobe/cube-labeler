@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Pin header: square pins through a plastic strip -->
+  <g fill="#000"><rect x="7.5" y="4" width="5" height="56"/><rect x="21.5" y="4" width="5" height="56"/><rect x="35.5" y="4" width="5" height="56"/><rect x="49.5" y="4" width="5" height="56"/>
+    <rect x="2" y="28" width="60" height="12" rx="1"/>
+  </g>
+  <g fill="#fff"><rect x="15.5" y="28" width="2" height="12"/><rect x="29.5" y="28" width="2" height="12"/><rect x="43.5" y="28" width="2" height="12"/></g>
+</svg>

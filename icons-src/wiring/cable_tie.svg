@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Cable tie: head with a ribbed strap looped round -->
+  <path d="M24 50C8 46 4 28 14 16 24 4 46 6 54 20c4 8 4 18-2 26" fill="none" stroke="#000" stroke-width="8"/>
+  <rect x="20" y="44" width="16" height="14" rx="2" fill="#000"/>
+  <rect x="25" y="49" width="6" height="4" fill="#fff"/>
+  <path d="M52 46l-10 6" stroke="#000" stroke-width="7"/>
+</svg>

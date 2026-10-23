@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- DC motor: can with end cap, shaft and terminals -->
+  <g fill="#000">
+    <rect x="6" y="14" width="40" height="36" rx="6"/>
+    <rect x="46" y="22" width="6" height="20"/>
+    <rect x="52" y="30" width="11" height="4"/>
+    <rect x="1" y="20" width="6" height="4"/><rect x="1" y="40" width="6" height="4"/>
+  </g>
+  <rect x="38" y="14" width="2.5" height="36" fill="#fff"/>
+  <path d="M17 39V26l6 8 6-8v13" fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="miter"/>
+</svg>

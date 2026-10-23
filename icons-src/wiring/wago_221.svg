@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- WAGO 221 lever connector: clear housing, three orange levers up, wire entries -->
+  <rect x="4" y="22" width="56" height="34" rx="3" fill="#000"/>
+  <g fill="#000"><path d="M8 22V8l12-4v18z"/><path d="M26 22V8l12-4v18z"/><path d="M44 22V8l12-4v18z"/></g>
+  <g fill="#fff"><circle cx="14" cy="42" r="5"/><circle cx="32" cy="42" r="5"/><circle cx="50" cy="42" r="5"/>
+    <rect x="22" y="22" width="2.5" height="34"/><rect x="40" y="22" width="2.5" height="34"/></g>
+</svg>

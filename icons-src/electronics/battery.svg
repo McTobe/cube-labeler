@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Battery cell (AA) with + terminal and polarity marks -->
+  <rect x="3" y="18" width="52" height="28" rx="4" fill="#000"/>
+  <rect x="55" y="25" width="6" height="14" rx="1" fill="#000"/>
+  <rect x="38" y="18" width="3" height="28" fill="#fff"/>
+  <g fill="#fff"><rect x="44" y="30" width="8" height="4"/><rect x="46" y="28" width="4" height="8"/><rect x="10" y="30" width="10" height="4"/></g>
+</svg>

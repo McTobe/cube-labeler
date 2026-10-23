@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- NPN transistor schematic symbol in a circle -->
+  <circle cx="34" cy="32" r="22" fill="none" stroke="#000" stroke-width="4"/>
+  <g fill="#000"><rect x="2" y="30" width="22" height="4"/><rect x="24" y="17" width="5" height="30"/></g>
+  <g stroke="#000" stroke-width="4" fill="none"><path d="M27 25L44 14V2"/><path d="M27 39L44 50V62"/></g>
+  <path d="M46 52l-11-1 6-8z" fill="#000"/>
+</svg>
