@@ -94,12 +94,8 @@ class TestIconManager(unittest.TestCase):
         item = self.mgr.save_user_icon(test_img, "unit_test_save_icon")
         self.assertIsNotNone(item)
         self.assertTrue(os.path.isfile(item.file_path))
-        # Cleanup
-        try:
-            os.remove(item.file_path)
-            self.mgr.reload()
-        except Exception:
-            pass
+        # Cleanup: also forgets the name it was saved under
+        self.assertTrue(self.mgr.delete_user_icon(item))
 
 
 class TestAIGenerator(unittest.TestCase):
