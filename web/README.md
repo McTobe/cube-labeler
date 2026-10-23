@@ -56,6 +56,52 @@ phone on your Wi-Fi without hosting it anywhere:
    `http://192.168.1.20:8000`, enable it and restart Chrome.
 3. Open that address on the phone.
 
+## Hosting with Docker
+
+Every release tag (`v1.5.0` and so on) makes GitHub Actions build a Docker image and publish
+it as `ghcr.io/mctobe/cube-labeler-web` (for amd64 and arm64), tagged `latest`, `1.5.0` and
+`1.5`. You can also run the "Publish Web Image" workflow by hand from the Actions tab; that
+image only gets a commit tag such as `sha-4c256cc`, so `latest` always means the newest release. The image serves
+the site with nginx on port 80. Web Serial needs HTTPS, so put it behind a reverse proxy that
+handles TLS, such as Nginx Proxy Manager.
+
+With Dockge (or plain Docker Compose), create a stack with this compose file:
+
+```yaml
+services:
+  cube-labeler-web:
+    image: ghcr.io/mctobe/cube-labeler-web:latest
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+```
+
+Dockge's **Update** button pulls the newest `latest` image and restarts the container, so
+after tagging a release you wait for the "Publish Web Image" workflow to finish and press
+Update. To stay on one version instead, use a version tag such as `:1.5`.
+
+**Private repository:** the image is a GitHub package with its own visibility, and a new one
+starts out private. Either:
+
+- make the package public (GitHub › your profile › Packages › cube-labeler-web › Package
+  settings › Change visibility). The repository stays private. The image only holds the
+  static site, which anyone opening the page downloads anyway. Or
+- keep it private and log in once from the Docker that Dockge uses, with a personal access
+  token (classic) that has only the `read:packages` scope:
+  `docker exec -it dockge docker login ghcr.io -u <your GitHub user>`.
+
+In Nginx Proxy Manager, add a proxy host for your domain (for example `print.tobezone.com`)
+that forwards to `http://<docker host>:8080`, and turn on a Let's Encrypt certificate with
+**Force SSL**. If Nginx Proxy Manager runs in Docker on the same host, you can instead put both
+containers on one Docker network and forward to `http://cube-labeler-web:80`.
+
+The server tells browsers to check for changes on every load, so phones pick up a new version
+straight away. On Android, the first visit still needs Chrome's **Nearby devices** permission
+and a force stop of Chrome, as described above; the Chrome flag for insecure origins is not
+needed.
+
+To build the image yourself from a checkout instead: `docker compose up -d --build`.
+
 ## How it fits together
 
 | File | What it does |
