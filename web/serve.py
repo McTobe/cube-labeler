@@ -19,15 +19,21 @@ import build
 DEFAULT_PORT = 8000
 
 
-def lan_address() -> str:
-    """The address other devices on the network reach this computer at, or "" if unknown."""
+def lan_addresses() -> list:
+    """Addresses other devices on the network can reach this computer at (a PC can have several)."""
+    found = []
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             # No packet is sent: connecting a UDP socket only picks the outgoing interface
             s.connect(("192.168.0.1", 9))
-            return s.getsockname()[0]
+            found.append(s.getsockname()[0])
     except OSError:
-        return ""
+        pass
+    try:
+        found += socket.gethostbyname_ex(socket.gethostname())[2]
+    except OSError:
+        pass
+    return [a for a in dict.fromkeys(found) if not a.startswith("127.")]
 
 
 def main() -> int:
@@ -45,9 +51,8 @@ def main() -> int:
     local_url = f"http://localhost:{port}/"
     print()
     print(f"  On this computer: {local_url}")
-    lan = lan_address()
-    if lan:
-        print(f"  On your phone:    http://{lan}:{port}/")
+    for address in lan_addresses():
+        print(f"  On your phone:    http://{address}:{port}/")
     print()
     print("Press Ctrl+C to stop.")
 
