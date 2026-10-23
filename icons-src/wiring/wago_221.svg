@@ -1,20 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- WAGO 221 lever connector, three-quarter line drawing: three wire entries, middle lever open -->
-  <path d="M3.00 44.00 L36.00 59.00 L36.00 38.00 L3.00 23.00z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M36.00 59.00 L60.00 46.00 L60.00 25.00 L36.00 38.00z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M3.00 23.00 L36.00 38.00 L60.00 25.00 L27.00 10.00z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M4.65 41.60 L12.35 45.10 L12.35 31.45 L4.65 27.95z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M6.96 39.08 L10.04 40.48 L10.04 33.97 L6.96 32.57z" fill="#000" stroke="#000" stroke-width="0.5" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M15.65 46.60 L23.35 50.10 L23.35 36.45 L15.65 32.95z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M17.96 44.08 L21.04 45.48 L21.04 38.97 L17.96 37.57z" fill="#000" stroke="#000" stroke-width="0.5" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M26.65 51.60 L34.35 55.10 L34.35 41.45 L26.65 37.95z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M28.96 49.08 L32.04 50.48 L32.04 43.97 L28.96 42.57z" fill="#000" stroke="#000" stroke-width="0.5" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M7.38 22.60 L14.42 25.80 L32.42 16.05 L25.38 12.85z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M10.98 20.65 L18.02 23.85" fill="none" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M29.38 32.60 L36.42 35.80 L54.42 26.05 L47.38 22.85z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M32.98 30.65 L40.02 33.85" fill="none" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M18.38 27.60 L25.42 30.80 L43.42 21.05 L36.38 17.85z" fill="#000" stroke="#000" stroke-width="1" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M37.10 17.46 L44.14 20.66 L37.90 -0.11 L30.86 -3.31z" fill="#fff" stroke="#000" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M34.33 6.34 L40.05 8.94" fill="none" stroke="#000" stroke-width="1.7600000000000002" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M33.27 2.81 L38.99 5.41" fill="none" stroke="#000" stroke-width="1.7600000000000002" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- WAGO 221 lever connector, three-quarter drawing: three wire entries, middle lever open -->
+  <path d="M3.00 46.00 L33.00 61.00 L33.00 42.00 L3.00 27.00z" fill="#000" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M33.00 61.00 L59.00 47.00 L59.00 28.00 L33.00 42.00z" fill="#fff" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M3.00 27.00 L33.00 42.00 L59.00 28.00 L29.00 13.00z" fill="#fff" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M4.80 44.05 L11.20 47.25 L11.20 35.85 L4.80 32.65z" fill="#fff"/>
+  <path d="M14.80 49.05 L21.20 52.25 L21.20 40.85 L14.80 37.65z" fill="#fff"/>
+  <path d="M24.80 54.05 L31.20 57.25 L31.20 45.85 L24.80 42.65z" fill="#fff"/>
+  <path d="M9.00 25.95 L14.80 28.85 L31.70 19.75 L25.90 16.85z" fill="#000"/>
+  <path d="M29.00 35.95 L34.80 38.85 L51.70 29.75 L45.90 26.85z" fill="#000"/>
+  <path d="M36.42 21.57 L42.22 24.47 L35.98 8.83 L30.18 5.93z" fill="#000" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
 </svg>
