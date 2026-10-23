@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Tin can with ribs -->
+  <g fill="#000"><ellipse cx="32" cy="10" rx="22" ry="7"/><rect x="10" y="10" width="44" height="44"/><ellipse cx="32" cy="54" rx="22" ry="7"/></g>
+  <ellipse cx="32" cy="10" rx="17" ry="4" fill="#fff"/>
+  <g fill="#fff"><rect x="10" y="22" width="44" height="2.5"/><rect x="10" y="44" width="44" height="2.5"/></g>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Bottle with cap and label -->
+  <g fill="#000"><rect x="25" y="2" width="14" height="7" rx="1"/><path d="M27 9h10v10c0 4 9 7 9 15v26a2 2 0 0 1-2 2H20a2 2 0 0 1-2-2V34c0-8 9-11 9-15z"/></g>
+  <rect x="22" y="36" width="20" height="16" rx="1" fill="#fff"/>
+</svg>

@@ -61,7 +61,7 @@ class TestIconManager(unittest.TestCase):
         self.assertEqual(
             self.mgr.CATEGORIES,
             ["All", "Fasteners", "Screw drives", "Mechanical", "Electronics", "Wiring & connectors",
-             "Tools", "Safety & handling", "Symbols", "My Icons"],
+             "Tools", "Home & Kitchen", "Safety & handling", "Symbols", "My Icons"],
         )
         self.assertGreater(len(self.mgr.list_icons(category="Fasteners")), 5)
         self.assertEqual(len(self.mgr.list_icons(category="Screw drives")), 6)
