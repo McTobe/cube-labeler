@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Side cutters: short pointed cutting head, pivot and two handles -->
+  <g fill="#000"><path d="M32 4c8 6 10 16 8 24H24c-2-8 0-18 8-24z"/><path d="M26.5 33l5 4.5-11 25-7-2.5z"/><path d="M37.5 33l-5 4.5 11 25 7-2.5z"/><circle cx="32" cy="31" r="7"/></g>
+  <path d="M32 9v15" stroke="#fff" stroke-width="2"/>
+  <circle cx="32" cy="31" r="2.5" fill="#fff"/>
+</svg>

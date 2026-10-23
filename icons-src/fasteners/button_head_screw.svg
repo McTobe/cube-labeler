@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Button head screw, side view -->
+  <path d="M14 21C14 8 22 3 32 3s18 5 18 18z" fill="#000"/>
+  <rect x="25" y="21" width="14" height="41" fill="#000"/>
+  <path d="M25 31 L39 28 v2 L25 33z" fill="#fff"/>
+  <path d="M25 36 L39 33 v2 L25 38z" fill="#fff"/>
+  <path d="M25 41 L39 38 v2 L25 43z" fill="#fff"/>
+  <path d="M25 46 L39 43 v2 L25 48z" fill="#fff"/>
+  <path d="M25 51 L39 48 v2 L25 53z" fill="#fff"/>
+  <path d="M25 56 L39 53 v2 L25 58z" fill="#fff"/>
+  <path d="M25 61 L39 58 v2 L25 63z" fill="#fff"/>
+</svg>

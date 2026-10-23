@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- JST connector: latch housing with three wires -->
+  <g fill="#000">
+    <rect x="6" y="24" width="52" height="24" rx="2"/>
+    <path d="M18 24v-8h28v8z"/>
+    <rect x="13" y="48" width="6" height="15"/><rect x="29" y="48" width="6" height="15"/><rect x="45" y="48" width="6" height="15"/>
+  </g>
+  <g fill="#fff"><rect x="12" y="30" width="8" height="12"/><rect x="28" y="30" width="8" height="12"/><rect x="44" y="30" width="8" height="12"/></g>
+  <g fill="#000"><rect x="14.5" y="33" width="3" height="6"/><rect x="30.5" y="33" width="3" height="6"/><rect x="46.5" y="33" width="3" height="6"/></g>
+</svg>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Toggle switch: body, threaded bushing with nut, lever -->
+  <g fill="#000">
+    <rect x="12" y="34" width="40" height="22" rx="2"/>
+    <rect x="22" y="26" width="20" height="8"/>
+    <rect x="18" y="22" width="28" height="5" rx="1"/>
+    <path d="M30 24l4-1 12-20 4 2-12 21z"/>
+    <rect x="18" y="56" width="4" height="6"/><rect x="30" y="56" width="4" height="6"/><rect x="42" y="56" width="4" height="6"/>
+  </g>
+</svg>

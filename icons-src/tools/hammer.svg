@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Claw hammer: head with face and claw, handle with grip -->
+  <g transform="rotate(-35 32 34)">
+    <rect x="28" y="16" width="8" height="46" rx="3" fill="#000"/>
+    <rect x="27" y="42" width="10" height="20" rx="4" fill="#000"/>
+    <path d="M14 6h26v12H14z" fill="#000"/>
+    <rect x="8" y="4" width="8" height="16" rx="1" fill="#000"/>
+    <path d="M40 6c8 0 14 2 18 6l-2 3c-4-2-9-3-16-3z" fill="#000"/>
+    <path d="M40 12c6 0 11 2 15 6l-2 3c-4-3-8-4-13-4z" fill="#000"/>
+  </g>
+</svg>

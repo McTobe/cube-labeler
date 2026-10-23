@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Heat shrink tube over a wire joint -->
+  <g transform="rotate(-30 32 32)">
+    <rect x="-4" y="29" width="72" height="6" fill="#000"/>
+    <rect x="14" y="21" width="36" height="22" rx="3" fill="#000"/>
+    <g fill="#fff"><rect x="20" y="25" width="24" height="2.5" rx="1"/></g>
+  </g>
+</svg>

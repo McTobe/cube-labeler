@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Screw terminal block: three clamps with slotted screws, wire entries -->
+  <rect x="2" y="12" width="60" height="44" rx="2" fill="#000"/>
+  <g fill="#fff">
+    <circle cx="13" cy="24" r="6.5"/><circle cx="32" cy="24" r="6.5"/><circle cx="51" cy="24" r="6.5"/>
+    <rect x="8" y="40" width="10" height="9"/><rect x="27" y="40" width="10" height="9"/><rect x="46" y="40" width="10" height="9"/>
+  </g>
+  <g fill="#000"><rect x="8" y="22.5" width="10" height="3"/><rect x="27" y="22.5" width="10" height="3"/><rect x="46" y="22.5" width="10" height="3"/></g>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Key: round bow with hole, shaft and bit -->
+  <g transform="rotate(-45 32 32)">
+    <circle cx="14" cy="32" r="13" fill="#000"/>
+    <circle cx="10" cy="32" r="4.5" fill="#fff"/>
+    <rect x="24" y="28" width="38" height="8" fill="#000"/>
+    <rect x="44" y="36" width="5" height="9" fill="#000"/><rect x="53" y="36" width="5" height="12" fill="#000"/>
+  </g>
+</svg>

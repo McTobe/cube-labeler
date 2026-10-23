@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Cooling fan: square frame, round opening, four blades and hub -->
+  <rect x="2" y="2" width="60" height="60" rx="6" fill="#000"/>
+  <circle cx="32" cy="32" r="27" fill="#fff"/>
+  <g fill="#fff"><circle cx="9" cy="9" r="3"/><circle cx="55" cy="9" r="3"/><circle cx="9" cy="55" r="3"/><circle cx="55" cy="55" r="3"/></g>
+  <g fill="#000"><path d="M32 32C30 22 32 12 42 8C46 16 42 26 32 32z" transform="rotate(0 32 32)"/><path d="M32 32C30 22 32 12 42 8C46 16 42 26 32 32z" transform="rotate(90 32 32)"/><path d="M32 32C30 22 32 12 42 8C46 16 42 26 32 32z" transform="rotate(180 32 32)"/><path d="M32 32C30 22 32 12 42 8C46 16 42 26 32 32z" transform="rotate(270 32 32)"/><circle cx="32" cy="32" r="7"/></g>
+</svg>

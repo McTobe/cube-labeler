@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Threaded rod -->
+  <g transform="rotate(45 32 32)">
+    <rect x="25" y="-8" width="14" height="80" fill="#000"/>
+    <path d="M25 -3 L39 -6 v2 L25 -1z" fill="#fff"/>
+  <path d="M25 2 L39 -1 v2 L25 4z" fill="#fff"/>
+  <path d="M25 7 L39 4 v2 L25 9z" fill="#fff"/>
+  <path d="M25 12 L39 9 v2 L25 14z" fill="#fff"/>
+  <path d="M25 17 L39 14 v2 L25 19z" fill="#fff"/>
+  <path d="M25 22 L39 19 v2 L25 24z" fill="#fff"/>
+  <path d="M25 27 L39 24 v2 L25 29z" fill="#fff"/>
+  <path d="M25 32 L39 29 v2 L25 34z" fill="#fff"/>
+  <path d="M25 37 L39 34 v2 L25 39z" fill="#fff"/>
+  <path d="M25 42 L39 39 v2 L25 44z" fill="#fff"/>
+  <path d="M25 47 L39 44 v2 L25 49z" fill="#fff"/>
+  <path d="M25 52 L39 49 v2 L25 54z" fill="#fff"/>
+  <path d="M25 57 L39 54 v2 L25 59z" fill="#fff"/>
+  <path d="M25 62 L39 59 v2 L25 64z" fill="#fff"/>
+  <path d="M25 67 L39 64 v2 L25 69z" fill="#fff"/>
+  <path d="M25 72 L39 69 v2 L25 74z" fill="#fff"/>
+  </g>
+</svg>

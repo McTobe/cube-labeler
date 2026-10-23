@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Combination pliers: long closed jaws, pivot and two handles -->
+  <g fill="#000"><path d="M27 3h10l3 25H24z"/><path d="M26.5 33l5 4.5-11 25-7-2.5z"/><path d="M37.5 33l-5 4.5 11 25 7-2.5z"/><circle cx="32" cy="31" r="7"/></g>
+  <rect x="31" y="3" width="2" height="16" fill="#fff"/>
+  <circle cx="32" cy="31" r="2.5" fill="#fff"/>
+</svg>

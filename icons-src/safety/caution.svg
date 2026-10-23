@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Caution: warning triangle with an exclamation mark -->
+  <path d="M32 2L63 59H1z" fill="#000"/>
+  <path d="M32 13L55 54H9z" fill="#fff"/>
+  <rect x="29" y="21" width="6" height="18" rx="3" fill="#000"/>
+  <circle cx="32" cy="47" r="3.5" fill="#000"/>
+</svg>

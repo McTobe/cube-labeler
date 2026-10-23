@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Keep dry (ISO 780): umbrella with rain drops -->
+  <path d="M4 34C4 18 17 8 32 8s28 10 28 26c-3-3-6-3-9 0-3-3-7-3-10 0-3-3-6-3-9 0-3-3-7-3-10 0-3-3-6-3-9 0z" fill="#000"/>
+  <path d="M32 32v20c0 6-9 6-9 0" fill="none" stroke="#000" stroke-width="5"/>
+  <rect x="29.5" y="3" width="5" height="7" fill="#000"/>
+  <g fill="#000"><path d="M8 0l3 5a3 3 0 1 1-6 0z"/><path d="M56 0l3 5a3 3 0 1 1-6 0z"/></g>
+</svg>

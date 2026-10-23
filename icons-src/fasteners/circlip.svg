@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- External circlip (retaining ring) with lug holes -->
+  <path d="M40.99 11.75 A24 24 0 1 1 23.01 11.75" fill="none" stroke="#000" stroke-width="8"/>
+  <circle cx="23.76" cy="13.60" r="7" fill="#000"/>
+  <circle cx="40.24" cy="13.60" r="7" fill="#000"/>
+  <circle cx="23.76" cy="13.60" r="2.8" fill="#fff"/>
+  <circle cx="40.24" cy="13.60" r="2.8" fill="#fff"/>
+</svg>

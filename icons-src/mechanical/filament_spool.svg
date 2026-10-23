@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 3D printer filament spool, side view: two flanges with wound filament between -->
+  <g fill="#000">
+    <rect x="4" y="3" width="8" height="58" rx="2"/>
+    <rect x="52" y="3" width="8" height="58" rx="2"/>
+    <rect x="12" y="13" width="40" height="38"/>
+    <rect x="1" y="28" width="62" height="8" rx="2"/>
+  </g>
+  <g fill="#fff"><rect x="12" y="19" width="40" height="2.5"/><rect x="12" y="25" width="40" height="2.5"/><rect x="12" y="36.5" width="40" height="2.5"/><rect x="12" y="42.5" width="40" height="2.5"/></g>
+</svg>

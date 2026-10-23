@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- File: handle, ferrule and cut blade tapering to a point -->
+  <g transform="rotate(45 32 32)">
+    <rect x="-2" y="23" width="22" height="18" rx="7" fill="#000"/>
+    <rect x="19" y="25" width="5" height="14" rx="1" fill="#000"/>
+    <path d="M24 26h32l8 6-8 6H24z" fill="#000"/>
+    <g fill="#fff"><path d="M29 26h2l-3 12h-2z"/><path d="M35 26h2l-3 12h-2z"/><path d="M41 26h2l-3 12h-2z"/><path d="M47 26h2l-3 12h-2z"/><path d="M53 26h2l-3 12h-2z"/></g>
+  </g>
+</svg>

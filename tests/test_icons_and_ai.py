@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.config import ConfigManager
-from core.icon_manager import IconManager, IconItem
+from core.icon_manager import IconManager, IconItem, load_catalog
 from core.ai_generator import (
     post_process_thermal,
     local_edge_filter,
@@ -58,22 +58,27 @@ class TestIconManager(unittest.TestCase):
         self.assertGreaterEqual(len(icons), 25, "Expected at least 25 built-in icons")
 
     def test_categories(self):
-        cats = self.mgr.CATEGORIES
-        self.assertIn("Fasteners", cats)
-        self.assertIn("Engineering", cats)
-        self.assertIn("Electronics", cats)
-        self.assertIn("Tools", cats)
-        self.assertIn("Symbols", cats)
-        self.assertIn("My Icons", cats)
+        self.assertEqual(
+            self.mgr.CATEGORIES,
+            ["All", "Fasteners", "Screw drives", "Mechanical", "Electronics", "Wiring & connectors",
+             "Tools", "Home & Kitchen", "Safety & handling", "Symbols", "My Icons"],
+        )
+        self.assertGreater(len(self.mgr.list_icons(category="Fasteners")), 5)
+        self.assertEqual(len(self.mgr.list_icons(category="Screw drives")), 6)
+        self.assertGreaterEqual(len(self.mgr.list_icons(category="Mechanical")), 3)
+        self.assertGreater(len(self.mgr.list_icons(category="Electronics")), 5)
 
-        fasteners = self.mgr.list_icons(category="Fasteners")
-        self.assertGreater(len(fasteners), 5)
-
-        engineering = self.mgr.list_icons(category="Engineering")
-        self.assertGreaterEqual(len(engineering), 3)
-
-        electronics = self.mgr.list_icons(category="Electronics")
-        self.assertGreater(len(electronics), 5)
+    def test_catalog_matches_bundled_files(self):
+        """Every category folder is in the catalog and every built-in icon has a title there."""
+        icons_dir = self.mgr._get_base_icons_dir()
+        catalog = load_catalog(icons_dir)
+        folders = {c["folder"] for c in catalog["categories"]}
+        on_disk = {e.name for e in os.scandir(icons_dir) if e.is_dir()}
+        self.assertEqual(folders, on_disk)
+        for folder in folders:
+            for entry in os.scandir(os.path.join(icons_dir, folder)):
+                icon_id = os.path.splitext(entry.name)[0]
+                self.assertIn(icon_id, catalog["icons"], f"{folder}/{entry.name} has no catalog entry")
 
     def test_search_bearing_and_torx(self):
         bearing_results = self.mgr.list_icons(search_query="bearing")

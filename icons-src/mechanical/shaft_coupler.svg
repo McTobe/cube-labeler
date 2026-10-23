@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Flexible shaft coupler: helical slots and set screws -->
+  <rect x="4" y="14" width="56" height="36" rx="4" fill="#000"/>
+  <g fill="#fff">
+    <path d="M22 14h3l-6 36h-3z" transform="translate(4 0)"/>
+    <path d="M22 14h3l-6 36h-3z" transform="translate(11 0)"/>
+    <path d="M22 14h3l-6 36h-3z" transform="translate(18 0)"/>
+    <circle cx="11" cy="32" r="3.5"/><circle cx="53" cy="32" r="3.5"/>
+  </g>
+</svg>

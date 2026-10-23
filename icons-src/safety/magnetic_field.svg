@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Magnetic field (ISO 7010 W006): warning triangle with a magnet -->
+  <path d="M32 2L63 59H1z" fill="#000"/>
+  <path d="M32 13L55 54H9z" fill="#fff"/>
+  <path d="M25 22V36a7 7 0 0 0 14 0V22" fill="none" stroke="#000" stroke-width="6"/>
+  <g fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"><path d="M18 46c4 3 8 3 10 1"/><path d="M46 46c-4 3-8 3-10 1"/></g>
+</svg>

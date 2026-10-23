@@ -18,7 +18,7 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 - **Less tape waste.** Queue several labels and print them as one continuous strip with cut guides between them. Each extra label saves about 25 mm of tape.
 - **Bin labels.** A dedicated editor for fastener and parts bins: size block, name, one, two or four length boxes and a drive icon (Allen, Hex, PH, PZ, Torx, Slot), in English or Swedish.
 - **Text, QR codes and images.** Any installed or imported font, auto-fit to the tape height, alignment and outline. Add QR codes (including Wi-Fi guest login codes), icons or your own pictures.
-- **Icon library.** More than 30 monochrome icons for fasteners, electronics, tools and more, plus your own icons in `~/.printlabel/icons/`.
+- **Icon library.** Monochrome icons for fasteners, screw drives, mechanical parts, electronics, wiring, tools, home & kitchen and safety marks, plus your own icons in `~/.printlabel/icons/`.
 - **Templates.** Ready-made starting points (storage box, cable flag, Wi-Fi QR, spice jar, asset tag, name badge) and saving or opening your own templates as JSON.
 - **Printer status.** Battery level, loaded tape width and color, and clear messages for errors such as an open cover or missing tape.
 - **Simulation mode.** Design and "print" labels with no printer connected.
@@ -127,7 +127,8 @@ The tests run on Windows and Linux in CI. On machines without tkinter the GUI te
 |---|---|
 | `core/` | Printer protocol and status, serial driver and simulator, label and bin label rendering, fonts, icons, config, CLI |
 | `ui/` | The customtkinter app: main window, preview, editors, printer chip, templates, settings, dialogs |
-| `assets/` | App icon, icon library and template previews |
+| `assets/` | App icon, icon library (`assets/icons/catalog.json` lists categories, titles and search words) and template previews |
+| `icons-src/` | SVG drawings of the library icons; `python tools/build_icons.py` renders them to `assets/icons/` (needs `pip install resvg-py`) |
 | `tests/` | Unit tests and headless GUI tests |
 
 ## Contributing

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Combination wrench: ring end and open end -->
+  <g transform="rotate(-45 32 32) translate(32 32) scale(0.92) translate(-32 -32)">
+    <rect x="12" y="28" width="38" height="8" fill="#000"/>
+    <circle cx="10" cy="32" r="10" fill="#000"/>
+    <path d="M10 26.5l4.8 2.75v5.5L10 37.5l-4.8-2.75v-5.5z" fill="#fff"/>
+    <circle cx="53" cy="32" r="11" fill="#000"/>
+    <path d="M51 28.5h16v7H51z" fill="#fff" transform="rotate(-15 53 32)"/>
+  </g>
+</svg>

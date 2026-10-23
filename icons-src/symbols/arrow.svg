@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Arrow pointing right -->
+  <path d="M2 24H34V8L62 32 34 56V40H2z" fill="#000"/>
+</svg>

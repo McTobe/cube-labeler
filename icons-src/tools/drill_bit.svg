@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Twist drill bit: round shank, spiral flutes, pointed tip -->
+  <g transform="rotate(45 32 32)">
+    <rect x="-2" y="26" width="26" height="12" rx="2" fill="#000"/>
+    <path d="M24 24h32l10 8-10 8H24z" fill="#000"/>
+    <g fill="#fff"><path d="M30 24h4l-6 16h-4z"/><path d="M39 24h4l-6 16h-4z"/><path d="M48 24h4l-6 16h-4z"/><path d="M57 25h3l-5 15h-4z"/></g>
+  </g>
+</svg>

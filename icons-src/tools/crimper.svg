@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Crimping pliers: wide jaws with crimp dies -->
+  <g fill="#000"><rect x="22" y="2" width="20" height="27" rx="3"/><path d="M26.5 33l5 4.5-11 25-7-2.5z"/><path d="M37.5 33l-5 4.5 11 25 7-2.5z"/><circle cx="32" cy="31" r="7"/></g>
+  <g fill="#fff"><path d="M27 7h10l-2 4h-6z"/><path d="M26 15h12l-2 5h-8z"/></g>
+  <circle cx="32" cy="31" r="2.5" fill="#fff"/>
+</svg>

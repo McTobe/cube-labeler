@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- LED schematic symbol with light arrows -->
+  <g fill="#000"><rect x="2" y="34" width="56" height="4"/><path d="M16 18L36 36 16 54z"/><rect x="36" y="18" width="5" height="36"/></g>
+  <g stroke="#000" stroke-width="3.5" fill="none" ><path d="M42 16l9-9"/><path d="M50 22l9-9"/></g>
+  <g fill="#000"><path d="M54 3l-1 9-8-8z"/><path d="M62 9l-1 9-8-8z"/></g>
+</svg>

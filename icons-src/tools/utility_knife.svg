@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Utility knife: handle with slider and snap-off blade -->
+  <g transform="rotate(-35 32 32)">
+    <rect x="0" y="26" width="40" height="16" rx="4" fill="#000"/>
+    <rect x="14" y="21" width="10" height="6" rx="2" fill="#000"/>
+    <path d="M39 26h25l-11 16H39z" fill="#000"/>
+    <g fill="#fff"><path d="M45 26h2.5l-5 16H40z"/><path d="M53 26h2.5l-5 16H48z"/></g>
+  </g>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Tweezers: legs joined at the top, slightly open, with angled tips -->
+  <g transform="rotate(0 32 32)" fill="#000">
+    <rect x="24" y="1" width="16" height="10" rx="4"/>
+    <path d="M24 8h7.5L22 50l-3 12h-4l1-13z"/>
+    <path d="M40 8h-7.5L42 50l3 12h4l-1-13z"/>
+  </g>
+</svg>
