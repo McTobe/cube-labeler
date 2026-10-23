@@ -56,6 +56,27 @@ phone on your Wi-Fi without hosting it anywhere:
    `http://192.168.1.20:8000`, enable it and restart Chrome.
 3. Open that address on the phone.
 
+## Hosting with Docker
+
+The `Dockerfile` in the repository root builds the site and serves it with nginx on port 80.
+Web Serial needs HTTPS, so put it behind a reverse proxy that handles TLS, such as Nginx Proxy
+Manager.
+
+```bash
+docker compose up -d --build      # serves on port 8080 (see docker-compose.yml)
+```
+
+In Nginx Proxy Manager, add a proxy host for your domain (for example `print.tobezone.com`)
+that forwards to `http://<docker host>:8080`, and turn on a Let's Encrypt certificate with
+**Force SSL**. If Nginx Proxy Manager runs in Docker on the same host, you can instead put both
+containers on one Docker network and forward to `http://cube-labeler-web:80`.
+
+After pulling new code, run `docker compose up -d --build` again. The server tells browsers to
+check for changes on every load, so phones pick up the new version straight away.
+
+On Android, the first visit still needs Chrome's **Nearby devices** permission and a force
+stop of Chrome, as described above; the Chrome flag for insecure origins is not needed.
+
 ## How it fits together
 
 | File | What it does |

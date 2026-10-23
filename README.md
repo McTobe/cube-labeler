@@ -109,7 +109,7 @@ python build.py         # or double-click build.bat
 
 ### Web version (preview)
 
-`web/` holds a browser version that prints over Bluetooth from Chrome on Android, Windows, macOS and Linux. Double-click `run_web.bat` (or run `python web/serve.py`) to start it; it prints the address to open on your phone. See [web/README.md](web/README.md).
+`web/` holds a browser version that prints over Bluetooth from Chrome on Android, Windows, macOS and Linux. Double-click `run_web.bat` (or run `python web/serve.py`) to start it; it prints the address to open on your phone. To host it on your own domain, `docker compose up -d --build` serves it on port 8080 for a reverse proxy that adds HTTPS. See [web/README.md](web/README.md).
 
 Pushing a tag such as `v1.4.0` builds the executable on GitHub Actions and publishes it as a release.
 
