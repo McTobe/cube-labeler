@@ -58,8 +58,10 @@ phone on your Wi-Fi without hosting it anywhere:
 
 ## Hosting with Docker
 
-Every push to `main` that touches the web app makes GitHub Actions build a Docker image and
-publish it as `ghcr.io/mctobe/cube-labeler-web:latest` (for amd64 and arm64). The image serves
+Every release tag (`v1.5.0` and so on) makes GitHub Actions build a Docker image and publish
+it as `ghcr.io/mctobe/cube-labeler-web` (for amd64 and arm64), tagged `latest`, `1.5.0` and
+`1.5`. You can also run the "Publish Web Image" workflow by hand from the Actions tab; that
+image only gets a commit tag such as `sha-4c256cc`, so `latest` always means the newest release. The image serves
 the site with nginx on port 80. Web Serial needs HTTPS, so put it behind a reverse proxy that
 handles TLS, such as Nginx Proxy Manager.
 
@@ -75,7 +77,8 @@ services:
 ```
 
 Dockge's **Update** button pulls the newest `latest` image and restarts the container, so
-after a merge to `main` you wait for the "Publish Web Image" workflow to finish and press Update.
+after tagging a release you wait for the "Publish Web Image" workflow to finish and press
+Update. To stay on one version instead, use a version tag such as `:1.5`.
 
 **Private repository:** the image is a GitHub package with its own visibility, and a new one
 starts out private. Either:
