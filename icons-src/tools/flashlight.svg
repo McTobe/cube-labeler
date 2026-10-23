@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Flashlight: body with button, wide head and light beams -->
+  <g transform="rotate(-30 32 32)">
+    <rect x="0" y="25" width="30" height="14" rx="3" fill="#000"/>
+    <rect x="10" y="21" width="7" height="5" rx="1" fill="#000"/>
+    <path d="M29 25l10-6v26l-10-6z" fill="#000"/>
+    <rect x="38" y="17" width="5" height="30" rx="1" fill="#000"/>
+    <g stroke="#000" stroke-width="4" stroke-linecap="round"><path d="M49 22l9-5"/><path d="M50 32h11"/><path d="M49 42l9 5"/></g>
+  </g>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Hot glue gun: body, nozzle, glue stick, trigger and grip -->
+  <rect x="10" y="12" width="38" height="20" rx="7" fill="#000"/>
+  <path d="M47 16l9 4 7 2-7 2-9 4z" fill="#000"/>
+  <rect x="1" y="19" width="11" height="6" fill="#000"/>
+  <path d="M15 28h15l-4 30H11z" fill="#000"/>
+  <rect x="32" y="30" width="5" height="12" rx="2" fill="#000"/>
+</svg>

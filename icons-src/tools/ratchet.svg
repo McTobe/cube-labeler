@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Ratchet: round head with square drive and lever, long handle -->
+  <g transform="rotate(-45 32 32)">
+    <rect x="14" y="28" width="40" height="8" fill="#000"/>
+    <rect x="38" y="25" width="26" height="14" rx="6" fill="#000"/>
+    <circle cx="12" cy="32" r="13" fill="#000"/>
+    <circle cx="12" cy="32" r="6.5" fill="#fff"/>
+    <rect x="9" y="29" width="6" height="6" fill="#000"/>
+  </g>
+</svg>

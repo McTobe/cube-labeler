@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Screwdriver: grooved handle, collar, shaft and flat tip -->
+  <g transform="rotate(45 32 32)">
+    <rect x="-1" y="22" width="26" height="20" rx="7" fill="#000"/>
+    <g fill="#fff"><rect x="4" y="26.5" width="16" height="2.5" rx="1"/><rect x="4" y="35" width="16" height="2.5" rx="1"/></g>
+    <rect x="24" y="25" width="5" height="14" rx="1" fill="#000"/>
+    <rect x="29" y="29" width="27" height="6" fill="#000"/>
+    <path d="M56 28l8 2v4l-8 2z" fill="#000"/>
+  </g>
+</svg>

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Tape measure: case with centre hub and tape pulled out with a hook -->
+  <rect x="2" y="8" width="46" height="46" rx="10" fill="#000"/>
+  <circle cx="25" cy="31" r="12" fill="#fff"/>
+  <circle cx="25" cy="31" r="6" fill="#000"/>
+  <rect x="44" y="46" width="16" height="8" fill="#000"/>
+  <rect x="58" y="42" width="5" height="14" fill="#000"/>
+  <g fill="#fff"><rect x="48" y="46" width="2" height="4"/><rect x="53" y="46" width="2" height="4"/></g>
+</svg>
