@@ -72,9 +72,14 @@ def build_icons() -> None:
 
 
 def main() -> int:
-    if os.path.isdir(DIST_DIR):
-        shutil.rmtree(DIST_DIR)
-    os.makedirs(DIST_DIR)
+    # Empty the folder rather than deleting it, so a server running from it keeps working
+    os.makedirs(DIST_DIR, exist_ok=True)
+    for name in os.listdir(DIST_DIR):
+        path = os.path.join(DIST_DIR, name)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
 
     for name in PAGE_FILES:
         shutil.copy2(os.path.join(WEB_DIR, name), DIST_DIR)
