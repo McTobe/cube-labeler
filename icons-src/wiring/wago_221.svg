@@ -1,7 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- WAGO 221 lever connector: clear housing, three orange levers up, wire entries -->
-  <rect x="4" y="22" width="56" height="34" rx="3" fill="#000"/>
-  <g fill="#000"><path d="M8 22V8l12-4v18z"/><path d="M26 22V8l12-4v18z"/><path d="M44 22V8l12-4v18z"/></g>
-  <g fill="#fff"><circle cx="14" cy="42" r="5"/><circle cx="32" cy="42" r="5"/><circle cx="50" cy="42" r="5"/>
-    <rect x="22" y="22" width="2.5" height="34"/><rect x="40" y="22" width="2.5" height="34"/></g>
+  <!-- WAGO 221 lever connector, three-quarter drawing: three wire entries, middle lever open -->
+  <path d="M3.00 46.00 L33.00 61.00 L33.00 42.00 L3.00 27.00z" fill="#000" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M33.00 61.00 L59.00 47.00 L59.00 28.00 L33.00 42.00z" fill="#fff" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M3.00 27.00 L33.00 42.00 L59.00 28.00 L29.00 13.00z" fill="#fff" stroke="#000" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M4.80 44.05 L11.20 47.25 L11.20 35.85 L4.80 32.65z" fill="#fff"/>
+  <path d="M14.80 49.05 L21.20 52.25 L21.20 40.85 L14.80 37.65z" fill="#fff"/>
+  <path d="M24.80 54.05 L31.20 57.25 L31.20 45.85 L24.80 42.65z" fill="#fff"/>
+  <path d="M9.00 25.95 L14.80 28.85 L31.70 19.75 L25.90 16.85z" fill="#000"/>
+  <path d="M29.00 35.95 L34.80 38.85 L51.70 29.75 L45.90 26.85z" fill="#000"/>
+  <path d="M36.42 21.57 L42.22 24.47 L35.98 8.83 L30.18 5.93z" fill="#000" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
 </svg>
