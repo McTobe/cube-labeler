@@ -75,6 +75,12 @@ class TestSavedLibraryIcons(unittest.TestCase):
         )
         self.assertEqual(renderer.render_fastener(stale).tobytes(), renderer.render_fastener(current).tobytes())
 
+    def test_icon_that_moved_category_is_found(self):
+        old = r"C:\Users\tobe\AppData\Local\Temp\_MEI12345\assets\icons\engineering\gear.png"
+        found = resolve_icon_path(old)
+        self.assertTrue(os.path.isfile(found))
+        self.assertEqual(os.path.basename(found), "gear.png")
+
     def test_other_paths_are_left_alone(self):
         for path in (None, "", r"D:\pictures\missing.png", "/home/tobe/assets/icons/fasteners/nope.png"):
             self.assertEqual(resolve_icon_path(path), path)

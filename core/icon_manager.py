@@ -5,13 +5,19 @@ Indexes built-in and user-generated monochrome icons, providing categorization,
 search, and persistence across app sessions.
 """
 
+import json
 import os
 import sys
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional
 from PIL import Image
 
 from core.config import config_manager
+
+# Built-in icons live in one folder per category under assets/icons; catalog.json there
+# lists the categories in display order and gives each icon its title and search words
+CATALOG_FILE = "catalog.json"
+USER_CATEGORY = "My Icons"
 
 
 @dataclass
@@ -24,62 +30,26 @@ class IconItem:
 
     @property
     def is_user_custom(self) -> bool:
-        return self.category in ("My Icons", "user")
+        return self.category == USER_CATEGORY
 
 
-# Metadata dictionaries for human-readable titles and search keywords
-METADATA_REGISTRY: Dict[str, Dict[str, any]] = {
-    # Fasteners
-    "hex_socket": {"title": "Hex Socket (Allen / DIN 912)", "keywords": ["allen", "hex", "socket", "inbus", "drive", "bolt"]},
-    "torx": {"title": "Torx Star Drive", "keywords": ["torx", "star", "t10", "t15", "t20", "t25", "t30", "tx"]},
-    "phillips": {"title": "Phillips Cross (PH)", "keywords": ["phillips", "cross", "ph", "screw"]},
-    "slotted": {"title": "Slotted Flat (SL)", "keywords": ["slotted", "flat", "slot", "minus", "screw"]},
-    "pozidriv": {"title": "Pozidriv Cross (PZ)", "keywords": ["pozidriv", "pz", "cross", "star"]},
-    "robertson": {"title": "Robertson Square", "keywords": ["robertson", "square", "cube"]},
-    "hex_bolt": {"title": "Hex Head Bolt (DIN 933)", "keywords": ["bolt", "hex", "screw", "wrench", "external"]},
-    "hex_nut": {"title": "Hex Nut (DIN 934)", "keywords": ["nut", "hex", "thread", "mutter"]},
-    "flat_washer": {"title": "Flat Washer (DIN 125)", "keywords": ["washer", "bricka", "flat", "ring", "donut"]},
-    "spring_washer": {"title": "Spring Lock Washer (DIN 127)", "keywords": ["washer", "spring", "lock", "split"]},
-    "countersunk": {"title": "Countersunk Screw (DIN 7991)", "keywords": ["countersunk", "flathead", "conical", "screw"]},
-    "standoff": {"title": "Hex PCB Standoff", "keywords": ["standoff", "spacer", "pcb", "hex", "threaded"]},
-
-    # Engineering
-    "bearing_608zz": {"title": "Ball Bearing (608ZZ)", "keywords": ["bearing", "kullager", "ball", "608", "roller", "engineering"]},
-    "gear": {"title": "Spur Gear / Cogwheel", "keywords": ["gear", "kugghjul", "cog", "sprocket", "pinion", "engineering"]},
-    "spring": {"title": "Compression Spring", "keywords": ["spring", "fjäder", "coil", "compression", "engineering"]},
-
-    # Electronics
-    "fuse_inline": {"title": "Cartridge Glass Fuse", "keywords": ["fuse", "säkring", "glass", "inline", "cartridge"]},
-    "resistor": {"title": "Resistor (IEEE Symbol)", "keywords": ["resistor", "motstånd", "ohm", "schematic"]},
-    "capacitor_ceramic": {"title": "Ceramic Capacitor", "keywords": ["capacitor", "kondensator", "ceramic", "pf", "nf"]},
-    "capacitor_elec": {"title": "Electrolytic Capacitor", "keywords": ["capacitor", "electrolytic", "kondensator", "polarized", "uf"]},
-    "diode": {"title": "Diode (Semiconductor)", "keywords": ["diode", "rectifier", "1n4007", "semiconductor"]},
-    "led": {"title": "Light Emitting Diode (LED)", "keywords": ["led", "light", "diode", "lamp", "emitter"]},
-    "ic_dip": {"title": "IC Chip (DIP Package)", "keywords": ["ic", "chip", "dip", "microcontroller", "integrated circuit"]},
-    "ground": {"title": "Chassis / Earth Ground", "keywords": ["ground", "earth", "gnd", "chassis"]},
-    "usb_c": {"title": "USB-C Port / Connector", "keywords": ["usb", "usb-c", "type-c", "port", "cable"]},
-
-    # Tools
-    "caliper": {"title": "Digital Caliper", "keywords": ["caliper", "skjutmått", "vernier", "measure", "tool"]},
-    "wrench": {"title": "Open-End Wrench", "keywords": ["wrench", "spanner", "fastyckel", "tool"]},
-    "soldering_iron": {"title": "Soldering Iron", "keywords": ["soldering", "iron", "lödkolv", "heat", "solder"]},
-    "drill_bit": {"title": "Spiral Drill Bit", "keywords": ["drill", "bit", "borr", "flute", "spiral"]},
-
-    # Symbols
-    "high_voltage": {"title": "High Voltage Warning", "keywords": ["high voltage", "danger", "electric", "shock", "lightning"]},
-    "caution": {"title": "Caution / Attention", "keywords": ["caution", "warning", "attention", "triangle"]},
-    "esd_warning": {"title": "ESD Sensitive Device", "keywords": ["esd", "static", "sensitive", "hand", "electronic"]},
-    "recycle": {"title": "Recycle / Sustainable", "keywords": ["recycle", "loop", "arrows", "waste", "eco"]},
-}
+def load_catalog(icons_dir: str) -> Dict[str, Any]:
+    """Reads the built-in icon catalog: category folders in display order plus titles and search words."""
+    try:
+        with open(os.path.join(icons_dir, CATALOG_FILE), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {"categories": [], "icons": {}}
+    return {"categories": data.get("categories", []), "icons": data.get("icons", {})}
 
 
 class IconManager:
     """Manages icon discovery, categorization, search, and user additions."""
 
-    CATEGORIES = ["All", "Fasteners", "Engineering", "Electronics", "Tools", "Symbols", "My Icons"]
-
     def __init__(self):
         self._icons: List[IconItem] = []
+        self._metadata: Dict[str, Dict[str, Any]] = {}
+        self.CATEGORIES: List[str] = ["All", USER_CATEGORY]
         self._cache: Dict[str, Image.Image] = {}
         self.reload()
 
@@ -99,32 +69,27 @@ class IconManager:
         self._icons = []
         base_dir = self._get_base_icons_dir()
 
-        folder_cat_map = {
-            "fasteners": "Fasteners",
-            "engineering": "Engineering",
-            "electronics": "Electronics",
-            "tools": "Tools",
-            "symbols": "Symbols",
-            "user": "My Icons",
-        }
+        catalog = load_catalog(base_dir)
+        self._metadata = catalog["icons"]
+        categories = [(c["folder"], c["name"]) for c in catalog["categories"]]
+        self.CATEGORIES = ["All"] + [name for _, name in categories] + [USER_CATEGORY]
 
-        # 1. Bundled icons
-        if os.path.isdir(base_dir):
-            for folder, cat_name in folder_cat_map.items():
-                cat_dir = os.path.join(base_dir, folder)
-                if os.path.isdir(cat_dir):
-                    self._scan_folder(cat_dir, cat_name)
+        # 1. Bundled icons, one folder per category
+        for folder, cat_name in categories:
+            cat_dir = os.path.join(base_dir, folder)
+            if os.path.isdir(cat_dir):
+                self._scan_folder(cat_dir, cat_name)
 
         # 2. Persistent User Icons directory in ~/.printlabel/icons
         user_dir = config_manager.user_icons_dir
         if os.path.isdir(user_dir):
-            self._scan_folder(user_dir, "My Icons")
+            self._scan_folder(user_dir, USER_CATEGORY)
 
     def _scan_folder(self, folder_path: str, category_name: str):
         for entry in os.scandir(folder_path):
             if entry.is_file() and entry.name.lower().endswith((".png", ".jpg", ".jpeg", ".bmp")):
                 icon_id = os.path.splitext(entry.name)[0]
-                meta = METADATA_REGISTRY.get(icon_id.lower(), {})
+                meta = self._metadata.get(icon_id.lower(), {})
                 
                 title = meta.get("title", icon_id.replace("_", " ").title())
                 keywords = meta.get("keywords", [icon_id.lower(), category_name.lower()])
@@ -162,7 +127,7 @@ class IconManager:
             results.append(icon)
 
         # Sort: bundled catalog first by title, then user icons
-        results.sort(key=lambda x: (x.category == "My Icons", x.title.lower()))
+        results.sort(key=lambda x: (x.category == USER_CATEGORY, x.title.lower()))
         return results
 
     def get_icon_by_id(self, icon_id: str) -> Optional[IconItem]:
@@ -198,7 +163,7 @@ class IconManager:
         return IconItem(
             id=os.path.splitext(os.path.basename(target_path))[0],
             title=safe_name.replace("_", " ").title(),
-            category="My Icons",
+            category=USER_CATEGORY,
             file_path=target_path,
             keywords=[safe_name.lower(), "custom", "user"]
         )

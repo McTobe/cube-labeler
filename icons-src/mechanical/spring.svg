@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Compression spring, side view: closed flat ends and slanted coils -->
+  <g stroke="#000" stroke-width="5" stroke-linecap="round" fill="none">
+    <path d="M17 6h30"/>
+    <path d="M17 13l30-6"/><path d="M17 21l30-6"/><path d="M17 29l30-6"/><path d="M17 37l30-6"/><path d="M17 45l30-6"/><path d="M17 53l30-6"/>
+    <path d="M17 58h30"/>
+  </g>
+</svg>

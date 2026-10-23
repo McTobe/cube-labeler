@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- ESD sensitive: warning triangle with a reaching hand, struck through -->
+  <path d="M32 2L63 59H1z" fill="#000"/>
+  <path d="M32 12L55 54H9z" fill="#fff"/>
+  <path d="M22 44V31a2.5 2.5 0 0 1 5 0v-5a2.5 2.5 0 0 1 5 0v-1a2.5 2.5 0 0 1 5 0v2a2.5 2.5 0 0 1 5 0v17l-3 7H27l-5-5-5-6 3-2.5 2 2z" fill="#000"/>
+  <path d="M15 51L49 21" stroke="#fff" stroke-width="7"/>
+  <path d="M15 51L49 21" stroke="#000" stroke-width="3.5"/>
+</svg>

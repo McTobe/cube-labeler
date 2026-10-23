@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Hex standoff, side view: hex body with two visible edges, male thread at the bottom -->
+  <path d="M19 6h26l2 2v40H17V8z" fill="#000"/>
+  <rect x="24" y="8" width="2.5" height="40" fill="#fff"/>
+  <rect x="37.5" y="8" width="2.5" height="40" fill="#fff"/>
+  <path d="M25 48h14v3l-2 2 2 2-2 2 2 2-2 2-1 1h-8l-1-1-2-2 2-2-2-2 2-2-2-2z" fill="#000"/>
+</svg>

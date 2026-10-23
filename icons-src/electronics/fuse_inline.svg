@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Glass cartridge fuse: metal end caps, glass body, filament -->
+  <g fill="#000">
+    <rect x="2" y="18" width="14" height="28" rx="2"/>
+    <rect x="48" y="18" width="14" height="28" rx="2"/>
+    <rect x="16" y="21" width="32" height="22"/>
+  </g>
+  <rect x="16" y="25" width="32" height="14" fill="#fff"/>
+  <rect x="16" y="30" width="32" height="4" fill="#000"/>
+</svg>

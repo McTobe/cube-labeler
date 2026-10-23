@@ -247,8 +247,8 @@ class HardwareInventoryTab(ctk.CTkFrame):
         )
         self.chk_simple_icon.pack(side="left", padx=(12, 0))
         self.btn_lib_tool_icon, self.btn_pick_tool_icon = self._icon_buttons(
-            r, lambda: self._choose_icon("library", self._set_tool_icon_path, "Fasteners"),
-            lambda: self._choose_icon("file", self._set_tool_icon_path, "Fasteners"),
+            r, lambda: self._choose_icon("library", self._set_tool_icon_path, "Screw drives"),
+            lambda: self._choose_icon("file", self._set_tool_icon_path, "Screw drives"),
         )
         self.lbl_custom_tool_icon = ctk.CTkLabel(r, text="", text_color=MUTED_TEXT)
         self.lbl_custom_tool_icon.pack(side="left", padx=(8, 0))
@@ -274,8 +274,8 @@ class HardwareInventoryTab(ctk.CTkFrame):
         )
         self.part_icon_combo.pack(side="left")
         self.btn_lib_comp_icon, self.btn_pick_comp_icon = self._icon_buttons(
-            r, lambda: self._choose_icon("library", self._set_comp_icon_path, "Engineering"),
-            lambda: self._choose_icon("file", self._set_comp_icon_path, "Engineering"),
+            r, lambda: self._choose_icon("library", self._set_comp_icon_path, "Mechanical"),
+            lambda: self._choose_icon("file", self._set_comp_icon_path, "Mechanical"),
         )
         self.lbl_custom_comp_icon = ctk.CTkLabel(r, text="", text_color=MUTED_TEXT)
         self.lbl_custom_comp_icon.pack(side="left", padx=(8, 0))

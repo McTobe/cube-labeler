@@ -35,20 +35,32 @@ def _bundled_icons_dir() -> str:
     return os.path.join(base, "assets", "icons")
 
 
+def find_bundled_icon(file_name: str) -> Optional[str]:
+    """Path of a built-in icon by file name, whichever category folder it is in."""
+    base = _bundled_icons_dir()
+    try:
+        folders = sorted(e.path for e in os.scandir(base) if e.is_dir())
+    except OSError:
+        return None
+    for folder in folders:
+        path = os.path.join(folder, file_name)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def drive_library_icon(tool_type: str) -> Optional[str]:
     """Path of the icon library picture for a drive, or None if there isn't one."""
     name = DRIVE_LIBRARY_ICONS.get(tool_type)
-    if not name:
-        return None
-    path = os.path.join(_bundled_icons_dir(), "fasteners", name)
-    return path if os.path.isfile(path) else None
+    return find_bundled_icon(name) if name else None
 
 
 def resolve_icon_path(path: Optional[str]) -> Optional[str]:
     """
     Finds a saved icon again. The packaged app unpacks its icon library into a temporary
     folder with a new name on every start, so a saved path into .../assets/icons/ from an
-    earlier run is looked up in the current icon library instead.
+    earlier run is looked up in the current icon library instead. Icons that moved to
+    another category folder are found by their file name.
     """
     if not path or os.path.isfile(path):
         return path
@@ -56,7 +68,9 @@ def resolve_icon_path(path: Optional[str]) -> Optional[str]:
     for i in range(len(parts) - 2, 0, -1):
         if parts[i].lower() == "icons" and parts[i - 1].lower() == "assets":
             candidate = os.path.join(_bundled_icons_dir(), *parts[i + 1:])
-            return candidate if os.path.isfile(candidate) else path
+            if os.path.isfile(candidate):
+                return candidate
+            return find_bundled_icon(parts[-1]) or path
     return path
 
 
