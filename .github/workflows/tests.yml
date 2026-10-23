@@ -43,3 +43,34 @@ jobs:
         run: |
           python tests/test_gui_inventory.py
           python tests/test_gui_queue.py
+
+  web:
+    name: Web app tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build the site
+        run: |
+          pip install pillow -c constraints.txt
+          python web/build.py
+
+      - name: Run printer.js against the Python core in Pyodide
+        working-directory: web
+        run: |
+          npm ci
+          npm test

@@ -1,0 +1,179 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #1f2430;
+  --muted: #5d6475;
+  --border: #d8dbe2;
+  --accent: #2f6fde;
+  --accent-text: #ffffff;
+  --ok: #1d7a46;
+  --error: #b3261e;
+  --warn-bg: #fff4d6;
+  --preview-bg: #e7e9ee;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d;
+    --card: #1f2430;
+    --text: #e8eaf0;
+    --muted: #a3a9b8;
+    --border: #353b49;
+    --accent: #5b8ff0;
+    --accent-text: #0d1117;
+    --ok: #5cc98a;
+    --error: #ff8a80;
+    --warn-bg: #3a3217;
+    --preview-bg: #2a303d;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 16px 32px;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header, main, .loading, .notice {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 0 8px;
+}
+
+h1 { font-size: 1.4rem; margin: 0; }
+h2 { font-size: 1.05rem; margin: 0; }
+
+.badge {
+  font-size: 0.8rem;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--error);
+}
+.badge.ok { color: var(--ok); }
+
+.notice {
+  background: var(--warn-bg);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.loading { text-align: center; padding: 48px 0; }
+.loading.error #loading-text { color: var(--error); }
+.loading.error .spinner { display: none; }
+.hint { color: var(--muted); font-size: 0.9rem; }
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 12px;
+  border: 4px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.card, .preview-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.preview-card { text-align: center; }
+
+#preview {
+  display: block;
+  max-width: 100%;
+  max-height: 160px;
+  margin: 0 auto;
+  padding: 12px;
+  background: var(--preview-bg);
+  border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+.metrics { color: var(--muted); font-size: 0.9rem; margin: 8px 0 0; }
+.warning { background: var(--warn-bg); border-radius: 8px; padding: 8px; margin: 8px 0 0; }
+
+label { display: block; font-size: 0.85rem; color: var(--muted); margin: 10px 0 4px; }
+
+textarea, select, input[type="text"], input[type="number"] {
+  width: 100%;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+}
+textarea { resize: vertical; }
+input:disabled { opacity: 0.5; }
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.row > * { flex: 1; min-width: 0; }
+.row > .check, .row > .file-button, .row > h2 { flex: 0 0 auto; }
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 1rem;
+  margin: 12px 0 4px;
+}
+label.check input { width: 20px; height: 20px; }
+
+button, .button {
+  font: inherit;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 11px 16px;
+  background: var(--accent);
+  color: var(--accent-text);
+  cursor: pointer;
+  margin: 0;
+  text-align: center;
+}
+button.secondary, .button.secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+button:disabled { opacity: 0.45; cursor: default; }
+
+.file-button { position: relative; overflow: hidden; }
+.file-button input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.printer { margin: 10px 0; color: var(--muted); }
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+#print { grid-column: 1 / -1; padding: 14px; font-size: 1.05rem; }
+
+.log { min-height: 1.4em; margin: 10px 0 0; font-size: 0.9rem; color: var(--muted); }
+.log.error { color: var(--error); }
