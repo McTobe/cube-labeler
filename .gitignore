@@ -20,3 +20,6 @@ tests/temp_icon.png
 
 # Reference repo
 pt_p300bt_reference/
+
+# Web app
+web/node_modules/

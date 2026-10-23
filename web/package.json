@@ -1,0 +1,12 @@
+{
+  "name": "cube-labeler-web",
+  "private": true,
+  "description": "Tests for the Cube Labeler web app",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/test_printer.mjs"
+  },
+  "devDependencies": {
+    "pyodide": "0.29.5"
+  }
+}
