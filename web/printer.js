@@ -26,16 +26,17 @@ export class SerialTransport {
       && typeof navigator.serial.requestPort === 'function';
   }
 
-  // Shows the browser's device picker, limited to devices with the SPP service when possible
+  // Shows the browser's device picker. No filter: a filter on the SPP service hides paired
+  // printers whose services the browser hasn't looked up yet ("No compatible devices found").
+  // Allowing the SPP service is what lets the picker list Bluetooth serial devices at all.
   static async request() {
     try {
       return new SerialTransport(await navigator.serial.requestPort({
-        filters: [{ bluetoothServiceClassId: SPP_UUID }],
         allowedBluetoothServiceClassIds: [SPP_UUID],
       }));
     } catch (err) {
       if (err.name !== 'TypeError') throw err;
-      // Browsers without Bluetooth filters list every serial port instead
+      // Browsers without Bluetooth serial support list wired serial ports instead
       return new SerialTransport(await navigator.serial.requestPort());
     }
   }
