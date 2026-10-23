@@ -20,6 +20,10 @@ picture. Bin labels, icons, the queue and templates are not in it yet.
 Pair the printer in the phone's or computer's Bluetooth settings first. **Connect printer**
 then opens the browser's device picker, which lists paired devices with the serial port service.
 
+On Android, Chrome also needs the **Nearby devices** permission (Settings › Apps › Chrome ›
+Permissions). After granting it, force stop Chrome (Settings › Apps › Chrome › Force stop) and
+open it again: until Chrome fully restarts, the picker says "No compatible devices found".
+
 ## Running it
 
 ```bash
