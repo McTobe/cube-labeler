@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Lead screw (T8) with flanged nut -->
+  <g transform="rotate(-45 32 32)" fill="#000">
+    <rect x="-8" y="28" width="80" height="8"/>
+    <path d="M-6 25h4l1 3h-6zM-6 39h4l1-3h-6z"/><path d="M0 25h4l1 3h-6zM0 39h4l1-3h-6z"/><path d="M6 25h4l1 3h-6zM6 39h4l1-3h-6z"/><path d="M12 25h4l1 3h-6zM12 39h4l1-3h-6z"/><path d="M18 25h4l1 3h-6zM18 39h4l1-3h-6z"/><path d="M24 25h4l1 3h-6zM24 39h4l1-3h-6z"/><path d="M30 25h4l1 3h-6zM30 39h4l1-3h-6z"/><path d="M36 25h4l1 3h-6zM36 39h4l1-3h-6z"/><path d="M42 25h4l1 3h-6zM42 39h4l1-3h-6z"/><path d="M48 25h4l1 3h-6zM48 39h4l1-3h-6z"/><path d="M54 25h4l1 3h-6zM54 39h4l1-3h-6z"/><path d="M60 25h4l1 3h-6zM60 39h4l1-3h-6z"/><path d="M66 25h4l1 3h-6zM66 39h4l1-3h-6z"/>
+    <rect x="24" y="12" width="6" height="40" rx="2"/>
+    <rect x="30" y="20" width="14" height="24" rx="1"/>
+  </g>
+  <g transform="rotate(-45 32 32)" fill="#fff"><circle cx="27" cy="17" r="1.8"/><circle cx="27" cy="47" r="1.8"/></g>
+</svg>

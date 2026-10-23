@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Nyloc nut, side view: hex body with nylon collar -->
+  <g fill="#000">
+    <path d="M18 30V22c0-5 4-8 9-8h10c5 0 9 3 9 8v8z"/>
+    <rect x="8" y="32" width="48" height="24" rx="1"/>
+  </g>
+  <g fill="#fff"><rect x="19" y="32" width="2.5" height="24"/><rect x="42.5" y="32" width="2.5" height="24"/></g>
+</svg>

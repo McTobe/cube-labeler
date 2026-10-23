@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 2020 aluminium extrusion profile, end view: four T-slots and a centre bore -->
+  <rect x="4" y="4" width="56" height="56" rx="3" fill="#000"/>
+  <path d="M26 4h12v7h8v6l-6 7H24l-6-7v-6h8z" fill="#fff"/>
+  <g transform="rotate(90 32 32)"><path d="M26 4h12v7h8v6l-6 7H24l-6-7v-6h8z" fill="#fff"/></g>
+  <g transform="rotate(180 32 32)"><path d="M26 4h12v7h8v6l-6 7H24l-6-7v-6h8z" fill="#fff"/></g>
+  <g transform="rotate(270 32 32)"><path d="M26 4h12v7h8v6l-6 7H24l-6-7v-6h8z" fill="#fff"/></g>
+  <circle cx="32" cy="32" r="5" fill="#fff"/>
+</svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Horseshoe magnet with marked poles -->
+  <path d="M15 6V32a17 17 0 0 0 34 0V6" fill="none" stroke="#000" stroke-width="13"/>
+  <g fill="#fff"><rect x="8" y="16" width="14" height="3"/><rect x="42" y="16" width="14" height="3"/></g>
+</svg>

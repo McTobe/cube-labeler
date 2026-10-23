@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Grub (set) screw: headless threaded body with hex socket -->
+  <rect x="20" y="8" width="24" height="48" rx="2" fill="#000"/>
+  <rect x="27" y="8" width="10" height="7" fill="#fff"/>
+  <path d="M20 21 L44 18 v2.5 L20 23.5z" fill="#fff"/>
+  <path d="M20 27 L44 24 v2.5 L20 29.5z" fill="#fff"/>
+  <path d="M20 33 L44 30 v2.5 L20 35.5z" fill="#fff"/>
+  <path d="M20 39 L44 36 v2.5 L20 41.5z" fill="#fff"/>
+  <path d="M20 45 L44 42 v2.5 L20 47.5z" fill="#fff"/>
+  <path d="M20 51 L44 48 v2.5 L20 53.5z" fill="#fff"/>
+</svg>

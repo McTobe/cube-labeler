@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Wood screw: countersunk head with slot, tapered core with coarse thread, sharp point -->
+  <g fill="#000">
+    <path d="M10 4H54L40 18H24z"/>
+    <path d="M24 18H40L33 62H31z"/>
+    <path d="M20.0 23.0 L24.0 20.0 V24.5z"/><path d="M44.0 20.0 L40.0 19.0 V23.5z"/>
+    <path d="M20.9 28.5 L24.9 25.5 V30.0z"/><path d="M43.1 25.5 L39.1 24.5 V29.0z"/>
+    <path d="M21.8 34.0 L25.8 31.0 V35.5z"/><path d="M42.2 31.0 L38.2 30.0 V34.5z"/>
+    <path d="M22.7 39.5 L26.7 36.5 V41.0z"/><path d="M41.3 36.5 L37.3 35.5 V40.0z"/>
+    <path d="M23.6 45.0 L27.6 42.0 V46.5z"/><path d="M40.4 42.0 L36.4 41.0 V45.5z"/>
+    <path d="M24.5 50.5 L28.5 47.5 V52.0z"/><path d="M39.5 47.5 L35.5 46.5 V51.0z"/>
+    <path d="M25.4 56.0 L29.4 53.0 V57.5z"/><path d="M38.6 53.0 L34.6 52.0 V56.5z"/>
+  </g>
+  <rect x="30" y="4" width="4" height="8" fill="#fff"/>
+</svg>

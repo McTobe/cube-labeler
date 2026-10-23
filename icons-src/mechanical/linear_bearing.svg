@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Linear ball bearing (LM8UU): cylinder with retaining grooves and bore -->
+  <rect x="14" y="16" width="36" height="42" rx="2" fill="#000"/>
+  <ellipse cx="32" cy="16" rx="18" ry="8" fill="#000"/>
+  <ellipse cx="32" cy="16" rx="13.5" ry="5.5" fill="#fff"/>
+  <ellipse cx="32" cy="16" rx="9.5" ry="3.8" fill="#000"/>
+  <ellipse cx="32" cy="16" rx="5" ry="2" fill="#fff"/>
+  <g fill="#fff"><rect x="14" y="27" width="36" height="3"/><rect x="14" y="47" width="36" height="3"/></g>
+</svg>
