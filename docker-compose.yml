@@ -1,12 +1,15 @@
 # Runs the Cube Labeler web app on port 8080. Point your reverse proxy
 # (for example https://print.tobezone.com) at it; it handles TLS.
 #
-#   docker compose up -d --build
+#   docker compose up -d
+#
+# This pulls the image GitHub Actions publishes. To build from this checkout
+# instead, run: docker compose up -d --build
 
 services:
   cube-labeler-web:
+    image: ghcr.io/mctobe/cube-labeler-web:latest
     build: .
-    image: cube-labeler-web
     ports:
       - "8080:80"
     restart: unless-stopped

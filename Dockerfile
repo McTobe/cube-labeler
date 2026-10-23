@@ -3,8 +3,11 @@
 #
 #   docker build -t cube-labeler-web .
 #   docker run -d -p 8080:80 cube-labeler-web
+#
+# GitHub Actions publishes it as ghcr.io/mctobe/cube-labeler-web (see web-image.yml).
 
-FROM python:3.12-slim AS build
+# The build stage only produces static files, so it runs natively even for other platforms
+FROM --platform=$BUILDPLATFORM python:3.12-slim AS build
 WORKDIR /src
 COPY constraints.txt .
 RUN pip install --no-cache-dir pillow -c constraints.txt

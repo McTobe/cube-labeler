@@ -58,24 +58,46 @@ phone on your Wi-Fi without hosting it anywhere:
 
 ## Hosting with Docker
 
-The `Dockerfile` in the repository root builds the site and serves it with nginx on port 80.
-Web Serial needs HTTPS, so put it behind a reverse proxy that handles TLS, such as Nginx Proxy
-Manager.
+Every push to `main` that touches the web app makes GitHub Actions build a Docker image and
+publish it as `ghcr.io/mctobe/cube-labeler-web:latest` (for amd64 and arm64). The image serves
+the site with nginx on port 80. Web Serial needs HTTPS, so put it behind a reverse proxy that
+handles TLS, such as Nginx Proxy Manager.
 
-```bash
-docker compose up -d --build      # serves on port 8080 (see docker-compose.yml)
+With Dockge (or plain Docker Compose), create a stack with this compose file:
+
+```yaml
+services:
+  cube-labeler-web:
+    image: ghcr.io/mctobe/cube-labeler-web:latest
+    ports:
+      - "8080:80"
+    restart: unless-stopped
 ```
+
+Dockge's **Update** button pulls the newest `latest` image and restarts the container, so
+after a merge to `main` you wait for the "Publish Web Image" workflow to finish and press Update.
+
+**Private repository:** the image is a GitHub package with its own visibility, and a new one
+starts out private. Either:
+
+- make the package public (GitHub › your profile › Packages › cube-labeler-web › Package
+  settings › Change visibility). The repository stays private. The image only holds the
+  static site, which anyone opening the page downloads anyway. Or
+- keep it private and log in once from the Docker that Dockge uses, with a personal access
+  token (classic) that has only the `read:packages` scope:
+  `docker exec -it dockge docker login ghcr.io -u <your GitHub user>`.
 
 In Nginx Proxy Manager, add a proxy host for your domain (for example `print.tobezone.com`)
 that forwards to `http://<docker host>:8080`, and turn on a Let's Encrypt certificate with
 **Force SSL**. If Nginx Proxy Manager runs in Docker on the same host, you can instead put both
 containers on one Docker network and forward to `http://cube-labeler-web:80`.
 
-After pulling new code, run `docker compose up -d --build` again. The server tells browsers to
-check for changes on every load, so phones pick up the new version straight away.
+The server tells browsers to check for changes on every load, so phones pick up a new version
+straight away. On Android, the first visit still needs Chrome's **Nearby devices** permission
+and a force stop of Chrome, as described above; the Chrome flag for insecure origins is not
+needed.
 
-On Android, the first visit still needs Chrome's **Nearby devices** permission and a force
-stop of Chrome, as described above; the Chrome flag for insecure origins is not needed.
+To build the image yourself from a checkout instead: `docker compose up -d --build`.
 
 ## How it fits together
 
