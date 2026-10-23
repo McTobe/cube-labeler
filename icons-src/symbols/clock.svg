@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Clock face with hands at ten past ten -->
+  <circle cx="32" cy="32" r="30" fill="#000"/>
+  <circle cx="32" cy="32" r="24" fill="#fff"/>
+  <g fill="#000"><rect x="30.5" y="7" width="3" height="6" transform="rotate(0 32 32)"/><rect x="30.5" y="7" width="3" height="6" transform="rotate(90 32 32)"/><rect x="30.5" y="7" width="3" height="6" transform="rotate(180 32 32)"/><rect x="30.5" y="7" width="3" height="6" transform="rotate(270 32 32)"/></g>
+  <path d="M32 32V15M32 32l11 7" fill="none" stroke="#000" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="32" cy="32" r="4" fill="#000"/>
+</svg>

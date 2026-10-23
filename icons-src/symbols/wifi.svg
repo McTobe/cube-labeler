@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Wi-Fi: three arcs and a dot -->
+  <g fill="none" stroke="#000" stroke-width="6.5" stroke-linecap="round">
+    <path d="M5 24a38 38 0 0 1 54 0"/><path d="M14 34a25 25 0 0 1 36 0"/><path d="M23 44a12 12 0 0 1 18 0"/>
+  </g>
+  <circle cx="32" cy="54" r="5" fill="#000"/>
+</svg>

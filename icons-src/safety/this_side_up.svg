@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- This side up (ISO 780): two arrows above a bar -->
+  <g fill="#000">
+    <path d="M18 2L30 18H23V50H13V18H6z"/>
+    <path d="M46 2L58 18H51V50H41V18H34z"/>
+    <rect x="4" y="54" width="56" height="7"/>
+  </g>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Flammable (ISO 7010 W021): warning triangle with flame -->
+  <path d="M32 2L63 59H1z" fill="#000"/>
+  <path d="M32 13L55 54H9z" fill="#fff"/>
+  <path d="M32 18c2 7 9 11 9 20 0 7-4 12-9 12s-9-5-9-12c0-4 2-7 4-9 0 4 2 6 4 6-1-6 0-11 1-17z" fill="#000"/>
+  <rect x="20" y="49" width="24" height="3" fill="#000"/>
+</svg>

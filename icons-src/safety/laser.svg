@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Laser (ISO 7010 W004): warning triangle with a starburst and beam -->
+  <path d="M32 2L63 59H1z" fill="#000"/>
+  <path d="M32 13L55 54H9z" fill="#fff"/>
+  <g fill="#000"><rect x="30.5" y="21" width="3" height="9" transform="rotate(0 32 38)"/><rect x="30.5" y="21" width="3" height="9" transform="rotate(45 32 38)"/><rect x="30.5" y="21" width="3" height="9" transform="rotate(90 32 38)"/><rect x="30.5" y="21" width="3" height="9" transform="rotate(135 32 38)"/><rect x="30.5" y="21" width="3" height="9" transform="rotate(180 32 38)"/><rect x="30.5" y="21" width="3" height="9" transform="rotate(225 32 38)"/><rect x="30.5" y="21" width="3" height="9" transform="rotate(270 32 38)"/><rect x="30.5" y="21" width="3" height="9" transform="rotate(315 32 38)"/><circle cx="32" cy="38" r="5"/></g>
+  <rect x="11" y="36.5" width="17" height="3" fill="#000"/>
+</svg>

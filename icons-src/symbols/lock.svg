@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Padlock with keyhole -->
+  <path d="M19 28V20a13 13 0 0 1 26 0v8" fill="none" stroke="#000" stroke-width="7"/>
+  <rect x="9" y="27" width="46" height="35" rx="4" fill="#000"/>
+  <circle cx="32" cy="40" r="5" fill="#fff"/>
+  <path d="M30 42h4l1.5 11h-7z" fill="#fff"/>
+</svg>

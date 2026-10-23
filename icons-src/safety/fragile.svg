@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Fragile (ISO 780): broken wine glass -->
+  <path d="M14 2h36c0 18-5 28-15 30v20h11v8H17v-8h11V32C19 30 14 20 14 2z" fill="#000"/>
+  <path d="M30 4l-4 9 7 4-4 10" fill="none" stroke="#fff" stroke-width="3"/>
+</svg>

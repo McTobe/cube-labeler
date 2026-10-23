@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Cardboard box with taped lid, three-quarter view -->
+  <path d="M32 4L60 16V48L32 60 4 48V16z" fill="#000"/>
+  <path d="M4 16L32 28 60 16" fill="none" stroke="#fff" stroke-width="2.5"/>
+  <path d="M32 28V60" stroke="#fff" stroke-width="2.5"/>
+  <path d="M18 10L46 22V32L40 30V25L12 13z" fill="#fff"/>
+</svg>
