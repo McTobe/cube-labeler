@@ -104,6 +104,12 @@ class TestBackupDialog(unittest.TestCase):
         self.assertEqual(self.changed, [1])
         self.assertIn("Added 1", self.info[-1])
 
+    def test_says_when_no_cloud_folder_is_found(self):
+        with patch.object(ib, "cloud_folders", lambda: []):
+            dlg = self._open()
+        self.assertIn("No Google Drive", dlg.lbl_clouds.cget("text"))
+        self.assertEqual(dlg.cloud_row.winfo_children(), [])
+
     def test_import_rejects_other_files(self):
         path = os.path.join(self.tmp, "notes.cubeicons")
         with open(path, "w") as f:
@@ -118,6 +124,7 @@ class TestBackupDialog(unittest.TestCase):
         dlg = self._open()
         self.assertIn("Off", dlg.lbl_folder.cget("text"))
         self.assertEqual(dlg.btn_now.cget("state"), "disabled")
+        self.assertIn("Found on this PC: Google Drive", dlg.lbl_clouds.cget("text"))
         cloud_button = dlg.cloud_row.winfo_children()[0]
         self.assertEqual(cloud_button.cget("text"), "Use Google Drive")
         cloud_button.invoke()

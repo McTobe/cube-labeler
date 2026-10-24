@@ -69,7 +69,7 @@ class BackupDialog(ctk.CTkToplevel):
         super().__init__(parent)
         self._on_changed = on_changed
         self.title("Icon backups")
-        self.geometry("560x470")
+        self.geometry("560x510")
         self.resizable(False, False)
         self.transient(parent)
         self._build()
@@ -117,9 +117,19 @@ class BackupDialog(ctk.CTkToplevel):
         self.lbl_status = ctk.CTkLabel(auto, text="", anchor="w", justify="left", wraplength=500,
                                        font=ctk.CTkFont(size=11))
         self.lbl_status.pack(fill="x", pady=(0, 6))
+        clouds = icon_backup.cloud_folders()[:3]
+        if clouds:
+            found = "Found on this PC: " + ", ".join(name for name, _ in clouds) + \
+                f". Pick one to save backups in a “{BACKUP_SUBFOLDER}” folder there."
+        else:
+            found = ("No Google Drive, OneDrive, Dropbox or iCloud Drive folder found on this PC. "
+                     "Choose any folder, for example one your cloud app syncs.")
+        self.lbl_clouds = ctk.CTkLabel(auto, text=found, anchor="w", justify="left", wraplength=500,
+                                       font=ctk.CTkFont(size=11), text_color=MUTED_TEXT)
+        self.lbl_clouds.pack(fill="x", pady=(0, 4))
         self.cloud_row = ctk.CTkFrame(auto, fg_color="transparent")
         self.cloud_row.pack(fill="x", pady=(0, 6))
-        for name, path in icon_backup.cloud_folders()[:3]:
+        for name, path in clouds:
             ctk.CTkButton(self.cloud_row, text=f"Use {name}", width=130, fg_color="#8B5CF6", hover_color="#7C3AED",
                           command=lambda p=path: self._use_folder(os.path.join(p, BACKUP_SUBFOLDER))
                           ).pack(side="left", padx=(0, 8))
