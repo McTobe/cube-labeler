@@ -18,11 +18,15 @@ const PATHS = {
   edit: html`<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>`,
   up: html`<path d="M12 19V5M6 11l6-6 6 6"/>`,
   down: html`<path d="M12 5v14M6 13l6 6 6-6"/>`,
+  star: html`<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>`,
+  search: html`<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>`,
+  trash: html`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`,
+  plus: html`<path d="M12 5v14M5 12h14"/>`,
   refresh: html`<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>`,
 };
 
-export function Icon({ name, size = 22 }) {
-  return html`<svg class="icon" width=${size} height=${size} viewBox="0 0 24 24" fill="none"
+export function Icon({ name, size = 22, filled = false }) {
+  return html`<svg class=${filled ? 'icon filled' : 'icon'} width=${size} height=${size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
     aria-hidden="true">${PATHS[name]}</svg>`;
 }

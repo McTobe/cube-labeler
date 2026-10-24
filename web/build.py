@@ -26,6 +26,7 @@ PAGE_DIRS = ["js", "vendor"]
 CORE_MODULES = [
     "__init__.py",
     "font_manager.py",
+    "icon_editor.py",
     "inventory_renderer.py",
     "label_language.py",
     "label_renderer.py",
@@ -67,6 +68,43 @@ def build_core_zip(path: str) -> None:
             for name in sorted(names):
                 path = os.path.join(root, name)
                 zf.write(path, "assets/icons/" + os.path.relpath(path, icons_dir).replace(os.sep, "/"))
+
+
+def build_icon_library() -> None:
+    """
+    Copies the built-in icons next to the page, so the library shows them without Python,
+    and writes icons/library.json: categories in order and every icon's title, file and
+    search words, read the same way as core/icon_manager.py.
+    """
+    src = os.path.join(PROJECT_ROOT, "assets", "icons")
+    dst = os.path.join(DIST_DIR, "icons")
+    with open(os.path.join(src, "catalog.json"), encoding="utf-8") as f:
+        catalog = json.load(f)
+    meta = catalog.get("icons", {})
+    library = {"categories": [], "icons": []}
+    for category in catalog.get("categories", []):
+        folder, name = category["folder"], category["name"]
+        library["categories"].append(name)
+        folder_dir = os.path.join(src, folder)
+        if not os.path.isdir(folder_dir):
+            continue
+        os.makedirs(os.path.join(dst, folder), exist_ok=True)
+        for file_name in sorted(os.listdir(folder_dir)):
+            if not file_name.lower().endswith((".png", ".jpg", ".jpeg", ".bmp")):
+                continue
+            shutil.copy2(os.path.join(folder_dir, file_name), os.path.join(dst, folder, file_name))
+            icon_id = os.path.splitext(file_name)[0]
+            info = meta.get(icon_id.lower(), {})
+            library["icons"].append({
+                "key": f"{folder}/{file_name}",
+                "id": icon_id,
+                "title": info.get("title") or icon_id.replace("_", " ").title(),
+                "category": name,
+                "file": f"icons/{folder}/{file_name}",
+                "keywords": info.get("keywords") or [icon_id.lower(), name.lower()],
+            })
+    with open(os.path.join(dst, "library.json"), "w", encoding="utf-8") as f:
+        json.dump(library, f, ensure_ascii=False, indent=1)
 
 
 def build_icons() -> None:
@@ -126,6 +164,7 @@ def main() -> int:
         shutil.copytree(os.path.join(WEB_DIR, name), os.path.join(DIST_DIR, name), dirs_exist_ok=True)
     build_core_zip(os.path.join(DIST_DIR, "cube_core.zip"))
     build_icons()
+    build_icon_library()
     with open(os.path.join(DIST_DIR, "manifest.webmanifest"), "w", encoding="utf-8") as f:
         json.dump(MANIFEST, f, indent=2)
     build_service_worker()

@@ -4,6 +4,7 @@
 // Bin labels are designed for 12 mm tape and always print at 12 mm.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
+import { IconPickerSheet } from './icons.js';
 import { Field, Section, Segmented, Select, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateBin, setBinIcon } from '../app.js';
@@ -53,6 +54,7 @@ function IconPicker({ icon, options, value, field }) {
   const { phase } = useStore(boot);
   const fileRef = useRef(null);
   const [thumb, setThumb] = useState(null);
+  const [picking, setPicking] = useState(false);
   useEffect(() => {
     if (!icon || value !== 'custom') { setThumb(null); return undefined; }
     const url = URL.createObjectURL(new Blob([icon.data]));
@@ -69,8 +71,10 @@ function IconPicker({ icon, options, value, field }) {
   return html`<div class="row icon-row">
     <${Select} label="Icon" value=${value} options=${choices} onChange=${(v) => updateBin({ [field]: v })} />
     ${thumb && html`<img class="picture-thumb small" src=${thumb} alt="" />`}
+    <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => setPicking(true)}>Library</button>
     <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Own picture</button>
     <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
+    <${IconPickerSheet} open=${picking} target="bin" onClose=${() => setPicking(false)} />
   </div>`;
 }
 

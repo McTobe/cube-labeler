@@ -344,3 +344,41 @@ def job_state(raw: Any) -> str:
         return "invalid"
     protocol.raise_if_error(status)
     return "completed" if protocol.is_completed(status) else "pending"
+
+
+# --- Icons: the same steps as the desktop icon library and editor (core/icon_editor.py) ---
+
+def _open_picture(data: Any):
+    from PIL import Image, ImageOps
+    with Image.open(io.BytesIO(_to_bytes(data))) as src:
+        # Phone photos carry their rotation in EXIF
+        return ImageOps.exif_transpose(src).convert("RGBA")
+
+
+def icon_print_preview(data: Any, dots: int = 56) -> bytes:
+    """An icon as it comes out on a 12 mm bin label: cropped to its ink, shrunk, black and white."""
+    from core.icon_editor import print_dots
+    return _png(print_dots(_open_picture(data), int(dots)))
+
+
+def make_icon(data: Any, edit: Any = None, touch: Any = None) -> Dict[str, Any]:
+    """
+    Turns a picture into a black-and-white icon with the editor's settings (defaults when
+    edit is None). Returns the icon PNG, the original as it is kept with the icon, the
+    settings used, and whether the icon has any ink.
+    """
+    from PIL import Image
+    from core.icon_editor import IconEdit, has_ink, ink_mask, apply_touch, mask_to_icon, prepare_original
+    original = prepare_original(_open_picture(data))
+    settings = IconEdit.from_dict(_to_dict(edit) if edit is not None else None)
+    touch_layer = None
+    if touch is not None:
+        with Image.open(io.BytesIO(_to_bytes(touch))) as src:
+            touch_layer = src.convert("L")
+    mask = apply_touch(ink_mask(original, settings), touch_layer)
+    return {
+        "icon_png": _png(mask_to_icon(mask)),
+        "original_png": _png(original),
+        "edit": settings.to_dict(),
+        "has_ink": has_ink(mask),
+    }

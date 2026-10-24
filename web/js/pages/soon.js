@@ -3,7 +3,6 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 
 const PLANS = {
-  icons: 'Browse the icon library, add your own icons, edit them and redraw photos with AI.',
   templates: 'Start from a ready-made label or one you saved.',
 };
 

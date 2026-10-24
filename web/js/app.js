@@ -5,6 +5,7 @@
 import { createStore } from './state.js';
 import { startPython } from './python.js';
 import * as storage from './storage.js';
+import { loadLibrary } from './library.js';
 import { SerialTransport, queryStatus, printRaster, feedTape, errorMessage } from '../printer.js';
 
 const RENDER_DELAY_MS = 120;
@@ -103,6 +104,7 @@ export async function start() {
   });
   applyTheme(app.get().settings.theme);
   storage.askToPersist();
+  loadLibrary().catch((err) => console.warn('Icon library', err));
 
   if (printer.get().supported) {
     try {
@@ -305,9 +307,12 @@ export async function addFont(file) {
 }
 
 export async function setBinIcon(file) {
-  const kind = app.get().bin.kind;
-  const icon = { name: file.name, data: new Uint8Array(await file.arrayBuffer()) };
-  updateBin(kind === 'component' ? { icon_type: 'custom', icon } : { tool_type: 'custom', icon });
+  setBinIconBytes(file.name, new Uint8Array(await file.arrayBuffer()));
+}
+
+export function setBinIconBytes(name, data) {
+  const icon = { name, data };
+  updateBin(app.get().bin.kind === 'component' ? { icon_type: 'custom', icon } : { tool_type: 'custom', icon });
 }
 
 export async function setImage(file) {
@@ -315,8 +320,17 @@ export async function setImage(file) {
     updateLabel({ image: null });
     return;
   }
-  updateLabel({ image: { name: file.name, data: new Uint8Array(await file.arrayBuffer()) } });
+  setImageBytes(file.name, new Uint8Array(await file.arrayBuffer()));
 }
+
+export function setImageBytes(name, data) {
+  updateLabel({ image: { name, data } });
+}
+
+// --- Icons ---------------------------------------------------------------------------------
+
+export const iconPrintPreview = (data) => py.icon_print_preview(data);
+export const makeIcon = (data, edit = null, touch = null) => py.make_icon(data, edit, touch);
 
 // --- Printer -------------------------------------------------------------------------------
 

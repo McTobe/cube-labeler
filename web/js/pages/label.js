@@ -2,6 +2,7 @@
 // The preview and the print button stay in view while editing.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
+import { IconPickerSheet } from './icons.js';
 import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
@@ -249,6 +250,7 @@ function PictureSection() {
   const { phase } = useStore(boot);
   const fileRef = useRef(null);
   const [thumb, setThumb] = useState(null);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     if (!label.image) { setThumb(null); return undefined; }
@@ -269,8 +271,12 @@ function PictureSection() {
       <span class="picture-name">${label.image ? label.image.name : 'No picture'}</span>
       ${label.image && html`<button class="link-button" onClick=${() => setImage(null)}>Remove</button>`}
     </div>
-    <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Choose a picture</button>
+    <div class="button-row">
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => setPicking(true)}>Icon library</button>
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Your own picture</button>
+    </div>
     <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
+    <${IconPickerSheet} open=${picking} target="text" onClose=${() => setPicking(false)} />
     <${Segmented} label="Position" options=${SIDES} value=${label.image_position}
       onChange=${(image_position) => updateLabel({ image_position })} />
     <${Slider} label="Size" min=${0.3} max=${1.5} step=${0.05} value=${label.image_scale} format=${pct}

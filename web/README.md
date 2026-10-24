@@ -11,9 +11,10 @@ frames, QR codes (with a Wi-Fi helper), a picture, tape width, length and the ad
 settings, the tape and print-dot preview, the printer panel (connect, status, feed tape),
 saving the label as a picture, and settings. Bin labels (fasteners and parts, with their
 drive and part icons or your own picture) and the print queue (one strip with cut lines,
-reorder, edit, remove) are in too. The label, queue, settings and added fonts are kept in the
-browser, and after the first visit the app also starts offline. Icons, templates, backups and
-AI icons follow.
+reorder, edit, remove) are in too, and so is the icon library (search, categories, favourites,
+recently used, a print preview, your own icons made from pictures). The label, queue, icons,
+settings and added fonts are kept in the browser, and after the first visit the app also starts
+offline. The icon editor, templates, backups and AI icons follow.
 
 ## Browser support
 
@@ -116,6 +117,7 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 | `js/main.js` | Navigation and pages. The pages live in `js/pages/`, shared controls in `js/ui.js`. |
 | `js/app.js` | App state and actions: start Python, render, print, keep settings. |
 | `js/worker.js`, `js/python.js` | Pyodide runs in a Web Worker so the page stays smooth; `python.js` calls into it. |
+| `js/library.js` | The icon library: built-in icons from `icons/library.json` (made by `build.py`) and your own icons, with the desktop app's keys so backups move between the two. |
 | `js/storage.js` | Keeps the label, settings and fonts in the browser's IndexedDB. |
 | `sw.js` | Offline cache: the app's files, Pyodide, Pillow and qrcode. |
 | `vendor/` | [Preact](https://preactjs.com) and [htm](https://github.com/developit/htm), copied in so there is no build step (see `vendor/README.md`). |

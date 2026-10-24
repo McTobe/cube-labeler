@@ -160,6 +160,48 @@ class TestWebBinLabelsAndQueue(unittest.TestCase):
         self.assertEqual(Image.open(io.BytesIO(png)).height, 40)
 
 
+class TestWebIcons(unittest.TestCase):
+    def _picture(self):
+        picture = Image.new("RGB", (200, 120), "white")
+        picture.paste((0, 0, 0), (40, 20, 160, 100))
+        data = io.BytesIO()
+        picture.save(data, format="JPEG")
+        return data.getvalue()
+
+    def test_library_lists_every_icon_with_its_file(self):
+        import json
+        import tempfile
+        from unittest import mock
+        import build
+        with tempfile.TemporaryDirectory() as dist, mock.patch.object(build, "DIST_DIR", dist):
+            build.build_icon_library()
+            with open(os.path.join(dist, "icons", "library.json"), encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertGreater(len(data["icons"]), 100)
+            for icon in data["icons"]:
+                self.assertIn(icon["category"], data["categories"])
+                self.assertTrue(os.path.isfile(os.path.join(dist, icon["file"])), icon["file"])
+                self.assertEqual(icon["file"], "icons/" + icon["key"])
+
+    def test_print_preview_is_the_bin_label_size(self):
+        preview = Image.open(io.BytesIO(cube_web.icon_print_preview(self._picture())))
+        self.assertEqual(max(preview.size), 56)
+
+    def test_make_icon_from_a_photo(self):
+        made = cube_web.make_icon(self._picture())
+        self.assertTrue(made["has_ink"])
+        self.assertEqual(Image.open(io.BytesIO(made["icon_png"])).format, "PNG")
+        self.assertEqual(made["edit"]["mode"], "drawing")
+        # The same settings again give the same icon
+        again = cube_web.make_icon(made["original_png"], made["edit"])
+        self.assertEqual(again["icon_png"], made["icon_png"])
+
+    def test_blank_picture_has_no_ink(self):
+        data = io.BytesIO()
+        Image.new("RGB", (50, 50), "white").save(data, format="PNG")
+        self.assertFalse(cube_web.make_icon(data.getvalue())["has_ink"])
+
+
 class TestWebTextEditing(unittest.TestCase):
     def test_toggle_style(self):
         self.assertEqual(cube_web.toggle_style("M3 screw", 0, 2, "bold"), ["**M3** screw", 2, 4])
