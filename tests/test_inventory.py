@@ -6,6 +6,7 @@ Unit tests for Hardware Inventory Label Design System & Template Catalog (V2).
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
@@ -16,6 +17,8 @@ from core.inventory_renderer import (
     FastenerLabelConfig,
     ComponentLabelConfig,
     inventory_renderer,
+    PART_LIBRARY_ICONS,
+    part_library_icon,
 )
 from core.label_renderer import SINGLE_BIN_PADDING_MM, LabelConfig, LabelRenderer
 from core.specs import DOT_PITCH_MM
@@ -103,7 +106,7 @@ class TestInventoryRenderer(unittest.TestCase):
 
     def test_component_icon_types(self):
         """Verify Archetype B renders across all component icon types."""
-        icons = ["ball_bearing", "wago", "fuse", "none"]
+        icons = list(PART_LIBRARY_ICONS) + ["none"]
         for icon in icons:
             cfg = ComponentLabelConfig(
                 category_banner="HARDWARE",
@@ -113,6 +116,18 @@ class TestInventoryRenderer(unittest.TestCase):
             )
             img = self.renderer.render_component(cfg)
             self.assertEqual(img.size[1], 64)
+
+    def test_part_icons_come_from_the_library(self):
+        """Every part icon is a library picture, and older bearing/WAGO/fuse labels print them too."""
+        for icon_type, file_name in PART_LIBRARY_ICONS.items():
+            path = part_library_icon(icon_type)
+            self.assertTrue(path and os.path.isfile(path), file_name)
+        self.assertTrue(part_library_icon("wago").endswith("wago_221.png"))
+        self.assertIsNone(part_library_icon("none"))
+        cfg = ComponentLabelConfig(category_banner="X", spec_primary="Y", icon_type="wago")
+        with patch.object(InventoryRenderer, "_draw_wago_icon") as drawn:
+            self.renderer.render_component(cfg)
+        drawn.assert_not_called()
 
     def test_label_renderer_integration(self):
         """Verify seamless integration with core LabelRenderer and batch queuing."""

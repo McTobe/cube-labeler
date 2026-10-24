@@ -29,6 +29,21 @@ DRIVE_LIBRARY_ICONS = {
     "slotted": "slotted.png",
 }
 
+# Part icons on bin labels come from the icon library. Bearing, WAGO and fuse labels saved
+# before this used drawn icons under the same names, so they now print the library pictures.
+PART_LIBRARY_ICONS = {
+    "ball_bearing": "bearing_608zz.png",
+    "linear_bearing": "linear_bearing.png",
+    "spring": "spring.png",
+    "wago": "wago_221.png",
+    "terminal_block": "terminal_block.png",
+    "jst": "jst_connector.png",
+    "fuse": "fuse_inline.png",
+    "resistor": "resistor.png",
+    "capacitor": "capacitor_elec.png",
+    "led": "led.png",
+}
+
 
 def _bundled_icons_dir() -> str:
     base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -52,6 +67,12 @@ def find_bundled_icon(file_name: str) -> Optional[str]:
 def drive_library_icon(tool_type: str) -> Optional[str]:
     """Path of the icon library picture for a drive, or None if there isn't one."""
     name = DRIVE_LIBRARY_ICONS.get(tool_type)
+    return find_bundled_icon(name) if name else None
+
+
+def part_library_icon(icon_type: str) -> Optional[str]:
+    """Path of the icon library picture for a part icon, or None if there isn't one."""
+    name = PART_LIBRARY_ICONS.get(icon_type)
     return find_bundled_icon(name) if name else None
 
 
@@ -117,7 +138,7 @@ class ComponentLabelConfig:
     category_banner: str = "BEARINGS"     # e.g. "BEARINGS", "WAGO", "FUSE HOLDERS"
     spec_primary: str = "608ZZ"           # e.g. "608ZZ", "221-413 • 3-way", "16 AWG / 1.3 mm²"
     spec_secondary: str = ""              # e.g. "0.2 - 4.0 mm²", "Inline type"
-    icon_type: str = "ball_bearing"       # "ball_bearing", "wago", "fuse", "resistor", "capacitor", "custom", "none"
+    icon_type: str = "ball_bearing"       # a PART_LIBRARY_ICONS key, "custom" or "none"
     custom_icon_path: Optional[str] = None
     
     # Dimensions
@@ -612,14 +633,18 @@ class InventoryRenderer:
             icon_cy = canvas_h // 2
             icon_r = 17 * scale
 
-            if cfg.icon_type == "ball_bearing":
+            max_dim = int(icon_w * 0.76)
+            library_icon = part_library_icon(cfg.icon_type)
+            if library_icon:
+                self._draw_custom_image(img, icon_cx, icon_cy, max_dim, max_dim, library_icon)
+            # Drawn icons, in case the library picture is missing
+            elif cfg.icon_type == "ball_bearing":
                 self._draw_ball_bearing_icon(draw, icon_cx, icon_cy, icon_r, stroke=line_w)
             elif cfg.icon_type == "wago":
                 self._draw_wago_icon(draw, icon_cx, icon_cy, icon_r, stroke=line_w)
             elif cfg.icon_type == "fuse":
                 self._draw_fuse_icon(draw, icon_cx, icon_cy, icon_r, stroke=line_w)
             elif cfg.icon_type == "custom" and cfg.custom_icon_path:
-                max_dim = int(icon_w * 0.76)
                 self._draw_custom_image(img, icon_cx, icon_cy, max_dim, max_dim, cfg.custom_icon_path)
 
         # 3. Top Category Banner Strip (36% height) with Solid Inverted Block

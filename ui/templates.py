@@ -4,8 +4,9 @@ Label templates and preset library for Brother PT-P300BT.
 """
 
 import json
+import os
 from dataclasses import asdict, fields
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from core.label_renderer import LabelConfig
 from core.inventory_renderer import ComponentLabelConfig, FastenerLabelConfig
 
@@ -198,3 +199,52 @@ def import_config_from_json(file_path: str) -> Optional[LabelConfig]:
         return load_config_from_json(file_path)
     except Exception:
         return None
+
+
+# --- The user's own templates, kept in the app's data folder so backups include them ---
+
+TEMPLATE_EXTENSION = ".json"
+_BAD_NAME_CHARS = '<>:"/\\|?*'
+
+
+def _user_templates_dir(folder: Optional[str] = None) -> str:
+    if folder:
+        os.makedirs(folder, exist_ok=True)
+        return folder
+    from core.config import config_manager
+
+    return config_manager.user_templates_dir
+
+
+def template_file_name(name: str) -> str:
+    """A file name for a template called `name`, without characters Windows does not allow."""
+    clean = "".join("_" if c in _BAD_NAME_CHARS or ord(c) < 32 else c for c in name).strip().strip(".")
+    return (clean or "My template")[:80] + TEMPLATE_EXTENSION
+
+
+def list_user_templates(folder: Optional[str] = None) -> List[Tuple[str, str]]:
+    """The user's saved templates as (name, path), by name."""
+    folder = _user_templates_dir(folder)
+    found = []
+    for entry in os.scandir(folder):
+        if entry.is_file() and entry.name.lower().endswith(TEMPLATE_EXTENSION):
+            found.append((entry.name[: -len(TEMPLATE_EXTENSION)], entry.path))
+    return sorted(found, key=lambda t: t[0].lower())
+
+
+def user_template_path(name: str, folder: Optional[str] = None) -> str:
+    return os.path.join(_user_templates_dir(folder), template_file_name(name))
+
+
+def save_user_template(config: LabelConfig, name: str, folder: Optional[str] = None) -> Optional[str]:
+    """Saves the label as one of the user's templates, over one with the same name; returns its path."""
+    path = user_template_path(name, folder)
+    return path if export_config_to_json(config, path) else None
+
+
+def delete_user_template(path: str) -> bool:
+    try:
+        os.remove(path)
+        return True
+    except OSError:
+        return False

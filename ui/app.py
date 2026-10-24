@@ -37,11 +37,12 @@ from core.label_language import LANGUAGES
 from ui.tape_preview import TapePreviewWidget
 from ui.templates import (
     load_preset,
-    export_config_to_json,
     load_config_from_json,
+    save_user_template,
+    user_template_path,
 )
 from ui.inventory_tab import HardwareInventoryTab
-from ui.icon_browser import IconBrowserDialog
+from ui.icon_browser import IconBrowserDialog, IconLibraryPage
 from ui.printer_chip import PrinterChip, PrinterPanel
 from ui.settings_view import SettingsView
 from ui.templates_view import TemplatesView
@@ -55,6 +56,7 @@ VIEW_TEXT = "text"
 VIEW_BIN = "bin"
 VIEW_QUEUE = "queue"
 VIEW_TEMPLATES = "templates"
+VIEW_ICONS = "icons"
 VIEW_SETTINGS = "settings"
 
 POS_LEFT = "Left of text"
@@ -221,6 +223,7 @@ class PrintLabelApp(ctk.CTk):
                 (VIEW_BIN, "Bin label"),
                 (VIEW_QUEUE, "Queue"),
                 (VIEW_TEMPLATES, "Templates"),
+                (VIEW_ICONS, "Icons"),
             ],
             bottom_items=[(VIEW_SETTINGS, "Settings")],
             on_select=self._show_view,
@@ -246,7 +249,9 @@ class PrintLabelApp(ctk.CTk):
             on_apply=self._apply_preset_and_edit,
             on_save=self._on_save_template,
             on_open=self._on_load_template,
+            on_open_user=self._open_template_file,
         )
+        self.icons_view = IconLibraryPage(self.main_area)
         self.settings_view = SettingsView(
             self.main_area,
             virtual_var=self.virtual_mode_var,
@@ -262,7 +267,7 @@ class PrintLabelApp(ctk.CTk):
     # VIEW SWITCHING
     # -------------------------------------------------------------------------
     def _show_view(self, view: str):
-        """Shows one of the rail's views: text, bin, queue, templates or settings."""
+        """Shows one of the rail's views: text, bin, queue, templates, icons or settings."""
         self._hide_printer_panel()
         for widget in (
             self.preview_widget,
@@ -270,6 +275,7 @@ class PrintLabelApp(ctk.CTk):
             self.inventory_studio_frame,
             self.queue_container_frame,
             self.templates_view,
+            self.icons_view,
             self.settings_view,
         ):
             widget.pack_forget()
@@ -291,8 +297,13 @@ class PrintLabelApp(ctk.CTk):
             self.queue_container_frame.pack(side="bottom", fill="both", expand=True)
             self._refresh_queue_display()
         elif view == VIEW_TEMPLATES:
+            self.templates_view.refresh_user_templates()
             self.templates_view.pack(fill="both", expand=True)
+        elif view == VIEW_ICONS:
+            self.icons_view.refresh()
+            self.icons_view.pack(fill="both", expand=True)
         elif view == VIEW_SETTINGS:
+            self.settings_view.refresh_backup_status()
             self.settings_view.pack(fill="both", expand=True)
 
         if view in (VIEW_TEXT, VIEW_BIN):
@@ -1254,16 +1265,21 @@ class PrintLabelApp(ctk.CTk):
         self._trigger_render()
 
     def _on_save_template(self):
-        p = filedialog.asksaveasfilename(
-            title="Save Label Template",
-            defaultextension=".json",
-            filetypes=[("JSON Files", "*.json")],
-        )
-        if p:
-            if export_config_to_json(self.config, p):
-                self.action_status_label.configure(text=f"Saved {os.path.basename(p)}")
-            else:
-                messagebox.showerror("Couldn't save template", f"The template couldn't be written to:\n{p}")
+        """Saves the current label under My templates, which backups include."""
+        dialog = ctk.CTkInputDialog(title="Save template", text="Name for this template:")
+        name = (dialog.get_input() or "").strip()
+        if not name:
+            return
+        path = user_template_path(name)
+        if os.path.isfile(path) and not messagebox.askyesno(
+            "Save template", f"There is already a template called “{name}”. Replace it?"
+        ):
+            return
+        if save_user_template(self.config, name):
+            self.templates_view.refresh_user_templates()
+            self.action_status_label.configure(text=f"Saved template {name}")
+        else:
+            messagebox.showerror("Couldn't save template", f"The template couldn't be written to:\n{path}")
 
     def _on_load_template(self):
         p = filedialog.askopenfilename(
@@ -1271,22 +1287,25 @@ class PrintLabelApp(ctk.CTk):
             filetypes=[("JSON Files", "*.json")],
         )
         if p and os.path.isfile(p):
-            try:
-                cfg = load_config_from_json(p)
-            except (OSError, ValueError) as e:
-                messagebox.showerror("Could Not Load Template", str(e))
-                return
-            if cfg.inventory_config is not None:
-                self._show_view(VIEW_BIN)
-                self.config = cfg
-                self.inventory_tab_widget.load_inventory_config(cfg.inventory_config)
-            else:
-                # Switch first: showing the view re-reads the editor into the current config
-                self._show_view(VIEW_TEXT)
-                self.config = cfg
-                self._update_ui_from_config(cfg)
-            self._trigger_render()
-            self.action_status_label.configure(text=f"Opened {os.path.basename(p)}")
+            self._open_template_file(p)
+
+    def _open_template_file(self, p: str):
+        try:
+            cfg = load_config_from_json(p)
+        except (OSError, ValueError) as e:
+            messagebox.showerror("Could Not Load Template", str(e))
+            return
+        if cfg.inventory_config is not None:
+            self._show_view(VIEW_BIN)
+            self.config = cfg
+            self.inventory_tab_widget.load_inventory_config(cfg.inventory_config)
+        else:
+            # Switch first: showing the view re-reads the editor into the current config
+            self._show_view(VIEW_TEXT)
+            self.config = cfg
+            self._update_ui_from_config(cfg)
+        self._trigger_render()
+        self.action_status_label.configure(text=f"Opened {os.path.splitext(os.path.basename(p))[0]}")
 
     # =========================================================================
     # PORT MANAGEMENT & TELEMETRY

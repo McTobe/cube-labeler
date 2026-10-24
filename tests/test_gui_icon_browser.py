@@ -27,6 +27,7 @@ from PIL import Image, ImageDraw
 from core import icon_manager as im
 from core.icon_manager import FAVOURITES, RECENT, USER_CATEGORY, IconManager
 import ui.icon_browser as browser
+import ui.icon_grid as icon_grid
 import ui.icon_editor_dialog as editor
 
 
@@ -102,6 +103,27 @@ class TestIconBrowser(unittest.TestCase):
         self.assertEqual(self._shown_ids(dlg), ["wago_221"])
         dlg._clear_search()
         self.assertGreater(len(dlg._shown), 1)
+
+    def test_click_and_double_click_tiles(self):
+        dlg = self._open(initial_category="Screw drives")
+        grid = dlg.icon_grid
+        grid.update()
+        first = dlg._shown[0]
+
+        class Click:
+            x, y = 30, 30
+
+        grid._clicked(Click)
+        self.assertEqual(dlg.selected_icon.file_path, first.file_path)
+        self.assertEqual(grid.canvas.itemcget(grid._shapes[0], "outline"), icon_grid.TILE_SELECTED)
+        Click.x = grid._cell_w + 30
+        grid._double_clicked(Click)
+        self.assertEqual(self.chosen, [dlg._shown[1].file_path])
+
+    def test_empty_grid_says_why(self):
+        dlg = self._open(initial_category=FAVOURITES)
+        texts = [dlg.icon_grid.canvas.itemcget(i, "text") for i in dlg.icon_grid.canvas.find_all()]
+        self.assertTrue(any("No favourites yet" in t for t in texts))
 
     def test_select_favourite_and_insert(self):
         dlg = self._open()
@@ -259,6 +281,52 @@ class TestIconBrowser(unittest.TestCase):
         self.assertEqual(calls, [((200, 160), editor.CUSTOM, "keep it round")])
         self.assertIn("OpenAI's icon is ready", ed.lbl_status.cget("text"))
         self.assertIsNotNone(ed._picture_before_ai)
+
+    def test_icons_page_has_nothing_to_insert(self):
+        with patch("ui.backup_dialog.backup_status", lambda: ("Auto-backup off", "gray", False)):
+            page = browser.IconLibraryPage(self.root)
+        self.addCleanup(page.destroy)
+        page.pack(fill="both", expand=True)
+        page.update()
+        page._select_path(self.mgr.get_icon_by_id("torx").file_path)
+        page._confirm_selection()
+        self.assertEqual(self.chosen, [])
+        self.assertTrue(page.winfo_exists())
+        self.assertEqual(page.lbl_backup.cget("text"), "Auto-backup off")
+        self.assertEqual(page.btn_backups.cget("text"), "Backups…")
+        with patch.object(page, "_take_grab"):
+            ed = page._open_editor(picture_path=self._picture())
+        self.addCleanup(lambda: ed.winfo_exists() and ed.destroy())
+        ed.update()
+        self.assertEqual(ed.btn_save_insert.winfo_manager(), "")
+        ed._save(insert=False)
+        page.refresh()
+        self.assertEqual(page.selected_icon.title, "M3 hex nut")
+
+    def test_icons_page_shows_favourites_made_in_the_picker(self):
+        with patch("ui.backup_dialog.backup_status", lambda: ("Auto-backup off", "gray", False)):
+            page = browser.IconLibraryPage(self.root)
+        self.addCleanup(page.destroy)
+        page._select_category(FAVOURITES)
+        torx = self.mgr.get_icon_by_id("torx")
+        page._select_path(torx.file_path)
+        self.assertEqual(page._shown, [])
+        dlg = self._open()
+        dlg._select_path(torx.file_path)
+        dlg._toggle_favourite()
+        dlg.destroy()
+        page.refresh()
+        self.assertEqual([i.id for i in page._shown], ["torx"])
+        self.assertIn("(1)", page._sidebar_buttons[FAVOURITES].cget("text"))
+        self.assertIn("★", page.btn_fav.cget("text"))
+
+    def test_picker_shows_backup_status(self):
+        dlg = self._open()
+        with patch("ui.backup_dialog.backup_status", lambda: ("● Auto-backup on: OneDrive", "green", True)):
+            dlg._refresh_backup_status()
+        self.assertEqual(dlg.lbl_backup.cget("text"), "● Auto-backup on: OneDrive")
+        self.assertEqual(dlg.btn_backups.cget("text"), "Backups ✓")
+        self.assertEqual(dlg.btn_use.cget("text"), "Insert icon")
 
 
 if __name__ == "__main__":

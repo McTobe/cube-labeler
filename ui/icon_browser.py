@@ -19,49 +19,29 @@ from core.icon_manager import (
     icon_manager, IconItem, parse_keywords, print_preview,
 )
 from core.config import config_manager
+from ui.icon_grid import IconGrid, TILE_BG, short_title, thumbnail
 # Imported here so automatic backups follow every change made in the library
-from core.icon_backup import auto_backup  # noqa: F401
+from core.backup import auto_backup  # noqa: F401
 
-TILE_BG = "#F5F5F5"
-TILE_HOVER = "#E3E3E3"
 TILE_SELECTED = "#1F6AA5"
-TITLE_MAX_CHARS = 20
-TILE_W = 122
-TILE_H = 104
 SEARCH_DELAY_MS = 180
 PREVIEW_SIZE = 112
+BACKUP_STATUS_MS = 5000
 
 
-class IconBrowserDialog(ctk.CTkToplevel):
-    """Modal dialog allowing users to browse, search, and select icons."""
+class _IconLibrary:
+    """
+    The icon library itself: sidebar, search, grid and details. Shown in a window that
+    picks an icon for a label (IconBrowserDialog) and as the Icons page of the main window
+    (IconLibraryPage), where there is nothing to insert into.
+    """
 
-    def __init__(
-        self,
-        parent,
-        on_select: Callable[[str], None],
-        initial_category: str = ALL,
-        title_suffix: str = "",
-    ):
-        super().__init__(parent)
+    def _init_library(self, on_select: Optional[Callable[[str], None]], initial_category: str):
         self.on_select_callback = on_select
+        self._picker = on_select is not None
         self.selected_icon: Optional[IconItem] = None
-        self._ctk_image_cache: Dict[str, ctk.CTkImage] = {}
-        self._tiles: Dict[str, ctk.CTkButton] = {}
-        self._shown: list = []
-        self._columns = 0
         self._search_job = None
-        self._layout_job = None
-
-        dialog_title = "Icon Library"
-        if title_suffix:
-            dialog_title += f" - {title_suffix}"
-        self.title(dialog_title)
-        self.geometry("1040x680")
-        self.minsize(860, 520)
-
-        # Make modal
-        self.transient(parent)
-        self.grab_set()
+        self._backup_job = None
 
         if initial_category not in icon_manager.views:
             initial_category = ALL
@@ -71,6 +51,8 @@ class IconBrowserDialog(ctk.CTkToplevel):
         self._refresh_sidebar()
         self._refresh_icons()
         self._show_details(None)
+        self._refresh_backup_status()
+
 
     # ----- Layout -----
 
@@ -82,6 +64,9 @@ class IconBrowserDialog(ctk.CTkToplevel):
         top_row = ctk.CTkFrame(self, fg_color="transparent")
         top_row.grid(row=0, column=0, columnspan=3, sticky="ew", padx=16, pady=(14, 6))
         ctk.CTkLabel(top_row, text="Icon library", font=ctk.CTkFont(size=18, weight="bold")).pack(side="left")
+        self.lbl_backup = ctk.CTkLabel(top_row, text="", font=ctk.CTkFont(size=11), cursor="hand2")
+        self.lbl_backup.pack(side="left", padx=(14, 0))
+        self.lbl_backup.bind("<Button-1>", lambda e: self._open_backups())
 
         ctk.CTkButton(
             top_row, text="Make an icon…", width=130, fg_color="#8B5CF6", hover_color="#7C3AED",
@@ -91,10 +76,11 @@ class IconBrowserDialog(ctk.CTkToplevel):
             top_row, text="Import image…", width=120, font=ctk.CTkFont(size=12),
             command=self._import_image,
         ).pack(side="right", padx=(8, 0))
-        ctk.CTkButton(
+        self.btn_backups = ctk.CTkButton(
             top_row, text="Backups…", width=100, fg_color="gray30", hover_color="gray40",
             font=ctk.CTkFont(size=12), command=self._open_backups,
-        ).pack(side="right", padx=(8, 0))
+        )
+        self.btn_backups.pack(side="right", padx=(8, 0))
         ctk.CTkButton(
             top_row, text="Open my icons folder", width=150, fg_color="gray30", hover_color="gray40",
             font=ctk.CTkFont(size=12), command=self._open_custom_folder,
@@ -115,10 +101,8 @@ class IconBrowserDialog(ctk.CTkToplevel):
         self._sidebar_buttons: Dict[str, ctk.CTkButton] = {}
 
         # Icon grid
-        self.scroll_grid = ctk.CTkScrollableFrame(self, corner_radius=8)
-        self.scroll_grid.grid(row=2, column=1, sticky="nsew", pady=0)
-        self.scroll_grid._parent_canvas.bind("<Configure>", self._on_grid_resized, add="+")
-        self.empty_label = ctk.CTkLabel(self.scroll_grid, text="", font=ctk.CTkFont(size=14), text_color="gray60")
+        self.icon_grid = IconGrid(self, on_click=self._select_path, on_double=self._insert_path)
+        self.icon_grid.grid(row=2, column=1, sticky="nsew", pady=0)
 
         # Details panel
         self.details = ctk.CTkFrame(self, width=260, corner_radius=8)
@@ -126,9 +110,12 @@ class IconBrowserDialog(ctk.CTkToplevel):
         self.details.grid_propagate(False)
         self._build_details()
 
-        # Bottom bar
+        # Bottom bar; the Icons page has nothing to insert into, so it keeps the bar hidden
         bottom_bar = ctk.CTkFrame(self, fg_color="transparent")
-        bottom_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=16, pady=(8, 14))
+        if self._picker:
+            bottom_bar.grid(row=3, column=0, columnspan=3, sticky="ew", padx=16, pady=(8, 14))
+        else:
+            ctk.CTkFrame(self, height=6, fg_color="transparent").grid(row=3, column=0)
         self.preview_badge = ctk.CTkLabel(
             bottom_bar, text="No icon selected", font=ctk.CTkFont(size=13, weight="bold"), text_color="gray70",
         )
@@ -223,96 +210,32 @@ class IconBrowserDialog(ctk.CTkToplevel):
         self.entry_search.delete(0, "end")
         self._refresh_icons()
 
-    def _on_grid_resized(self, _event=None):
-        if self._layout_job:
-            self.after_cancel(self._layout_job)
-        self._layout_job = self.after(60, self._layout_tiles)
-
     def _get_thumbnail(self, file_path: str, size: int = 56) -> Optional[ctk.CTkImage]:
-        key = f"{file_path}@{size}"
-        if key in self._ctk_image_cache:
-            return self._ctk_image_cache[key]
-        try:
-            with Image.open(file_path) as src:
-                pil_img = src.convert("RGBA")
-            pil_img.thumbnail((size, size), Image.Resampling.LANCZOS)
-            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
-            self._ctk_image_cache[key] = ctk_img
-            return ctk_img
-        except Exception:
-            return None
+        img = thumbnail(file_path, size)
+        return ctk.CTkImage(light_image=img, dark_image=img, size=img.size) if img else None
 
-    def _tile_for(self, item: IconItem) -> ctk.CTkButton:
-        """Tiles are made once and reused, so filtering and searching stay quick."""
-        tile = self._tiles.get(item.file_path)
-        text = f"\n{self._short_title(item.title)}"
-        if tile is None:
-            # Light tiles: icons print black on white tape, so show them that way
-            tile = ctk.CTkButton(
-                self.scroll_grid, text=text, image=self._get_thumbnail(item.file_path, 52), compound="top",
-                width=TILE_W, height=TILE_H, corner_radius=8, fg_color=TILE_BG, hover_color=TILE_HOVER,
-                text_color="#222222", border_width=2, border_color=TILE_BG, font=ctk.CTkFont(size=11),
-                command=lambda p=item.file_path: self._select_path(p),
-            )
-            tile.bind("<Double-Button-1>", lambda e, p=item.file_path: (self._select_path(p), self._confirm_selection()))
-            self._tiles[item.file_path] = tile
-        else:
-            tile.configure(text=text)
-        selected = self.selected_icon is not None and self.selected_icon.file_path == item.file_path
-        tile.configure(border_color=TILE_SELECTED if selected else TILE_BG)
-        return tile
+    @property
+    def _shown(self) -> list:
+        return self.icon_grid.items
 
     def _refresh_icons(self):
         self._search_job = None
         category = self.category_var.get()
         query = self.entry_search.get()
-        self._shown = icon_manager.list_icons(category=category, search_query=query)
-        self._columns = 0  # force a new layout
-        self._layout_tiles()
-        self._reset_scroll_top()
-
-    def _layout_tiles(self):
-        self._layout_job = None
-        width = self.scroll_grid._parent_canvas.winfo_width()
-        cols = max(1, (width - 16) // (TILE_W + 12)) if width > 1 else 4
-        if cols == self._columns:
-            return
-        self._columns = cols
-
-        for child in self.scroll_grid.grid_slaves():
-            child.grid_forget()
-        for col_idx in range(12):
-            self.scroll_grid.grid_columnconfigure(col_idx, weight=1 if col_idx < cols else 0, uniform="col" if col_idx < cols else "")
-
-        if not self._shown:
-            query = self.entry_search.get().strip()
-            category = self.category_var.get()
-            if query:
-                text = f"No icons match “{query}” in {category}."
-            elif category == FAVOURITES:
-                text = "No favourites yet. Pick an icon and press ☆ to add it."
-            elif category == RECENT:
-                text = "Icons you insert show up here."
-            else:
-                text = f"No icons in {category} yet."
-            self.empty_label.configure(text=text)
-            self.empty_label.grid(row=0, column=0, columnspan=cols, pady=40)
-            return
-
-        for idx, item in enumerate(self._shown):
-            self._tile_for(item).grid(row=idx // cols, column=idx % cols, padx=6, pady=6, sticky="nsew")
-
-    def _reset_scroll_top(self):
-        try:
-            if hasattr(self.scroll_grid, "_parent_canvas"):
-                self.scroll_grid._parent_canvas.yview_moveto(0.0)
-        except Exception:
-            pass
+        shown = icon_manager.list_icons(category=category, search_query=query)
+        if query.strip():
+            message = f"No icons match “{query.strip()}” in {category}."
+        elif category == FAVOURITES:
+            message = "No favourites yet. Pick an icon and press ☆ to add it."
+        elif category == RECENT:
+            message = "Icons you insert show up here."
+        else:
+            message = f"No icons in {category} yet."
+        self.icon_grid.show(shown, message)
 
     @staticmethod
-    def _short_title(title: str, limit: int = TITLE_MAX_CHARS) -> str:
-        """Cuts long names at the end so the start of the name always shows."""
-        return title if len(title) <= limit else title[: limit - 1].rstrip() + "…"
+    def _short_title(title: str) -> str:
+        return short_title(title)
 
     # ----- Selection and details -----
 
@@ -324,16 +247,17 @@ class IconBrowserDialog(ctk.CTkToplevel):
     def _select_icon(self, icon: IconItem):
         previous = self.selected_icon
         self.selected_icon = icon
-        if previous and previous.file_path in self._tiles:
-            self._tiles[previous.file_path].configure(border_color=TILE_BG)
-        if icon.file_path in self._tiles:
-            self._tiles[icon.file_path].configure(border_color=TILE_SELECTED)
+        self.icon_grid.select(icon.file_path)
         self.preview_badge.configure(text=f"Selected: {icon.title}", text_color="#10B981")
         self.btn_use.configure(state="normal")
         self._show_details(icon)
 
     def _select_icon_by_path(self, path: str):
         self._select_path(path)
+
+    def _insert_path(self, path: str):
+        self._select_path(path)
+        self._confirm_selection()
 
     def _show_details(self, icon: Optional[IconItem]):
         if icon is None:
@@ -394,10 +318,8 @@ class IconBrowserDialog(ctk.CTkToplevel):
     def _after_library_change(self, select_path: Optional[str] = None):
         """Refreshes everything after the user's icons changed on disk."""
         self.selected_icon = None
-        for tile in self._tiles.values():
-            tile.destroy()
-        self._tiles.clear()
-        self._ctk_image_cache.clear()
+        self.icon_grid.select(None)
+        self.icon_grid.forget_pictures()
         self._refresh_sidebar()
         self._refresh_icons()
         if select_path:
@@ -450,8 +372,8 @@ class IconBrowserDialog(ctk.CTkToplevel):
         category = self.category_var.get()
         if category not in icon_manager.built_in_categories:
             category = USER_CATEGORY
-        editor = IconEditorDialog(self, on_saved=self._on_icon_saved, picture_path=picture_path,
-                                  category=category, icon=icon)
+        editor = IconEditorDialog(self.winfo_toplevel(), on_saved=self._on_icon_saved, picture_path=picture_path,
+                                  category=category, icon=icon, can_insert=self._picker)
         # The editor takes the input grab while it is open; take it back afterwards
         editor.bind("<Destroy>", lambda e: e.widget is editor and self.after(10, self._take_grab), add="+")
         return editor
@@ -459,11 +381,35 @@ class IconBrowserDialog(ctk.CTkToplevel):
     def _open_backups(self):
         from ui.backup_dialog import BackupDialog
 
-        dialog = BackupDialog(self, on_changed=self._after_library_change)
-        dialog.bind("<Destroy>", lambda e: e.widget is dialog and self.after(10, self._take_grab), add="+")
+        dialog = BackupDialog(self.winfo_toplevel(), on_changed=self._after_library_change)
+        dialog.bind("<Destroy>", lambda e: e.widget is dialog and self.after(10, self._after_backups_closed), add="+")
         return dialog
 
+    def _after_backups_closed(self):
+        self._refresh_backup_status()
+        self._take_grab()
+
+    def _refresh_backup_status(self):
+        """Shows whether automatic backup is on; checked again now and then, as backups run in the background."""
+        from ui.backup_dialog import backup_status
+
+        if self._backup_job:
+            self.after_cancel(self._backup_job)
+            self._backup_job = None
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        text, colour, on = backup_status()
+        self.lbl_backup.configure(text=text, text_color=colour)
+        self.btn_backups.configure(text="Backups ✓" if on else "Backups…")
+        self._backup_job = self.after(BACKUP_STATUS_MS, self._refresh_backup_status)
+
     def _take_grab(self):
+        # Only the picker window is modal; the Icons page lives in the main window
+        if not self._picker:
+            return
         try:
             if self.winfo_exists():
                 self.grab_set()
@@ -494,7 +440,68 @@ class IconBrowserDialog(ctk.CTkToplevel):
                     pass
 
     def _confirm_selection(self):
-        if self.selected_icon:
+        if self.selected_icon and self._picker:
             icon_manager.mark_used(self.selected_icon)
             self.on_select_callback(self.selected_icon.file_path)
             self.destroy()
+
+
+class IconBrowserDialog(_IconLibrary, ctk.CTkToplevel):
+    """Modal dialog allowing users to browse, search, and select icons."""
+
+    def __init__(
+        self,
+        parent,
+        on_select: Callable[[str], None],
+        initial_category: str = ALL,
+        title_suffix: str = "",
+    ):
+        super().__init__(parent)
+        dialog_title = "Icon Library"
+        if title_suffix:
+            dialog_title += f" - {title_suffix}"
+        self.title(dialog_title)
+        self.geometry("1040x680")
+        self.minsize(860, 520)
+
+        # Make modal
+        self.transient(parent)
+        self.grab_set()
+        self._init_library(on_select, initial_category)
+
+
+class IconLibraryPage(_IconLibrary, ctk.CTkFrame):
+    """The icon library as a page of the main window: browse, make, edit and back up icons."""
+
+    def __init__(self, master, **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self._init_library(None, ALL)
+        self._signature = self._user_icons_signature()
+
+    def refresh(self):
+        """Shows changes made elsewhere, e.g. an icon made from a label or a restored backup."""
+        icon_manager.reload()
+        signature = self._user_icons_signature()
+        if signature != getattr(self, "_signature", None):
+            self._signature = signature
+            path = self.selected_icon.file_path if self.selected_icon else None
+            self._after_library_change(path)
+        else:
+            # Favourites and recently used may have changed in the picker window
+            self._refresh_sidebar()
+            self._refresh_icons()
+            if self.selected_icon:
+                self.icon_grid.select(self.selected_icon.file_path)
+                self._update_fav_button(self.selected_icon)
+        self._refresh_backup_status()
+
+    @staticmethod
+    def _user_icons_signature():
+        """Changes whenever one of the user's icons is added, changed or removed."""
+        sig = []
+        for icon in icon_manager.user_icons():
+            try:
+                sig.append((icon.file_path, os.path.getmtime(icon.file_path), icon.title, icon.category))
+            except OSError:
+                pass
+        return tuple(sorted(sig))

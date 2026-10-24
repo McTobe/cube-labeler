@@ -58,8 +58,15 @@ LEGACY_DRIVES = {"Washer": "washer"}
 # Part icon dropdown -> renderer icon_type
 PART_ICONS = {
     "Bearing": "ball_bearing",
+    "Linear bearing": "linear_bearing",
+    "Spring": "spring",
     "WAGO": "wago",
+    "Terminal block": "terminal_block",
+    "JST": "jst",
     "Fuse": "fuse",
+    "Resistor": "resistor",
+    "Capacitor": "capacitor",
+    "LED": "led",
 }
 
 LAST_LABEL_KEY = "last_bin_label"
@@ -270,7 +277,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
 
         r = self._row(f, 3, "Icon")
         self.part_icon_combo = ctk.CTkComboBox(
-            r, values=self._part_icon_values(), width=110, state="readonly", command=self._on_part_icon_selected
+            r, values=self._part_icon_values(), width=140, state="readonly", command=self._on_part_icon_selected
         )
         self.part_icon_combo.pack(side="left")
         self.btn_lib_comp_icon, self.btn_pick_comp_icon = self._icon_buttons(

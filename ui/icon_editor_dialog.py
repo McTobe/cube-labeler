@@ -68,9 +68,12 @@ class IconEditorDialog(ctk.CTkToplevel):
         picture_path: Optional[str] = None,
         category: str = USER_CATEGORY,
         icon: Optional[IconItem] = None,
+        can_insert: bool = True,
     ):
         super().__init__(parent)
         self.on_saved = on_saved
+        # Opened from the Icons page there is no label to insert the icon into
+        self._can_insert = can_insert
         # The user's icon being edited; built-in icons are edited as a new copy
         self.editing: Optional[IconItem] = icon if icon is not None and icon.user else None
 
@@ -151,7 +154,8 @@ class IconEditorDialog(ctk.CTkToplevel):
             bottom, text="Save and insert", width=150, height=36, fg_color=OK_GREEN, hover_color="#059669",
             font=ctk.CTkFont(size=13, weight="bold"), command=lambda: self._save(insert=True),
         )
-        self.btn_save_insert.pack(side="right", padx=(8, 0))
+        if self._can_insert:
+            self.btn_save_insert.pack(side="right", padx=(8, 0))
         self.btn_save = ctk.CTkButton(
             bottom, text="Save", width=110, height=36, font=ctk.CTkFont(size=13, weight="bold"),
             command=lambda: self._save(insert=False),
