@@ -487,7 +487,12 @@ class IconLibraryPage(_IconLibrary, ctk.CTkFrame):
             path = self.selected_icon.file_path if self.selected_icon else None
             self._after_library_change(path)
         else:
+            # Favourites and recently used may have changed in the picker window
             self._refresh_sidebar()
+            self._refresh_icons()
+            if self.selected_icon:
+                self.icon_grid.select(self.selected_icon.file_path)
+                self._update_fav_button(self.selected_icon)
         self._refresh_backup_status()
 
     @staticmethod

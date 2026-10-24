@@ -303,6 +303,23 @@ class TestIconBrowser(unittest.TestCase):
         page.refresh()
         self.assertEqual(page.selected_icon.title, "M3 hex nut")
 
+    def test_icons_page_shows_favourites_made_in_the_picker(self):
+        with patch("ui.backup_dialog.backup_status", lambda: ("Auto-backup off", "gray", False)):
+            page = browser.IconLibraryPage(self.root)
+        self.addCleanup(page.destroy)
+        page._select_category(FAVOURITES)
+        torx = self.mgr.get_icon_by_id("torx")
+        page._select_path(torx.file_path)
+        self.assertEqual(page._shown, [])
+        dlg = self._open()
+        dlg._select_path(torx.file_path)
+        dlg._toggle_favourite()
+        dlg.destroy()
+        page.refresh()
+        self.assertEqual([i.id for i in page._shown], ["torx"])
+        self.assertIn("(1)", page._sidebar_buttons[FAVOURITES].cget("text"))
+        self.assertIn("★", page.btn_fav.cget("text"))
+
     def test_picker_shows_backup_status(self):
         dlg = self._open()
         with patch("ui.backup_dialog.backup_status", lambda: ("● Auto-backup on: OneDrive", "green", True)):
