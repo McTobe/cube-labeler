@@ -19,15 +19,11 @@ from core.icon_manager import (
     icon_manager, IconItem, parse_keywords, print_preview,
 )
 from core.config import config_manager
+from ui.icon_grid import IconGrid, TILE_BG, short_title, thumbnail
 # Imported here so automatic backups follow every change made in the library
 from core.backup import auto_backup  # noqa: F401
 
-TILE_BG = "#F5F5F5"
-TILE_HOVER = "#E3E3E3"
 TILE_SELECTED = "#1F6AA5"
-TITLE_MAX_CHARS = 20
-TILE_W = 122
-TILE_H = 104
 SEARCH_DELAY_MS = 180
 PREVIEW_SIZE = 112
 BACKUP_STATUS_MS = 5000
@@ -44,12 +40,7 @@ class _IconLibrary:
         self.on_select_callback = on_select
         self._picker = on_select is not None
         self.selected_icon: Optional[IconItem] = None
-        self._ctk_image_cache: Dict[str, ctk.CTkImage] = {}
-        self._tiles: Dict[str, ctk.CTkButton] = {}
-        self._shown: list = []
-        self._columns = 0
         self._search_job = None
-        self._layout_job = None
         self._backup_job = None
 
         if initial_category not in icon_manager.views:
@@ -110,10 +101,8 @@ class _IconLibrary:
         self._sidebar_buttons: Dict[str, ctk.CTkButton] = {}
 
         # Icon grid
-        self.scroll_grid = ctk.CTkScrollableFrame(self, corner_radius=8)
-        self.scroll_grid.grid(row=2, column=1, sticky="nsew", pady=0)
-        self.scroll_grid._parent_canvas.bind("<Configure>", self._on_grid_resized, add="+")
-        self.empty_label = ctk.CTkLabel(self.scroll_grid, text="", font=ctk.CTkFont(size=14), text_color="gray60")
+        self.icon_grid = IconGrid(self, on_click=self._select_path, on_double=self._insert_path)
+        self.icon_grid.grid(row=2, column=1, sticky="nsew", pady=0)
 
         # Details panel
         self.details = ctk.CTkFrame(self, width=260, corner_radius=8)
@@ -221,96 +210,32 @@ class _IconLibrary:
         self.entry_search.delete(0, "end")
         self._refresh_icons()
 
-    def _on_grid_resized(self, _event=None):
-        if self._layout_job:
-            self.after_cancel(self._layout_job)
-        self._layout_job = self.after(60, self._layout_tiles)
-
     def _get_thumbnail(self, file_path: str, size: int = 56) -> Optional[ctk.CTkImage]:
-        key = f"{file_path}@{size}"
-        if key in self._ctk_image_cache:
-            return self._ctk_image_cache[key]
-        try:
-            with Image.open(file_path) as src:
-                pil_img = src.convert("RGBA")
-            pil_img.thumbnail((size, size), Image.Resampling.LANCZOS)
-            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
-            self._ctk_image_cache[key] = ctk_img
-            return ctk_img
-        except Exception:
-            return None
+        img = thumbnail(file_path, size)
+        return ctk.CTkImage(light_image=img, dark_image=img, size=img.size) if img else None
 
-    def _tile_for(self, item: IconItem) -> ctk.CTkButton:
-        """Tiles are made once and reused, so filtering and searching stay quick."""
-        tile = self._tiles.get(item.file_path)
-        text = f"\n{self._short_title(item.title)}"
-        if tile is None:
-            # Light tiles: icons print black on white tape, so show them that way
-            tile = ctk.CTkButton(
-                self.scroll_grid, text=text, image=self._get_thumbnail(item.file_path, 52), compound="top",
-                width=TILE_W, height=TILE_H, corner_radius=8, fg_color=TILE_BG, hover_color=TILE_HOVER,
-                text_color="#222222", border_width=2, border_color=TILE_BG, font=ctk.CTkFont(size=11),
-                command=lambda p=item.file_path: self._select_path(p),
-            )
-            tile.bind("<Double-Button-1>", lambda e, p=item.file_path: (self._select_path(p), self._confirm_selection()))
-            self._tiles[item.file_path] = tile
-        else:
-            tile.configure(text=text)
-        selected = self.selected_icon is not None and self.selected_icon.file_path == item.file_path
-        tile.configure(border_color=TILE_SELECTED if selected else TILE_BG)
-        return tile
+    @property
+    def _shown(self) -> list:
+        return self.icon_grid.items
 
     def _refresh_icons(self):
         self._search_job = None
         category = self.category_var.get()
         query = self.entry_search.get()
-        self._shown = icon_manager.list_icons(category=category, search_query=query)
-        self._columns = 0  # force a new layout
-        self._layout_tiles()
-        self._reset_scroll_top()
-
-    def _layout_tiles(self):
-        self._layout_job = None
-        width = self.scroll_grid._parent_canvas.winfo_width()
-        cols = max(1, (width - 16) // (TILE_W + 12)) if width > 1 else 4
-        if cols == self._columns:
-            return
-        self._columns = cols
-
-        for child in self.scroll_grid.grid_slaves():
-            child.grid_forget()
-        for col_idx in range(12):
-            self.scroll_grid.grid_columnconfigure(col_idx, weight=1 if col_idx < cols else 0, uniform="col" if col_idx < cols else "")
-
-        if not self._shown:
-            query = self.entry_search.get().strip()
-            category = self.category_var.get()
-            if query:
-                text = f"No icons match “{query}” in {category}."
-            elif category == FAVOURITES:
-                text = "No favourites yet. Pick an icon and press ☆ to add it."
-            elif category == RECENT:
-                text = "Icons you insert show up here."
-            else:
-                text = f"No icons in {category} yet."
-            self.empty_label.configure(text=text)
-            self.empty_label.grid(row=0, column=0, columnspan=cols, pady=40)
-            return
-
-        for idx, item in enumerate(self._shown):
-            self._tile_for(item).grid(row=idx // cols, column=idx % cols, padx=6, pady=6, sticky="nsew")
-
-    def _reset_scroll_top(self):
-        try:
-            if hasattr(self.scroll_grid, "_parent_canvas"):
-                self.scroll_grid._parent_canvas.yview_moveto(0.0)
-        except Exception:
-            pass
+        shown = icon_manager.list_icons(category=category, search_query=query)
+        if query.strip():
+            message = f"No icons match “{query.strip()}” in {category}."
+        elif category == FAVOURITES:
+            message = "No favourites yet. Pick an icon and press ☆ to add it."
+        elif category == RECENT:
+            message = "Icons you insert show up here."
+        else:
+            message = f"No icons in {category} yet."
+        self.icon_grid.show(shown, message)
 
     @staticmethod
-    def _short_title(title: str, limit: int = TITLE_MAX_CHARS) -> str:
-        """Cuts long names at the end so the start of the name always shows."""
-        return title if len(title) <= limit else title[: limit - 1].rstrip() + "…"
+    def _short_title(title: str) -> str:
+        return short_title(title)
 
     # ----- Selection and details -----
 
@@ -322,16 +247,17 @@ class _IconLibrary:
     def _select_icon(self, icon: IconItem):
         previous = self.selected_icon
         self.selected_icon = icon
-        if previous and previous.file_path in self._tiles:
-            self._tiles[previous.file_path].configure(border_color=TILE_BG)
-        if icon.file_path in self._tiles:
-            self._tiles[icon.file_path].configure(border_color=TILE_SELECTED)
+        self.icon_grid.select(icon.file_path)
         self.preview_badge.configure(text=f"Selected: {icon.title}", text_color="#10B981")
         self.btn_use.configure(state="normal")
         self._show_details(icon)
 
     def _select_icon_by_path(self, path: str):
         self._select_path(path)
+
+    def _insert_path(self, path: str):
+        self._select_path(path)
+        self._confirm_selection()
 
     def _show_details(self, icon: Optional[IconItem]):
         if icon is None:
@@ -392,10 +318,8 @@ class _IconLibrary:
     def _after_library_change(self, select_path: Optional[str] = None):
         """Refreshes everything after the user's icons changed on disk."""
         self.selected_icon = None
-        for tile in self._tiles.values():
-            tile.destroy()
-        self._tiles.clear()
-        self._ctk_image_cache.clear()
+        self.icon_grid.select(None)
+        self.icon_grid.forget_pictures()
         self._refresh_sidebar()
         self._refresh_icons()
         if select_path:

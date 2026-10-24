@@ -73,9 +73,11 @@ class TestTemplatesView(unittest.TestCase):
         path = tp.save_user_template(LabelConfig(text="x"), "Drawer", folder)
         view.refresh_user_templates()
         self.assertEqual(list(view.user_rows), ["Drawer"])
-        buttons = {w.cget("text"): w for w in view.user_rows["Drawer"].winfo_children()
-                   if hasattr(w, "invoke")}
-        buttons["Open"].invoke()
+        card = view.user_rows["Drawer"]
+        widgets = card.winfo_children() + [w for c in card.winfo_children() for w in c.winfo_children()]
+        buttons = {w.cget("text"): w for w in widgets if hasattr(w, "invoke")}
+        self.assertIsNotNone(buttons[""].cget("image"), "the card shows a picture of the label")
+        buttons[""].invoke()
         self.assertEqual(opened, [path])
         with patch("tkinter.messagebox.askyesno", return_value=True):
             buttons["Delete"].invoke()

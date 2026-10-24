@@ -7,21 +7,44 @@ opening template files.
 import os
 import re
 import sys
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Tuple
 
 import customtkinter as ctk
 from PIL import Image
 
-from ui.templates import BUILTIN_PRESETS, delete_user_template, list_user_templates
+from ui.templates import BUILTIN_PRESETS, delete_user_template, list_user_templates, load_config_from_json
 from ui.widgets import MUTED_TEXT
 
 CARD_IMAGE_SIZE = (220, 70)
 COLUMNS = 3
+USER_CARD_IMAGE_SIZE = (150, 48)
+USER_COLUMNS = 4
+
+# Pictures of saved templates: (path, modified time) -> picture, or None when it can't be drawn
+_user_previews: Dict[Tuple[str, float], Optional[Image.Image]] = {}
 
 
 def _assets_dir() -> str:
     base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     return os.path.join(base, "assets")
+
+
+def user_template_preview(path: str) -> Optional[Image.Image]:
+    """A picture of a saved template, drawn the way the label prints; drawn again only after it changes."""
+    try:
+        key = (path, os.path.getmtime(path))
+    except OSError:
+        return None
+    if key not in _user_previews:
+        try:
+            from core.label_renderer import LabelRenderer
+
+            img = LabelRenderer().render(load_config_from_json(path))[0].convert("RGB")
+            img.thumbnail(USER_CARD_IMAGE_SIZE, Image.Resampling.LANCZOS)
+        except Exception:
+            img = None
+        _user_previews[key] = img
+    return _user_previews[key]
 
 
 def preview_path_for(preset_key: str) -> str:
@@ -108,21 +131,42 @@ class TemplatesView(ctk.CTkFrame):
                 text_color=MUTED_TEXT,
             ).pack(fill="x", padx=2)
             return
-        for name, path in templates:
-            row = ctk.CTkFrame(self.user_list, corner_radius=8)
-            row.pack(fill="x", pady=2)
-            ctk.CTkLabel(row, text=name, anchor="w", font=ctk.CTkFont(size=13)).pack(
-                side="left", fill="x", expand=True, padx=12, pady=6
-            )
-            ctk.CTkButton(
-                row, text="Delete", width=70, height=26, fg_color="gray30", hover_color="#B91C1C",
-                command=lambda n=name, p=path: self._delete(n, p),
-            ).pack(side="right", padx=(4, 8))
-            ctk.CTkButton(
-                row, text="Open", width=70, height=26,
-                command=lambda p=path: self._on_open_user and self._on_open_user(p),
-            ).pack(side="right")
-            self.user_rows[name] = row
+        for col in range(USER_COLUMNS):
+            self.user_list.grid_columnconfigure(col, weight=1, uniform="user_card")
+        for idx, (name, path) in enumerate(templates):
+            card = self._make_user_card(name, path)
+            card.grid(row=idx // USER_COLUMNS, column=idx % USER_COLUMNS, padx=5, pady=5, sticky="nsew")
+            self.user_rows[name] = card
+
+    def _make_user_card(self, name: str, path: str):
+        card = ctk.CTkFrame(self.user_list, corner_radius=10)
+        # Like the starting points, clicking the picture opens the template
+        img = user_template_preview(path)
+        image = ctk.CTkImage(light_image=img, dark_image=img, size=img.size) if img else None
+        self._images[path] = image
+        open_template = lambda p=path: self._on_open_user and self._on_open_user(p)
+
+        ctk.CTkButton(
+            card,
+            text="" if image else "No preview",
+            image=image,
+            height=64,
+            fg_color=("gray85", "gray20"),
+            hover_color=("gray78", "gray28"),
+            text_color=MUTED_TEXT,
+            command=open_template,
+        ).pack(fill="x", padx=6, pady=(6, 4))
+        footer = ctk.CTkFrame(card, fg_color="transparent")
+        footer.pack(fill="x", padx=6, pady=(0, 6))
+        ctk.CTkButton(
+            footer, text="Delete", width=54, height=24, fg_color="gray30", hover_color="#B91C1C",
+            font=ctk.CTkFont(size=11), command=lambda n=name, p=path: self._delete(n, p),
+        ).pack(side="right")
+        short = name if len(name) <= 22 else name[:21].rstrip() + "…"
+        ctk.CTkLabel(footer, text=short, anchor="w", font=ctk.CTkFont(size=12, weight="bold")).pack(
+            side="left", fill="x", expand=True, padx=(4, 4)
+        )
+        return card
 
     def _delete(self, name: str, path: str):
         from tkinter import messagebox
