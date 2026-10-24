@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { useStore } from './state.js';
-import { app, boot } from './app.js';
+import { app, boot, updateLabel } from './app.js';
 import { useWide } from './ui.js';
 
 const ZOOMS = [['fit', 'Fit'], ['2', '2×'], ['4', '4×']];
@@ -28,7 +28,7 @@ function useFitWidth(stageRef, natural, wide) {
 }
 
 export function Preview() {
-  const { render, renderError } = useStore(app);
+  const { render, renderError, label } = useStore(app);
   const { phase, text, error } = useStore(boot);
   const [view, setView] = useState('tape');
   const [zoom, setZoom] = useState('fit');
@@ -68,6 +68,13 @@ export function Preview() {
         <span class="chip-group" role="group" aria-label="Preview view">
           <button class=${view === 'tape' ? 'on' : ''} onClick=${() => setView('tape')}>Tape</button>
           <button class=${view === 'dots' ? 'on' : ''} onClick=${() => setView('dots')}>Print dots</button>
+        </span>
+        <span class="chip-group" role="group" aria-label="Measuring aids">
+          <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}
+            onClick=${() => updateLabel({ show_rulers: !label.show_rulers })}>Rulers</button>
+          <button class=${label.show_guides ? 'on' : ''} aria-pressed=${label.show_guides}
+            title="Shows the part of the tape the printer can print on"
+            onClick=${() => updateLabel({ show_guides: !label.show_guides })}>Printable area</button>
         </span>
         <span class="chip-group" role="group" aria-label="Zoom">
           ${ZOOMS.map(([value, name]) => html`<button class=${zoom === value ? 'on' : ''} onClick=${() => setZoom(value)}>${name}</button>`)}

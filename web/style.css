@@ -464,7 +464,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 
 .metrics { font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.preview-controls { display: flex; gap: 8px; }
+.preview-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .chip-group { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .chip-group button { border: none; background: none; padding: 4px 9px; font-size: 0.8rem; color: var(--muted); min-height: 30px; }

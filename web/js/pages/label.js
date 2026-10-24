@@ -310,8 +310,7 @@ function AdvancedSection() {
       onChange=${(stroke_width) => updateLabel({ stroke_width })} />
     <${Slider} label="Darkness cutoff" min=${20} max=${220} step=${5} value=${label.threshold}
       onChange=${(threshold) => updateLabel({ threshold })} />
-    <${Toggle} label="Show printable area" checked=${label.show_guides} onChange=${(show_guides) => updateLabel({ show_guides })} />
-    <${Toggle} label="Show rulers" checked=${label.show_rulers} onChange=${(show_rulers) => updateLabel({ show_rulers })} />
+
     <button class="secondary" onClick=${() => { if (confirm('Reset font, size, QR code, picture and tape settings? Your text is kept.')) resetLabelSettings(); }}>Reset settings</button>
   <//>`;
 }
