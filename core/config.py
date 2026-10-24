@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Application configuration manager for Cube Labeler.
-Persists settings (Gemini API key, custom directories, defaults) to ~/.printlabel/config.json.
+Persists settings (AI API keys, custom directories, defaults) to ~/.printlabel/config.json.
 """
 
 import os
@@ -77,34 +77,59 @@ class ConfigManager:
         self._config[key] = value
         self.save()
 
+    # --- AI picture services: one API key and model per service ---
+
     @property
-    def gemini_api_key(self) -> str:
-        # Encrypted key first, then a plain-text key (non-Windows), then GEMINI_API_KEY
-        key = secret_store.unprotect(str(self._config.get("gemini_api_key_protected") or "")) or ""
+    def ai_provider(self) -> str:
+        return str(self._config.get("ai_provider") or "gemini")
+
+    @ai_provider.setter
+    def ai_provider(self, value: str):
+        self._config["ai_provider"] = value
+        self.save()
+
+    def api_key(self, provider: str) -> str:
+        # Encrypted key first, then a plain-text key (non-Windows), then e.g. GEMINI_API_KEY
+        key = secret_store.unprotect(str(self._config.get(f"{provider}_api_key_protected") or "")) or ""
         if not key:
-            key = str(self._config.get("gemini_api_key") or "")
+            key = str(self._config.get(f"{provider}_api_key") or "")
         if not key.strip():
-            key = os.environ.get("GEMINI_API_KEY", "")
+            key = os.environ.get(f"{provider.upper()}_API_KEY", "")
         return key.strip()
 
-    @gemini_api_key.setter
-    def gemini_api_key(self, value: str):
+    def set_api_key(self, provider: str, value: str):
         value = (value or "").strip()
         token = secret_store.protect(value) if value else None
         if token:
-            self._config["gemini_api_key_protected"] = token
-            self._config["gemini_api_key"] = ""
+            self._config[f"{provider}_api_key_protected"] = token
+            self._config[f"{provider}_api_key"] = ""
         else:
-            self._config["gemini_api_key_protected"] = ""
-            self._config["gemini_api_key"] = value
+            self._config[f"{provider}_api_key_protected"] = ""
+            self._config[f"{provider}_api_key"] = value
+        self.save()
+
+    def ai_model(self, provider: str) -> str:
+        """The model chosen for a service, or "" for the service's default."""
+        model = str(self._config.get(f"{provider}_model") or "").strip()
+        if provider == "gemini" and model == _LEGACY_TEXT_MODEL_DEFAULT:
+            return ""
+        return model
+
+    def set_ai_model(self, provider: str, value: str):
+        self._config[f"{provider}_model"] = (value or "").strip()
         self.save()
 
     @property
+    def gemini_api_key(self) -> str:
+        return self.api_key("gemini")
+
+    @gemini_api_key.setter
+    def gemini_api_key(self, value: str):
+        self.set_api_key("gemini", value)
+
+    @property
     def gemini_model(self) -> str:
-        model = str(self._config.get("gemini_model") or "").strip()
-        if not model or model == _LEGACY_TEXT_MODEL_DEFAULT:
-            return DEFAULT_GEMINI_IMAGE_MODEL
-        return model
+        return self.ai_model("gemini") or DEFAULT_GEMINI_IMAGE_MODEL
 
     @property
     def last_serial_port(self) -> str:

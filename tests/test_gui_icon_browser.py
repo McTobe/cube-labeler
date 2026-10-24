@@ -9,6 +9,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -216,7 +217,48 @@ class TestIconBrowser(unittest.TestCase):
         ed = self._editor(dlg)
         self.assertIsNone(ed.source)
         self.assertEqual(str(ed.btn_save.cget("state")), "disabled")
-        self.assertEqual(str(ed.btn_gem_photo.cget("state")), "disabled")
+        self.assertEqual(str(ed.btn_ai.cget("state")), "disabled")
+
+    def test_custom_preset_shows_its_text_box(self):
+        ed = self._editor(self._open())
+        self.assertEqual(ed.entry_custom.winfo_manager(), "")
+        ed.preset_menu.set(editor.CUSTOM)
+        ed._on_preset(editor.CUSTOM)
+        ed.update()
+        self.assertEqual(ed.entry_custom.winfo_manager(), "pack")
+        ed.preset_menu.set("Bold line drawing")
+        ed._on_preset("Bold line drawing")
+        ed.update()
+        self.assertEqual(ed.entry_custom.winfo_manager(), "")
+
+    def test_redraw_with_the_chosen_service(self):
+        calls = []
+
+        class FakeProvider:
+            id, name, api_key = "openai", "OpenAI", "sk-test"
+
+            def redraw(self, picture, preset, custom):
+                calls.append((picture.size, preset, custom))
+                return Image.new("RGB", (64, 64), "black")
+
+        with patch.object(editor, "current_provider", FakeProvider):
+            ed = self._editor(self._open(), picture_path=self._picture())
+            self.assertEqual(ed.lbl_ai_title.cget("text"), "Redraw it with OpenAI")
+            ed.preset_menu.set(editor.CUSTOM)
+            ed._on_preset(editor.CUSTOM)
+            with patch.object(editor.messagebox, "showinfo") as told:
+                ed._redraw_with_ai()
+            told.assert_called_once()
+            ed.entry_custom.insert(0, "keep it round")
+            ed._redraw_with_ai()
+            for _ in range(50):
+                ed.update()
+                if not ed._busy:
+                    break
+                time.sleep(0.02)
+        self.assertEqual(calls, [((200, 160), editor.CUSTOM, "keep it round")])
+        self.assertIn("OpenAI's icon is ready", ed.lbl_status.cget("text"))
+        self.assertIsNotNone(ed._picture_before_ai)
 
 
 if __name__ == "__main__":
