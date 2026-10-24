@@ -327,7 +327,31 @@ class ImageProvider:
         raise last_err or RuntimeError(f"{self.name} could not make the icon.")
 
     def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
+        req = self.request(picture, prompt, model)
+        try:
+            res = _post(req["url"], req["body"], {**req["headers"], **self.auth_headers(self.api_key)}, self.name)
+        except _HttpError as e:
+            raise self.http_error(e.code, e.body, str(e), model)
+        return self.read_answer(res, model)
+
+    # The pieces of a request, so the web version can send it from the browser itself
+
+    def request(self, picture: Image.Image, prompt: str, model: str) -> Dict[str, object]:
+        """The request for one model: {"url", "headers" (without the key), "body" as bytes}."""
         raise NotImplementedError
+
+    def auth_headers(self, api_key: str) -> Dict[str, str]:
+        return {"Authorization": f"Bearer {api_key}"}
+
+    def read_answer(self, res: dict, model: str) -> Image.Image:
+        """The picture in the service's answer."""
+        return _picture_from_images_api(res, self.name)
+
+    def http_error(self, code: int, body: str, message: str, model: str) -> Exception:
+        """The error to raise for an HTTP error; ModelNotFoundError makes redraw try the next model."""
+        if code == 404:
+            return ModelNotFoundError(f"{self.name} model '{model}' was not found: {message}")
+        return RuntimeError(message)
 
 
 class GeminiProvider(ImageProvider):
@@ -350,25 +374,35 @@ class GeminiProvider(ImageProvider):
 
     def _call_gemini_rest(self, model: str, payload: dict) -> dict:
         # The key goes in a header, never the URL, so it cannot leak through logs or proxies
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         try:
-            return _post(url, json.dumps(payload).encode("utf-8"),
-                         {"Content-Type": "application/json", "x-goog-api-key": self.api_key}, "Gemini")
+            return _post(self._url(model), json.dumps(payload).encode("utf-8"),
+                         {"Content-Type": "application/json", **self.auth_headers(self.api_key)}, "Gemini")
         except _HttpError as e:
-            if e.code == 429 or "limit: 0" in e.body or "quota" in e.body.lower():
-                raise RuntimeError(
-                    "Google AI Studio Quota Limit (Free Tier):\n"
-                    "Google currently requires a billing account enabled on your AI Studio / Google Cloud project "
-                    "for direct image-generation models (the free-tier quota for *-image models is set to 0 by Google).\n\n"
-                    "Free alternative: make the picture in Gemini on the web (gemini.google.com), "
-                    "save or copy it, then open or paste it in the icon editor."
-                )
-            if e.code == 404:
-                raise ModelNotFoundError(f"Gemini model '{model}' was not found: {e}")
-            raise RuntimeError(str(e))
+            raise self.http_error(e.code, e.body, str(e), model)
 
-    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
-        payload = {
+    @staticmethod
+    def _url(model: str) -> str:
+        return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+    def auth_headers(self, api_key: str) -> Dict[str, str]:
+        return {"x-goog-api-key": api_key}
+
+    def http_error(self, code: int, body: str, message: str, model: str) -> Exception:
+        if code == 429 or "limit: 0" in body or "quota" in body.lower():
+            return RuntimeError(
+                "Google AI Studio Quota Limit (Free Tier):\n"
+                "Google currently requires a billing account enabled on your AI Studio / Google Cloud project "
+                "for direct image-generation models (the free-tier quota for *-image models is set to 0 by Google).\n\n"
+                "Free alternative: make the picture in Gemini on the web (gemini.google.com), "
+                "save or copy it, then open or paste it in the icon editor."
+            )
+        if code == 404:
+            return ModelNotFoundError(f"Gemini model '{model}' was not found: {message}")
+        return RuntimeError(message)
+
+    @staticmethod
+    def _payload(picture: Image.Image, prompt: str) -> dict:
+        return {
             "contents": [{"parts": [
                 {"text": prompt},
                 {"inline_data": {"mime_type": "image/jpeg",
@@ -376,7 +410,15 @@ class GeminiProvider(ImageProvider):
             ]}],
             "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
         }
-        res = self._call_gemini_rest(model, payload)
+
+    def request(self, picture: Image.Image, prompt: str, model: str) -> Dict[str, object]:
+        return {"url": self._url(model), "headers": {"Content-Type": "application/json"},
+                "body": json.dumps(self._payload(picture, prompt)).encode("utf-8")}
+
+    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
+        return self.read_answer(self._call_gemini_rest(model, self._payload(picture, prompt)), model)
+
+    def read_answer(self, res: dict, model: str) -> Image.Image:
         candidates = res.get("candidates", [])
         if not candidates:
             raise RuntimeError(f"No picture came back from {model}.")
@@ -404,7 +446,7 @@ class OpenAIProvider(ImageProvider):
     default_model = "gpt-image-2"
     fallback_models = ["gpt-image-1.5", "gpt-image-1"]
 
-    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
+    def request(self, picture: Image.Image, prompt: str, model: str) -> Dict[str, object]:
         boundary = f"----CubeLabeler{uuid.uuid4().hex}"
         fields = [("model", model), ("prompt", prompt), ("size", "1024x1024")]
         body = io.BytesIO()
@@ -415,16 +457,13 @@ class OpenAIProvider(ImageProvider):
                    "Content-Type: image/png\r\n\r\n".encode("utf-8"))
         body.write(_picture_bytes(picture, "PNG"))
         body.write(f"\r\n--{boundary}--\r\n".encode("utf-8"))
-        try:
-            res = _post("https://api.openai.com/v1/images/edits", body.getvalue(), {
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "Authorization": f"Bearer {self.api_key}",
-            }, "OpenAI")
-        except _HttpError as e:
-            if e.code == 404 or "model_not_found" in e.body or "does not exist" in e.body:
-                raise ModelNotFoundError(f"OpenAI model '{model}' was not found: {e}")
-            raise RuntimeError(str(e))
-        return _picture_from_images_api(res, "OpenAI")
+        return {"url": "https://api.openai.com/v1/images/edits",
+                "headers": {"Content-Type": f"multipart/form-data; boundary={boundary}"}, "body": body.getvalue()}
+
+    def http_error(self, code: int, body: str, message: str, model: str) -> Exception:
+        if code == 404 or "model_not_found" in body or "does not exist" in body:
+            return ModelNotFoundError(f"OpenAI model '{model}' was not found: {message}")
+        return RuntimeError(message)
 
 
 class OpenRouterProvider(ImageProvider):
@@ -435,23 +474,15 @@ class OpenRouterProvider(ImageProvider):
                 "Any image model that takes a picture works, e.g. openai/gpt-image-2.")
     default_model = "google/gemini-2.5-flash-image"
 
-    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
+    def request(self, picture: Image.Image, prompt: str, model: str) -> Dict[str, object]:
         data_url = "data:image/png;base64," + base64.b64encode(_picture_bytes(picture, "PNG")).decode("ascii")
         payload = {
             "model": model,
             "prompt": prompt,
             "input_references": [{"type": "image_url", "image_url": {"url": data_url}}],
         }
-        try:
-            res = _post("https://openrouter.ai/api/v1/images", json.dumps(payload).encode("utf-8"), {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            }, "OpenRouter")
-        except _HttpError as e:
-            if e.code == 404:
-                raise ModelNotFoundError(f"OpenRouter model '{model}' was not found: {e}")
-            raise RuntimeError(str(e))
-        return _picture_from_images_api(res, "OpenRouter")
+        return {"url": "https://openrouter.ai/api/v1/images", "headers": {"Content-Type": "application/json"},
+                "body": json.dumps(payload).encode("utf-8")}
 
 
 PROVIDERS: Dict[str, ImageProvider] = {p.id: p for p in (GeminiProvider(), OpenAIProvider(), OpenRouterProvider())}

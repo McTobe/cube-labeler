@@ -895,3 +895,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 @media (max-width: 640px) {
   .templates-page .page-head { flex-direction: column; align-items: stretch; }
 }
+.key-row { display: flex; gap: 8px; }
+.key-row input { flex: 1; min-width: 0; font-family: ui-monospace, monospace; }
+.ai-box { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--raised); display: grid; gap: 8px; }
+.ai-box h4 { font-size: 0.9rem; }
+.ai-box .primary { width: 100%; }

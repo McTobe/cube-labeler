@@ -40,6 +40,8 @@ export const DEFAULT_LABEL = {
 };
 
 export const DEFAULT_SETTINGS = {
+  ai_provider: 'gemini',
+  ai_models: {},
   theme: 'system',  // 'system', 'light', 'dark'
   match_printer_tape: true,
   label_language: 'en',  // words suggested for bin labels
@@ -351,6 +353,13 @@ export const templateToDesktop = (item) => py.template_to_desktop(item);
 export const makeBackup = (data) => py.make_backup(data);
 export const openBackup = (data) => py.open_backup(data);
 export const pythonReady = () => py !== null;
+
+// --- AI icons ------------------------------------------------------------------------------
+
+export const aiServices = () => py.ai_services();
+export const aiModels = (service, model) => py.ai_models(service, model);
+export const aiRequest = (service, picture, preset, custom, model) => py.ai_request(service, picture, preset, custom, model);
+export const aiAnswer = (service, model, status, body) => py.ai_answer(service, model, status, body);
 
 // --- Printer -------------------------------------------------------------------------------
 

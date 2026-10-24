@@ -10,6 +10,8 @@ import { downloadBlob } from './ui.js';
 // Settings of the web version go in a backup with this prefix; the desktop app keeps them unused
 const WEB_PREFIX = 'web_';
 const WEB_SETTINGS = ['theme', 'match_printer_tape'];
+// AI settings shared with the desktop app (the keys never go in a backup)
+const AI_SERVICES = ['gemini', 'openai', 'openrouter'];
 
 function localTime(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -25,6 +27,8 @@ async function backupSettings() {
   const { settings } = app.get();
   const out = { ...desktop, label_language: settings.label_language };
   for (const key of WEB_SETTINGS) out[WEB_PREFIX + key] = settings[key];
+  out.ai_provider = settings.ai_provider;
+  for (const [service, model] of Object.entries(settings.ai_models || {})) out[`${service}_model`] = model;
   out.icon_favourites = library.get().favourites;
   out.icon_recent = library.get().recent;
   return out;
@@ -79,10 +83,18 @@ export async function restoreBackup(opened, parts, onConflict) {
     const s = opened.settings;
     const desktop = {};
     const change = {};
+    const models = { ...app.get().settings.ai_models };
     for (const [key, value] of Object.entries(s)) {
+      const service = key.endsWith('_model') ? key.slice(0, -'_model'.length) : null;
       if (key.startsWith(WEB_PREFIX) && WEB_SETTINGS.includes(key.slice(WEB_PREFIX.length))) change[key.slice(WEB_PREFIX.length)] = value;
+      else if (AI_SERVICES.includes(service)) {
+        // Older desktop versions saved a text-only Gemini model that cannot draw
+        if (typeof value === 'string' && value !== 'gemini-2.5-flash') models[service] = value;
+      }
+      else if (key === 'ai_provider') { if (AI_SERVICES.includes(value)) change.ai_provider = value; }
       else if (key !== 'icon_favourites' && key !== 'icon_recent' && key !== 'label_language') desktop[key] = value;
     }
+    change.ai_models = models;
     if (typeof s.label_language === 'string') change.label_language = s.label_language;
     if (!['system', 'light', 'dark'].includes(change.theme)) delete change.theme;
     if ('match_printer_tape' in change) change.match_printer_tape = !!change.match_printer_tape;

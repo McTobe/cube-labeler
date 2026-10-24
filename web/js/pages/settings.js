@@ -5,6 +5,7 @@ import { Segmented, Select, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateSettings } from '../app.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
+import { ai, loadAi, setKey, setModel } from '../ai.js';
 import { errorMessage } from '../../printer.js';
 import { PrinterPanel } from '../printer-ui.js';
 import { APP_VERSION } from '../version.js';
@@ -133,6 +134,40 @@ function BackupCard() {
   </section>`;
 }
 
+function AiCard() {
+  const { phase } = useStore(boot);
+  const { settings } = useStore(app);
+  const state = useStore(ai);
+  const [shown, setShown] = useState(false);
+  useEffect(() => { if (phase === 'ready') loadAi(); }, [phase]);
+  if (!state.ready) return null;
+  const service = state.services.find((s) => s.id === settings.ai_provider) || state.services[0];
+  const key = state.keys[service.id] || '';
+  return html`<section class="card" id="ai">
+    <h2 class="card-title">AI icons</h2>
+    <p>The icon editor can redraw a photo as a bold icon with an AI service, using your own API key.</p>
+    <${Segmented} label="Service" value=${service.id} options=${state.services.map((s) => [s.id, s.name])}
+      onChange=${(ai_provider) => updateSettings({ ai_provider })} />
+    <div class="field">
+      <label class="field-label" for="ai-key">${service.name} API key</label>
+      <div class="key-row">
+        <input id="ai-key" key=${service.id} type=${shown ? 'text' : 'password'} autocomplete="off" spellcheck="false"
+          value=${key} placeholder="Paste your key" onChange=${(e) => setKey(service.id, e.currentTarget.value)} />
+        <button class="secondary" onClick=${() => setShown(!shown)}>${shown ? 'Hide' : 'Show'}</button>
+      </div>
+      <p class="hint"><a href=${service.key_url} target="_blank" rel="noopener">Get a ${service.name} key</a>. ${service.key_note}</p>
+    </div>
+    <div class="field">
+      <label class="field-label" for="ai-model">Model</label>
+      <input id="ai-model" key=${`model-${service.id}`} type="text" spellcheck="false"
+        value=${settings.ai_models[service.id] || ''} placeholder=${service.default_model}
+        onChange=${(e) => setModel(service.id, e.currentTarget.value)} />
+      <p class="hint">Leave empty for ${service.default_model}.</p>
+    </div>
+    <p class="hint">Keys stay in this browser on this device. They are sent only to ${service.name} and never go in backups.</p>
+  </section>`;
+}
+
 export function SettingsPage() {
   const { settings, languages } = useStore(app);
   return html`<div class="settings-page">
@@ -155,6 +190,8 @@ export function SettingsPage() {
         options=${[['system', 'Like the device'], ['light', 'Light'], ['dark', 'Dark']]}
         onChange=${(theme) => updateSettings({ theme })} />
     </section>
+
+    <${AiCard} />
 
     <${BackupCard} />
 
