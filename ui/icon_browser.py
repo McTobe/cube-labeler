@@ -19,6 +19,8 @@ from core.icon_manager import (
     icon_manager, IconItem, parse_keywords, print_preview,
 )
 from core.config import config_manager
+# Imported here so automatic backups follow every change made in the library
+from core.icon_backup import auto_backup  # noqa: F401
 
 TILE_BG = "#F5F5F5"
 TILE_HOVER = "#E3E3E3"
@@ -88,6 +90,10 @@ class IconBrowserDialog(ctk.CTkToplevel):
         ctk.CTkButton(
             top_row, text="Import image…", width=120, font=ctk.CTkFont(size=12),
             command=self._import_image,
+        ).pack(side="right", padx=(8, 0))
+        ctk.CTkButton(
+            top_row, text="Backups…", width=100, fg_color="gray30", hover_color="gray40",
+            font=ctk.CTkFont(size=12), command=self._open_backups,
         ).pack(side="right", padx=(8, 0))
         ctk.CTkButton(
             top_row, text="Open my icons folder", width=150, fg_color="gray30", hover_color="gray40",
@@ -449,6 +455,13 @@ class IconBrowserDialog(ctk.CTkToplevel):
         # The editor takes the input grab while it is open; take it back afterwards
         editor.bind("<Destroy>", lambda e: e.widget is editor and self.after(10, self._take_grab), add="+")
         return editor
+
+    def _open_backups(self):
+        from ui.backup_dialog import BackupDialog
+
+        dialog = BackupDialog(self, on_changed=self._after_library_change)
+        dialog.bind("<Destroy>", lambda e: e.widget is dialog and self.after(10, self._take_grab), add="+")
+        return dialog
 
     def _take_grab(self):
         try:

@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from PIL import Image
 
 from core.config import config_manager
@@ -93,6 +93,8 @@ class IconManager:
         self._user_dir = user_dir
         self.CATEGORIES: List[str] = [ALL, USER_CATEGORY]
         self._cache: Dict[str, Image.Image] = {}
+        # Called after the user's icons change, e.g. to write an automatic backup
+        self.change_listeners: List[Callable[[], None]] = []
         self.reload()
 
     @property
@@ -221,6 +223,9 @@ class IconManager:
     def favourite_keys(self) -> List[str]:
         return list(config_manager.get("icon_favourites", []) or [])
 
+    def set_favourite_keys(self, keys: List[str]):
+        config_manager.set("icon_favourites", list(keys))
+
     def is_favourite(self, icon: IconItem) -> bool:
         return icon.key in self.favourite_keys()
 
@@ -252,6 +257,21 @@ class IconManager:
         except (OSError, ValueError):
             return {}
 
+    def notify_changed(self):
+        """Tells the listeners that the user's icons changed."""
+        for listener in list(self.change_listeners):
+            try:
+                listener()
+            except Exception as e:
+                print(f"Warning: after the icons changed: {e}", file=sys.stderr)
+
+    def user_icons(self) -> List[IconItem]:
+        return [icon for icon in self._icons if icon.user]
+
+    def user_meta(self, icon: IconItem) -> Dict[str, Any]:
+        """Everything kept about one of the user's icons: title, category, search words, editor settings."""
+        return dict(self._user_meta.get(os.path.basename(icon.file_path), {}))
+
     def _save_user_meta(self):
         os.makedirs(self.user_dir, exist_ok=True)
         path = os.path.join(self.user_dir, USER_META_FILE)
@@ -276,6 +296,7 @@ class IconManager:
         })
         self._save_user_meta()
         self.reload()
+        self.notify_changed()
         return self.get_icon_by_path(icon.file_path)
 
     def delete_user_icon(self, icon: IconItem) -> bool:
@@ -288,7 +309,7 @@ class IconManager:
             return False
         if self._user_meta.pop(os.path.basename(icon.file_path), None) is not None:
             self._save_user_meta()
-        for path in self._original_paths(icon.file_path):
+        for path in self.original_paths(icon.file_path):
             try:
                 os.remove(path)
             except OSError:
@@ -299,9 +320,10 @@ class IconManager:
                 keys.remove(icon.key)
                 config_manager.set(config_key, keys)
         self.reload()
+        self.notify_changed()
         return True
 
-    def _original_paths(self, icon_file: str) -> Tuple[str, str]:
+    def original_paths(self, icon_file: str) -> Tuple[str, str]:
         """Where the original picture and the touch-ups of a user icon are kept."""
         stem = os.path.splitext(os.path.basename(icon_file))[0]
         folder = os.path.join(self.user_dir, ORIGINALS_DIR)
@@ -311,7 +333,7 @@ class IconManager:
         self, icon_file: str, original: Optional[Image.Image], edit: Optional[IconEdit], touch: Optional[Image.Image]
     ) -> Dict[str, Any]:
         """Saves the original and touch-ups next to the icon; returns what goes in its metadata."""
-        original_path, touch_path = self._original_paths(icon_file)
+        original_path, touch_path = self.original_paths(icon_file)
         if original is None or edit is None:
             for path in (original_path, touch_path):
                 if os.path.isfile(path):
@@ -324,6 +346,25 @@ class IconManager:
         elif os.path.isfile(touch_path):
             os.remove(touch_path)
         return {"edit": edit.to_dict()}
+
+    def free_icon_path(self, name: str) -> str:
+        """A file in the user's icons folder for a new icon called `name`, not used by any icon yet."""
+        safe_name = "".join(c for c in name.strip().replace(" ", "_") if c.isalnum() or c in ("_", "-")).strip("_")
+        if not safe_name:
+            safe_name = "custom_icon"
+        user_dir = self.user_dir
+        os.makedirs(user_dir, exist_ok=True)
+        target_path = os.path.join(user_dir, f"{safe_name}.png")
+        counter = 1
+        while os.path.isfile(target_path):
+            target_path = os.path.join(user_dir, f"{safe_name}_{counter}.png")
+            counter += 1
+        return target_path
+
+    def set_user_meta(self, file_name: str, meta: Dict[str, Any]):
+        """Stores what is kept about one user icon, without reloading (used when restoring a backup)."""
+        self._user_meta[file_name] = dict(meta)
+        self._save_user_meta()
 
     def save_user_icon(
         self,
@@ -339,20 +380,8 @@ class IconManager:
         Saves a new icon into the user's icons folder. With an original picture and the
         settings that made the icon, the icon can be opened in the editor again later.
         """
-        safe_name = "".join(c for c in name.strip().replace(" ", "_") if c.isalnum() or c in ("_", "-")).strip("_")
-        if not safe_name:
-            safe_name = "custom_icon"
-
-        user_dir = self.user_dir
-        os.makedirs(user_dir, exist_ok=True)
-        target_path = os.path.join(user_dir, f"{safe_name}.png")
-
-        # Handle collisions
-        counter = 1
-        while os.path.isfile(target_path):
-            target_path = os.path.join(user_dir, f"{safe_name}_{counter}.png")
-            counter += 1
-
+        target_path = self.free_icon_path(name)
+        safe_name = os.path.splitext(os.path.basename(target_path))[0]
         image.save(target_path, "PNG")
         meta = {
             "title": name.strip() or safe_name.replace("_", " ").title(),
@@ -363,6 +392,7 @@ class IconManager:
         self._user_meta[os.path.basename(target_path)] = meta
         self._save_user_meta()
         self.reload()
+        self.notify_changed()
 
         item = self.get_icon_by_path(target_path)
         if item:
@@ -405,6 +435,7 @@ class IconManager:
         self._user_meta[os.path.basename(icon.file_path)] = meta
         self._save_user_meta()
         self.reload()
+        self.notify_changed()
         return self.get_icon_by_path(icon.file_path)
 
     def edit_source(self, icon: IconItem) -> Tuple[Image.Image, Optional[IconEdit], Optional[Image.Image]]:
@@ -415,7 +446,7 @@ class IconManager:
         """
         if icon.user:
             meta = self._user_meta.get(os.path.basename(icon.file_path), {})
-            original_path, touch_path = self._original_paths(icon.file_path)
+            original_path, touch_path = self.original_paths(icon.file_path)
             if meta.get("edit") and os.path.isfile(original_path):
                 try:
                     with Image.open(original_path) as src:
