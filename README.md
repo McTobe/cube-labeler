@@ -20,6 +20,7 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 - **Text, QR codes and images.** Any installed or imported font, auto-fit to the tape height, alignment and outline. Add QR codes (including Wi-Fi guest login codes), icons or your own pictures.
 - **Icon library.** Monochrome icons for fasteners, screw drives, mechanical parts, electronics, wiring, tools, home & kitchen and safety marks, plus your own icons in `~/.printlabel/icons/`.
 - **Icon editor.** Import or paste any picture and tune how it turns into black and white (drawing, filled silhouette or photo outline, cutoff, line thickness, crop, clean-up) with a live dot-for-dot print preview, then touch it up with a pencil and eraser. Your icons keep their original picture, so you can edit them again later.
+- **Icon backups.** Export all your icons to one `.cubeicons` file and import it on another PC, or turn on automatic backups to a folder that Google Drive, OneDrive or Dropbox syncs (the newest 10 are kept). Open **Backups…** in the icon library.
 - **Templates.** Ready-made starting points (storage box, cable flag, Wi-Fi QR, spice jar, asset tag, name badge) and saving or opening your own templates as JSON.
 - **Printer status.** Battery level, loaded tape width and color, and clear messages for errors such as an open cover or missing tape.
 - **Simulation mode.** Design and "print" labels with no printer connected.
