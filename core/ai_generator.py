@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-AI Wireframe & Line-Art Icon Generator for Cube Labeler.
+Gemini icon generator for Cube Labeler.
 Supports:
-1. Gemini API Image-to-Wireframe (photo of an object -> clean monochrome line-art icon)
-2. Gemini/Imagen Text-to-Wireframe (text description -> isometric wireframe icon)
-3. Offline Local Edge Filter (PIL-based Canny/contour extraction with no API key)
-4. Thermal post-processing (whitespace auto-trim, adaptive binarization, monochrome scaling)
+1. Gemini image-to-icon (photo of an object -> bold black-and-white icon)
+2. Gemini text-to-icon (text description -> bold black-and-white icon)
+3. Offline Local Edge Filter (PIL-based contour extraction with no API key)
+4. Thermal post-processing (whitespace auto-trim, binarization, monochrome scaling)
+The icon editor (core/icon_editor.py) does the clean-up of Gemini's pictures.
 """
 
 import sys
@@ -22,17 +23,34 @@ from core.config import config_manager
 
 # System instruction prompt ensuring output is strictly thermal-print ready
 THERMAL_WIREFRAME_SYSTEM_PROMPT = (
-    "You are an expert technical vector illustrator creating high-contrast icons specifically for miniature thermal label printers (such as Brother PT-P300BT / P-Touch). "
-    "Because thermal label tape has limited physical resolution (only 64 to 128 vertical print dots), THIN OR DELICATE HAIRLINE STROKES AND CLUTTERED DETAILS DISAPPEAR OR BLUR TOGETHER ON PRINTED LABELS. "
+    "You are an expert icon designer making pictograms for a small thermal label printer (Brother PT-P300BT / P-Touch). "
+    "The icon prints only about 56 dots high on 12 mm thermal label tape, so thin lines, small gaps and fine details disappear or blur together. "
     "\nCRITICAL DRAWING RULES:\n"
-    "1. AGGRESSIVE SIMPLIFICATION & ABSTRACTION: You are explicitly permitted and encouraged to simplify, declutter, and abstract the item as you see fit to make the icon perfect and instantly readable on workshop labels. Strip out transparent housing reflections, glare, internal shadows, and complicated internal mechanisms (such as tiny springs, screws, or intricate busbars). Focus on the bold, recognizable outer silhouette, essential functional geometry (e.g. ports, clips, levers, primary body contours), and prominent brand/rating markings.\n"
-    "2. BOLD & THICK LINEWORK: Draw ALL strokes with BOLD, HEAVY, PROMINENT THICKNESS (chunky technical line art, minimum 6 to 10 pixels stroke weight). Do NOT draw thin hairlines, faint outlines, or delicate sketches.\n"
-    "3. BACKGROUND: Pure solid white background (#FFFFFF) with zero texture, zero shading, and no background objects.\n"
-    "4. FOREGROUND: Pure solid jet black (#000000) for all strokes, outlines, and structural geometry.\n"
-    "5. NO GRADIENTS OR SHADING: Absolutely NO grayscale, NO soft gradients, NO airbrushing, NO cross-hatching, and NO drop shadows. Only crisp, high-contrast binary black lines on white.\n"
-    "6. ISOMETRIC PERSPECTIVE & GEOMETRY: Draw the subject in a clean isometric 3D perspective (like a clean patent drawing, CAD wireframe, or crisp vector clip-art icon).\n"
-    "7. HIGH LEGIBILITY AT SMALL SIZES: The resulting icon must be instantly recognizable when printed at a very small physical size (approx 9 mm / 0.35 inch high)."
+    "1. AGGRESSIVE SIMPLIFICATION & ABSTRACTION: Simplify and abstract the item freely so it is instantly readable on a small workshop label. "
+    "Leave out reflections, glare, shadows, textures and small internal parts (springs, tiny screws, busbars). "
+    "Keep the recognisable outer shape and the few features that identify the item (levers, ports, threads, slots, clips).\n"
+    "2. BOLD & THICK LINEWORK: Every line, gap and feature must be bold and chunky, at least 1/20 of the icon's height. No hairlines or faint strokes.\n"
+    "3. BACKGROUND: Pure solid white (#FFFFFF), nothing else in the picture.\n"
+    "4. FOREGROUND: Pure solid black (#000000) only.\n"
+    "5. NO GRADIENTS OR SHADING: No grey, no gradients, no hatching, no drop shadows. Only black and white.\n"
+    "6. ONE ITEM, CENTRED: Draw a single item filling most of a square picture, with no text unless asked for.\n"
+    "7. HIGH LEGIBILITY AT SMALL SIZES: The icon must stay recognisable when printed about 9 mm high."
 )
+
+# Drawing styles offered for Gemini; the first matches the built-in icon set
+ICON_STYLES = {
+    "Filled silhouette (like the built-in icons)": (
+        "Draw it as a FILLED BLACK SILHOUETTE in a clean side or three-quarter view: solid black shapes, "
+        "with the few identifying features cut out as bold white gaps."
+    ),
+    "Bold line drawing": (
+        "Draw it as a BOLD BLACK LINE DRAWING: heavy, even outlines with no fill, like a simple technical pictogram."
+    ),
+    "Flat symbol": (
+        "Draw it as a FLAT GEOMETRIC SYMBOL seen straight on, like a sign or a schematic symbol: simple solid shapes."
+    ),
+}
+DEFAULT_STYLE = next(iter(ICON_STYLES))
 
 
 def post_process_thermal(
@@ -227,9 +245,8 @@ class GeminiWireframeGenerator:
                     "Google AI Studio Quota Limit (Free Tier):\n"
                     "Google currently requires a billing account enabled on your AI Studio / Google Cloud project "
                     "for direct image-generation models (the free-tier quota for *-image models is set to 0 by Google).\n\n"
-                    "Free alternatives:\n"
-                    "• Use the '⚡ Offline Edge Filter' tab (works locally 100% free, no API key required!)\n"
-                    "• Generate the wireframe on gemini.google.com and drop it into '⚡ Clean & Post-Process'."
+                    "Free alternative: make the picture in Gemini on the web (gemini.google.com), "
+                    "save or copy it, then open or paste it in the icon editor."
                 )
             else:
                 try:
@@ -248,30 +265,29 @@ class GeminiWireframeGenerator:
         input_image: Image.Image,
         custom_instructions: str = "",
         model: Optional[str] = None,
+        style: str = DEFAULT_STYLE,
         line_thickness: int = 1,
         return_raw: bool = False,
     ) -> Image.Image:
         """
-        Takes a real-world photo, sends it to Gemini with our thermal wireframe prompt,
-        and returns a post-processed pure monochrome line-art icon.
+        Takes a real-world photo, sends it to Gemini with our thermal icon prompt,
+        and returns a post-processed pure monochrome icon.
         """
         # Compress / resize input image to reasonable size for API transfer (max 1024x1024)
-        img_copy = input_image.copy()
+        img_copy = input_image.convert("RGBA")
         img_copy.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+        # JPEG has no transparency; show see-through parts as white rather than black
+        flat = Image.new("RGBA", img_copy.size, (255, 255, 255, 255))
+        flat.alpha_composite(img_copy)
         buf = io.BytesIO()
-        img_copy.convert("RGB").save(buf, format="JPEG", quality=85)
+        flat.convert("RGB").save(buf, format="JPEG", quality=85)
         b64_image = base64.b64encode(buf.getvalue()).decode("utf-8")
 
         prompt_text = (
             f"{THERMAL_WIREFRAME_SYSTEM_PROMPT}\n\n"
-            "TASK: Generate a bold, heavy-outline isometric technical wireframe line-art icon of the item shown in the attached photo.\n"
-            "SIMPLIFICATION INSTRUCTIONS: You may aggressively simplify, declutter, and abstract the object as you see fit to make the icon perfect and immediately recognizable for our miniature label use case. "
-            "Strip out transparent housing reflections, internal clutter, shadows, and subtle micro-details. "
-            "Highlight the bold outer silhouette, characteristic functional shape (such as levers, wire ports, slots, threads), and any prominent bold markings.\n"
-            "CRITICAL REQUIREMENT: Draw with EXTRA THICK, BOLD, SOLID BLACK contour lines (#000000) on pure white background (#FFFFFF). "
-            "This icon is specifically for a low-resolution miniature thermal label printer. "
-            "Hairlines, thin delicate strokes, and subtle hatching are strictly prohibited as they will not print. "
-            "Make all structural outlines heavy, bold, and distinct.\n"
+            "TASK: Make a label icon of the item shown in the attached photo.\n"
+            f"STYLE: {ICON_STYLES.get(style, ICON_STYLES[DEFAULT_STYLE])}\n"
+            "Ignore the photo's background, lighting and anything that is not the item itself.\n"
         )
         if custom_instructions.strip():
             prompt_text += f"Additional user specification: {custom_instructions.strip()}\n"
@@ -301,20 +317,17 @@ class GeminiWireframeGenerator:
         self,
         prompt: str,
         model: Optional[str] = None,
+        style: str = DEFAULT_STYLE,
         line_thickness: int = 1,
         return_raw: bool = False,
     ) -> Image.Image:
         """
-        Generates a wireframe icon from a text description using Gemini image generation.
+        Generates an icon from a text description using Gemini image generation.
         """
         full_prompt = (
             f"{THERMAL_WIREFRAME_SYSTEM_PROMPT}\n\n"
-            f"TASK: Generate a bold, heavy-outline isometric technical wireframe line-art icon of: {prompt}.\n"
-            "SIMPLIFICATION INSTRUCTIONS: You may aggressively simplify, declutter, and abstract the object as you see fit to make the icon perfect and immediately recognizable for our miniature label use case. "
-            "Omit tiny cluttered micro-details in favor of bold primary geometry and silhouette.\n"
-            "CRITICAL REQUIREMENT: Draw with EXTRA THICK, BOLD, SOLID BLACK contour lines (#000000) on pure white background (#FFFFFF). "
-            "Optimized for miniature low-resolution thermal label printing. "
-            "Ensure strokes are thick, bold, and solid. Do NOT use thin hairlines or faint outlines.\n"
+            f"TASK: Make a label icon of: {prompt}.\n"
+            f"STYLE: {ICON_STYLES.get(style, ICON_STYLES[DEFAULT_STYLE])}\n"
         )
 
         payload = {

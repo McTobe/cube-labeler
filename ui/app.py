@@ -42,7 +42,6 @@ from ui.templates import (
 )
 from ui.inventory_tab import HardwareInventoryTab
 from ui.icon_browser import IconBrowserDialog
-from ui.ai_generator_dialog import AIGeneratorDialog
 from ui.printer_chip import PrinterChip, PrinterPanel
 from ui.settings_view import SettingsView
 from ui.templates_view import TemplatesView
@@ -1125,13 +1124,6 @@ class PrintLabelApp(ctk.CTk):
             self,
             on_select=self._set_custom_designer_image,
             title_suffix="Custom Designer",
-            on_open_ai_generator=self._on_open_ai_generator,
-        )
-
-    def _on_open_ai_generator(self):
-        AIGeneratorDialog(
-            self,
-            on_save_callback=self._set_custom_designer_image,
         )
 
     def _on_clear_image(self):

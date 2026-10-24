@@ -21,17 +21,19 @@ if importlib.util.find_spec("tkinter") is None:
     raise unittest.SkipTest("tkinter is not installed")
 
 import customtkinter as ctk
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from core import icon_manager as im
 from core.icon_manager import FAVOURITES, RECENT, USER_CATEGORY, IconManager
 import ui.icon_browser as browser
+import ui.icon_editor_dialog as editor
 
 
 class FakeConfig:
     def __init__(self, user_dir):
         self.data = {}
         self.user_icons_dir = user_dir
+        self.gemini_api_key = ""
 
     def get(self, key, default=None):
         return self.data.get(key, default)
@@ -62,7 +64,11 @@ class TestIconBrowser(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.mgr = IconManager(user_dir=self.user_dir)
-        patcher = patch.object(browser, "icon_manager", self.mgr)
+        for target in (browser, editor):
+            patcher = patch.object(target, "icon_manager", self.mgr)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        patcher = patch.object(editor, "config_manager", config)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.chosen = []
@@ -131,16 +137,86 @@ class TestIconBrowser(unittest.TestCase):
         self.assertEqual(dlg.user_box.winfo_manager(), "")
         self.assertEqual(dlg._shown, [])
 
-    def test_import_image(self):
-        src = os.path.join(self.user_dir, "..", os.path.basename(self.user_dir) + "_src.png")
-        Image.new("RGB", (100, 100), "white").save(src)  # a picture to pick in the file dialog
-        self.addCleanup(os.remove, src)
+    def _picture(self, name="M3_hex-nut.png"):
+        src = os.path.join(tempfile.mkdtemp(), name)
+        self.addCleanup(shutil.rmtree, os.path.dirname(src), True)
+        img = Image.new("RGB", (200, 160), "white")
+        ImageDraw.Draw(img).ellipse((40, 30, 160, 130), outline="black", width=12)
+        img.save(src)
+        return src
+
+    def _editor(self, dlg, **kwargs):
+        with patch.object(dlg, "_take_grab"):
+            ed = dlg._open_editor(**kwargs)
+        self.addCleanup(lambda: ed.winfo_exists() and ed.destroy())
+        ed.update()
+        return ed
+
+    def test_import_image_opens_editor_and_saves(self):
+        src = self._picture()
         dlg = self._open(initial_category="Tools")
         with patch.object(browser.filedialog, "askopenfilename", return_value=src):
-            with patch("core.ai_generator.post_process_thermal", return_value=Image.new("RGBA", (256, 256), (0, 0, 0, 255))):
-                dlg._import_image()
+            dlg._import_image()
+        ed = next(w for w in dlg.winfo_children() if isinstance(w, editor.IconEditorDialog))
+        self.addCleanup(lambda: ed.winfo_exists() and ed.destroy())
+        self.assertEqual(ed.entry_name.get(), "M3 hex nut")
+        self.assertEqual(ed.cat_menu.get(), "Tools")
+        self.assertEqual(str(ed.btn_save.cget("state")), "normal")
+        ed._save(insert=False)
         self.assertTrue(dlg.selected_icon.user)
-        self.assertEqual(dlg.selected_icon.category, "Tools")
+        self.assertEqual((dlg.selected_icon.title, dlg.selected_icon.category), ("M3 hex nut", "Tools"))
+        self.assertEqual(self.chosen, [])
+
+    def test_save_and_insert(self):
+        dlg = self._open()
+        ed = self._editor(dlg, picture_path=self._picture())
+        ed._save(insert=True)
+        self.assertEqual(len(self.chosen), 1)
+        self.assertTrue(self.mgr.get_icon_by_path(self.chosen[0]).user)
+
+    def test_edit_keeps_settings_and_touch_ups(self):
+        dlg = self._open()
+        ed = self._editor(dlg, picture_path=self._picture())
+        ed._on_mode("Silhouette")
+        ed._on_thickness("Bold")
+        ed._render_now()
+        ed.seg_tool.set("Pencil")
+
+        class Click:
+            x = y = 2
+        ed._on_touch(Click(), start=True)
+        ed._save(insert=False)
+        icon = dlg.selected_icon
+
+        ed2 = self._editor(dlg, icon=icon)
+        self.assertEqual((ed2.edit.mode, ed2.edit.thickness), ("silhouette", 1))
+        self.assertEqual(ed2.touch.getpixel((0, 0)), 1)
+        self.assertEqual(ed2.title(), "Edit icon")
+        ed2.entry_name.delete(0, "end")
+        ed2.entry_name.insert(0, "Ring")
+        ed2._on_thickness("Normal")
+        ed2._save(insert=False)
+        again = self.mgr.get_icon_by_path(icon.file_path)
+        self.assertEqual(again.title, "Ring")
+        self.assertEqual(self.mgr.edit_source(again)[1].thickness, 0)
+
+    def test_edit_a_copy_of_a_built_in_icon(self):
+        dlg = self._open()
+        dlg._select_path(self.mgr.get_icon_by_id("torx").file_path)
+        self.assertEqual(dlg.btn_edit.cget("text"), "Edit a copy…")
+        ed = self._editor(dlg, icon=dlg.selected_icon)
+        self.assertIsNone(ed.editing)
+        self.assertEqual(ed.entry_name.get(), "Torx Star Drive (my copy)")
+        ed._save(insert=False)
+        self.assertTrue(dlg.selected_icon.user)
+        self.assertTrue(os.path.isfile(self.mgr.get_icon_by_id("torx").file_path))
+
+    def test_editor_starts_empty(self):
+        dlg = self._open()
+        ed = self._editor(dlg)
+        self.assertIsNone(ed.source)
+        self.assertEqual(str(ed.btn_save.cget("state")), "disabled")
+        self.assertEqual(str(ed.btn_gem_photo.cget("state")), "disabled")
 
 
 if __name__ == "__main__":

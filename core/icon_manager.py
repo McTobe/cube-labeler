@@ -9,10 +9,11 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from PIL import Image
 
 from core.config import config_manager
+from core.icon_editor import IconEdit, print_dots, prepare_original
 
 # Built-in icons live in one folder per category under assets/icons; catalog.json there
 # lists the categories in display order and gives each icon its title and search words
@@ -20,6 +21,9 @@ CATALOG_FILE = "catalog.json"
 USER_CATEGORY = "My Icons"
 # The user's own icons keep their titles, categories and search words next to them
 USER_META_FILE = "icons.json"
+# Originals and touch-ups of the user's icons, so an icon can be edited again later
+ORIGINALS_DIR = "originals"
+TOUCH_SUFFIX = ".touch.png"
 
 # Views of the library that are not categories of their own
 ALL = "All"
@@ -71,14 +75,7 @@ def print_preview(image_path: str, dots: int = PRINT_PREVIEW_DOTS) -> Optional[I
             img = src.convert("RGBA")
     except Exception:
         return None
-    flat = Image.new("RGBA", img.size, "white")
-    flat.alpha_composite(img)
-    gray = flat.convert("L")
-    bbox = gray.point(lambda v: 255 if v < 240 else 0).getbbox()
-    if bbox:
-        gray = gray.crop(bbox)
-    gray.thumbnail((dots, dots), Image.Resampling.LANCZOS)
-    return gray.point(lambda v: 255 if v > PRINT_THRESHOLD else 0)
+    return print_dots(img, dots, PRINT_THRESHOLD)
 
 
 def parse_keywords(text: str) -> List[str]:
@@ -270,11 +267,13 @@ class IconManager:
         if not icon.user:
             return icon
         name = os.path.basename(icon.file_path)
-        self._user_meta[name] = {
+        # Anything else kept about the icon, such as its editor settings, stays
+        self._user_meta[name] = dict(self._user_meta.get(name, {}))
+        self._user_meta[name].update({
             "title": title.strip() or icon.id.replace("_", " ").title(),
             "category": category if category in self.built_in_categories else USER_CATEGORY,
             "keywords": keywords,
-        }
+        })
         self._save_user_meta()
         self.reload()
         return self.get_icon_by_path(icon.file_path)
@@ -289,6 +288,11 @@ class IconManager:
             return False
         if self._user_meta.pop(os.path.basename(icon.file_path), None) is not None:
             self._save_user_meta()
+        for path in self._original_paths(icon.file_path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
         for config_key in ("icon_favourites", "icon_recent"):
             keys = list(config_manager.get(config_key, []) or [])
             if icon.key in keys:
@@ -297,9 +301,45 @@ class IconManager:
         self.reload()
         return True
 
-    def save_user_icon(self, image: Image.Image, name: str, category: str = USER_CATEGORY) -> IconItem:
-        """Saves a user/AI generated image into the persistent user icons folder."""
-        safe_name = "".join(c for c in name if c.isalnum() or c in ("_", "-")).strip("_")
+    def _original_paths(self, icon_file: str) -> Tuple[str, str]:
+        """Where the original picture and the touch-ups of a user icon are kept."""
+        stem = os.path.splitext(os.path.basename(icon_file))[0]
+        folder = os.path.join(self.user_dir, ORIGINALS_DIR)
+        return os.path.join(folder, f"{stem}.png"), os.path.join(folder, stem + TOUCH_SUFFIX)
+
+    def _store_edit(
+        self, icon_file: str, original: Optional[Image.Image], edit: Optional[IconEdit], touch: Optional[Image.Image]
+    ) -> Dict[str, Any]:
+        """Saves the original and touch-ups next to the icon; returns what goes in its metadata."""
+        original_path, touch_path = self._original_paths(icon_file)
+        if original is None or edit is None:
+            for path in (original_path, touch_path):
+                if os.path.isfile(path):
+                    os.remove(path)
+            return {}
+        os.makedirs(os.path.dirname(original_path), exist_ok=True)
+        prepare_original(original).save(original_path, "PNG")
+        if touch is not None and touch.getbbox():
+            touch.convert("L").save(touch_path, "PNG")
+        elif os.path.isfile(touch_path):
+            os.remove(touch_path)
+        return {"edit": edit.to_dict()}
+
+    def save_user_icon(
+        self,
+        image: Image.Image,
+        name: str,
+        category: str = USER_CATEGORY,
+        keywords: Optional[List[str]] = None,
+        original: Optional[Image.Image] = None,
+        edit: Optional[IconEdit] = None,
+        touch: Optional[Image.Image] = None,
+    ) -> IconItem:
+        """
+        Saves a new icon into the user's icons folder. With an original picture and the
+        settings that made the icon, the icon can be opened in the editor again later.
+        """
+        safe_name = "".join(c for c in name.strip().replace(" ", "_") if c.isalnum() or c in ("_", "-")).strip("_")
         if not safe_name:
             safe_name = "custom_icon"
 
@@ -314,13 +354,14 @@ class IconManager:
             counter += 1
 
         image.save(target_path, "PNG")
-        if name.strip() or category != USER_CATEGORY:
-            self._user_meta[os.path.basename(target_path)] = {
-                "title": name.strip() or safe_name.replace("_", " ").title(),
-                "category": category if category in self.built_in_categories else USER_CATEGORY,
-                "keywords": [],
-            }
-            self._save_user_meta()
+        meta = {
+            "title": name.strip() or safe_name.replace("_", " ").title(),
+            "category": category if category in self.built_in_categories else USER_CATEGORY,
+            "keywords": list(keywords or []),
+        }
+        meta.update(self._store_edit(target_path, original, edit, touch))
+        self._user_meta[os.path.basename(target_path)] = meta
+        self._save_user_meta()
         self.reload()
 
         item = self.get_icon_by_path(target_path)
@@ -330,12 +371,64 @@ class IconManager:
         # Fallback return
         return IconItem(
             id=os.path.splitext(os.path.basename(target_path))[0],
-            title=safe_name.replace("_", " ").title(),
+            title=meta["title"],
             category=USER_CATEGORY,
             file_path=target_path,
-            keywords=[safe_name.lower(), "custom", "user"],
+            keywords=meta["keywords"],
             user=True,
         )
+
+    def replace_user_icon(
+        self,
+        icon: IconItem,
+        image: Image.Image,
+        title: str,
+        category: str,
+        keywords: List[str],
+        original: Optional[Image.Image] = None,
+        edit: Optional[IconEdit] = None,
+        touch: Optional[Image.Image] = None,
+    ) -> Optional[IconItem]:
+        """
+        Saves an edited icon over one of the user's icons. The file name stays, so labels,
+        favourites and recently used keep pointing at it.
+        """
+        if not icon.user:
+            return None
+        image.save(icon.file_path, "PNG")
+        meta = {
+            "title": title.strip() or icon.id.replace("_", " ").title(),
+            "category": category if category in self.built_in_categories else USER_CATEGORY,
+            "keywords": list(keywords),
+        }
+        meta.update(self._store_edit(icon.file_path, original, edit, touch))
+        self._user_meta[os.path.basename(icon.file_path)] = meta
+        self._save_user_meta()
+        self.reload()
+        return self.get_icon_by_path(icon.file_path)
+
+    def edit_source(self, icon: IconItem) -> Tuple[Image.Image, Optional[IconEdit], Optional[Image.Image]]:
+        """
+        What the editor needs to open an icon again: the original picture, its settings and
+        touch-ups. Built-in icons and icons saved before originals were kept open from the
+        icon itself, with no settings.
+        """
+        if icon.user:
+            meta = self._user_meta.get(os.path.basename(icon.file_path), {})
+            original_path, touch_path = self._original_paths(icon.file_path)
+            if meta.get("edit") and os.path.isfile(original_path):
+                try:
+                    with Image.open(original_path) as src:
+                        original = src.convert("RGBA")
+                    touch = None
+                    if os.path.isfile(touch_path):
+                        with Image.open(touch_path) as src:
+                            touch = src.convert("L")
+                    return original, IconEdit.from_dict(meta["edit"]), touch
+                except Exception:
+                    pass
+        with Image.open(icon.file_path) as src:
+            return src.convert("RGBA"), None, None
 
 
 # Global singleton
