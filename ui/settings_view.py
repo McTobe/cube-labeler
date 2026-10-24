@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Settings view: label language, Gemini API key and simulation mode.
+Settings view: label language, AI service and API key, and simulation mode.
 """
 
 import webbrowser
@@ -8,11 +8,11 @@ from typing import Callable
 
 import customtkinter as ctk
 
+from core.ai_generator import PROVIDERS, current_provider, provider_by_name
 from core.config import config_manager
 from core.label_language import LANGUAGES, get_label_language
 from ui.widgets import MUTED_TEXT
 
-API_KEY_URL = "https://aistudio.google.com/app/apikey"
 
 
 class SettingsView(ctk.CTkFrame):
@@ -50,25 +50,31 @@ class SettingsView(ctk.CTkFrame):
         self.language_combo.set(LANGUAGES[get_label_language()])
         self.language_combo.pack(anchor="w")
 
-        # Gemini API key
-        key_card = self._card("Gemini API key")
+        # AI service for redrawing pictures as icons
+        ai_card = self._card("AI icons")
         ctk.CTkLabel(
-            key_card,
-            text="Needed only to make icons from photos or descriptions with Google Gemini. "
-                 "Image generation needs billing enabled on your Google AI Studio project. "
-                 "The key is stored encrypted for your Windows user.",
+            ai_card,
+            text="Optional. The icon editor can send one of your pictures to an AI service to redraw it as an icon. "
+                 "Pick the service and paste your own API key; keys are stored encrypted for your Windows user.",
             anchor="w",
             justify="left",
             wraplength=560,
             text_color=MUTED_TEXT,
         ).pack(fill="x", pady=(0, 6))
-        key_row = ctk.CTkFrame(key_card, fg_color="transparent")
+        self.provider_menu = ctk.CTkSegmentedButton(
+            ai_card, values=[p.name for p in PROVIDERS.values()], command=self._provider_selected
+        )
+        self.provider_menu.pack(anchor="w", pady=(0, 6))
+        self.lbl_provider_note = ctk.CTkLabel(
+            ai_card, text="", anchor="w", justify="left", wraplength=560, text_color=MUTED_TEXT,
+            font=ctk.CTkFont(size=11),
+        )
+        self.lbl_provider_note.pack(fill="x", pady=(0, 6))
+        key_row = ctk.CTkFrame(ai_card, fg_color="transparent")
         key_row.pack(fill="x")
         self.entry_api_key = ctk.CTkEntry(key_row, show="•", width=360, placeholder_text="Paste your API key")
-        if config_manager.gemini_api_key:
-            self.entry_api_key.insert(0, config_manager.gemini_api_key)
         self.entry_api_key.pack(side="left")
-        ctk.CTkButton(key_row, text="Save key", width=90, command=self._save_key).pack(side="left", padx=8)
+        ctk.CTkButton(key_row, text="Save", width=90, command=self._save_key).pack(side="left", padx=8)
         ctk.CTkButton(
             key_row,
             text="Get a key ↗",
@@ -76,8 +82,17 @@ class SettingsView(ctk.CTkFrame):
             fg_color="transparent",
             border_width=1,
             text_color=("gray10", "gray90"),
-            command=lambda: webbrowser.open(API_KEY_URL),
+            command=lambda: webbrowser.open(self._provider().key_url),
         ).pack(side="left")
+        model_row = ctk.CTkFrame(ai_card, fg_color="transparent")
+        model_row.pack(fill="x", pady=(6, 0))
+        ctk.CTkLabel(model_row, text="Model", width=50, anchor="w").pack(side="left")
+        self.entry_model = ctk.CTkEntry(model_row, width=310)
+        self.entry_model.pack(side="left")
+        ctk.CTkLabel(model_row, text="Leave empty for the default", text_color=MUTED_TEXT,
+                     font=ctk.CTkFont(size=11)).pack(side="left", padx=8)
+        self.provider_menu.set(current_provider().name)
+        self._show_provider()
 
         # Simulation
         sim_card = self._card("Simulation")
@@ -107,10 +122,33 @@ class SettingsView(ctk.CTkFrame):
         if code:
             self._on_language_changed(code)
 
-    def _save_key(self):
-        from core.ai_generator import ai_generator
+    def _provider(self):
+        return provider_by_name(self.provider_menu.get()) or current_provider()
 
+    def _show_provider(self):
+        provider = self._provider()
+        self.lbl_provider_note.configure(text=provider.key_note)
+        self.entry_api_key.delete(0, "end")
+        key = config_manager.api_key(provider.id)
+        if key:
+            self.entry_api_key.insert(0, key)
+        self.entry_model.delete(0, "end")
+        model = config_manager.ai_model(provider.id)
+        if model:
+            self.entry_model.insert(0, model)
+        self.entry_model.configure(placeholder_text=provider.default_model)
+
+    def _provider_selected(self, name: str):
+        provider = provider_by_name(name)
+        if provider:
+            config_manager.ai_provider = provider.id
+            self._show_provider()
+            self._on_status(f"AI icons now use {provider.name}")
+
+    def _save_key(self):
+        provider = self._provider()
         key = self.entry_api_key.get().strip()
-        config_manager.gemini_api_key = key
-        ai_generator.api_key = key
-        self._on_status("API key saved" if key else "API key removed")
+        config_manager.set_api_key(provider.id, key)
+        config_manager.set_ai_model(provider.id, self.entry_model.get())
+        config_manager.ai_provider = provider.id
+        self._on_status(f"{provider.name} API key saved" if key else f"{provider.name} API key removed")

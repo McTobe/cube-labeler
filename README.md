@@ -24,7 +24,7 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 - **Templates.** Ready-made starting points (storage box, cable flag, Wi-Fi QR, spice jar, asset tag, name badge) and saving or opening your own templates as JSON.
 - **Printer status.** Battery level, loaded tape width and color, and clear messages for errors such as an open cover or missing tape.
 - **Simulation mode.** Design and "print" labels with no printer connected.
-- **Optional AI icons.** Turn a photo or a text prompt into a printable icon with Google Gemini, in the same filled style as the built-in icons, and finish it in the icon editor (needs your own API key).
+- **Optional AI icons.** Have Google Gemini, OpenAI or OpenRouter redraw a photo or picture as a printable icon, with ready-made presets (filled silhouette like the built-in icons, bold line drawing, flat symbol, clean up and keep the shape) or your own instructions, then finish it in the icon editor (needs your own API key for the service, chosen under Settings).
 - **Export.** Save any label as a high-resolution PNG.
 
 ![Bin label editor for fastener storage](docs/images/bin-label.png)
@@ -63,7 +63,7 @@ The window has a **left rail** for switching views, the **tape preview** in the 
 | **Bin label** | Labels for fastener or parts bins. Pick *Fasteners* or *Parts* under *Label for*; fields are listed in the order they appear on the label. |
 | **Queue** | Labels added with **Add to queue** print as one strip. Reorder, edit or remove them before printing. |
 | **Templates** | Ready-made labels and your own saved templates. |
-| **Settings** | Bin label language, Gemini API key and simulation mode. |
+| **Settings** | Bin label language, AI service (Gemini, OpenAI or OpenRouter) with its API key and model, and simulation mode. |
 
 The preview can show the whole label (**Fit**) or zoom to 100–300%, where long labels scroll sideways. The **•••** menu next to **Print** has *Export PNG* and *Feed tape*.
 

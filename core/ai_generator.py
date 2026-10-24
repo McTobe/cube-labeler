@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Gemini icon generator for Cube Labeler.
+AI icon redrawing for Cube Labeler.
 Supports:
-1. Gemini image-to-icon (photo of an object -> bold black-and-white icon)
-2. Gemini text-to-icon (text description -> bold black-and-white icon)
-3. Offline Local Edge Filter (PIL-based contour extraction with no API key)
-4. Thermal post-processing (whitespace auto-trim, binarization, monochrome scaling)
-The icon editor (core/icon_editor.py) does the clean-up of Gemini's pictures.
+1. Redrawing a picture of an item as a bold black-and-white icon with Gemini, OpenAI or
+   OpenRouter, using a ready-made preset or the user's own instructions
+2. Offline Local Edge Filter (PIL-based contour extraction with no API key)
+3. Thermal post-processing (whitespace auto-trim, binarization, monochrome scaling)
+The icon editor (core/icon_editor.py) does the clean-up of the services' pictures.
 """
 
 import sys
@@ -16,10 +16,13 @@ import json
 import base64
 import urllib.request
 import urllib.error
-from typing import List, Optional, Tuple
+import uuid
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 from PIL import Image, ImageFilter, ImageOps
 
-from core.config import config_manager
+from core.config import DEFAULT_GEMINI_IMAGE_MODEL, config_manager
+from core.icon_editor import DRAWING, SILHOUETTE
 
 # System instruction prompt ensuring output is strictly thermal-print ready
 THERMAL_WIREFRAME_SYSTEM_PROMPT = (
@@ -37,20 +40,64 @@ THERMAL_WIREFRAME_SYSTEM_PROMPT = (
     "7. HIGH LEGIBILITY AT SMALL SIZES: The icon must stay recognisable when printed about 9 mm high."
 )
 
-# Drawing styles offered for Gemini; the first matches the built-in icon set
-ICON_STYLES = {
-    "Filled silhouette (like the built-in icons)": (
+@dataclass(frozen=True)
+class Preset:
+    """A ready-made instruction for redrawing a picture, and how the editor first reads the result."""
+
+    label: str
+    instruction: str
+    mode: str
+
+
+# Ready-made redraws; the first matches the built-in icon set
+PRESETS: List[Preset] = [
+    Preset(
+        "Filled silhouette (like the built-in icons)",
         "Draw it as a FILLED BLACK SILHOUETTE in a clean side or three-quarter view: solid black shapes, "
-        "with the few identifying features cut out as bold white gaps."
+        "with the few identifying features cut out as bold white gaps.",
+        SILHOUETTE,
     ),
-    "Bold line drawing": (
-        "Draw it as a BOLD BLACK LINE DRAWING: heavy, even outlines with no fill, like a simple technical pictogram."
+    Preset(
+        "Bold line drawing",
+        "Draw it as a BOLD BLACK LINE DRAWING: heavy, even outlines with no fill, like a simple technical pictogram.",
+        DRAWING,
     ),
-    "Flat symbol": (
-        "Draw it as a FLAT GEOMETRIC SYMBOL seen straight on, like a sign or a schematic symbol: simple solid shapes."
+    Preset(
+        "Flat symbol",
+        "Draw it as a FLAT GEOMETRIC SYMBOL seen straight on, like a sign or a schematic symbol: simple solid shapes.",
+        SILHOUETTE,
     ),
-}
-DEFAULT_STYLE = next(iter(ICON_STYLES))
+    Preset(
+        "Clean up, keep the shape",
+        "Keep the item's own outline, view and proportions exactly as in the picture. Only clean it up: "
+        "fill it solid black, drop the background, shading and small details, and make thin parts bold.",
+        SILHOUETTE,
+    ),
+]
+CUSTOM = "Custom"
+PRESET_LABELS = [p.label for p in PRESETS] + [CUSTOM]
+DEFAULT_PRESET = PRESETS[0].label
+
+
+def preset_mode(label: str) -> str:
+    """How the editor should first read a picture redrawn with this preset."""
+    return next((p.mode for p in PRESETS if p.label == label), DRAWING)
+
+
+def build_prompt(preset: str, custom: str = "") -> str:
+    """The full instruction sent with the user's picture."""
+    if preset == CUSTOM:
+        if not custom.strip():
+            raise ValueError("Type your own instructions for the Custom preset first.")
+        style = custom.strip()
+    else:
+        style = next((p.instruction for p in PRESETS if p.label == preset), PRESETS[0].instruction)
+    return (
+        f"{THERMAL_WIREFRAME_SYSTEM_PROMPT}\n\n"
+        "TASK: Make a label icon of the item shown in the attached picture.\n"
+        f"STYLE: {style}\n"
+        "Ignore the picture's background, lighting and anything that is not the item itself.\n"
+    )
 
 
 def post_process_thermal(
@@ -196,188 +243,224 @@ def local_edge_filter(
     return post_process_thermal(line_art, line_thickness=line_thickness)
 
 
-# Tried in order after the configured model, but only when a model does not exist (HTTP 404)
-FALLBACK_IMAGE_MODELS = [
-    "gemini-3.1-flash-image",
-    "gemini-3.1-flash-lite-image",
-    "gemini-2.5-flash-image",
-    "gemini-3-pro-image",
-]
-
-
 class ModelNotFoundError(RuntimeError):
-    """Raised when the requested Gemini model does not exist for this API key."""
+    """Raised when the requested model does not exist for this API key."""
 
 
-class GeminiWireframeGenerator:
-    """Client for Google Gemini & Imagen API to generate monochrome line art."""
+def _picture_bytes(picture: Image.Image, fmt: str = "PNG") -> bytes:
+    """The picture shrunk to at most 1024 px, see-through parts shown as white, as PNG or JPEG."""
+    img = picture.convert("RGBA")
+    img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+    flat = Image.new("RGBA", img.size, (255, 255, 255, 255))
+    flat.alpha_composite(img)
+    buf = io.BytesIO()
+    if fmt == "JPEG":
+        flat.convert("RGB").save(buf, format="JPEG", quality=85)
+    else:
+        flat.convert("RGB").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _post(url: str, data: bytes, headers: Dict[str, str], service: str, timeout: int = 120) -> dict:
+    """Sends a request and returns its JSON; errors carry the service's own message."""
+    req = urllib.request.Request(url, data=data, headers={"User-Agent": "CubeLabeler", **headers}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        try:
+            err = json.loads(body).get("error", {})
+            msg = err.get("message", body) if isinstance(err, dict) else str(err)
+        except Exception:
+            msg = body
+        raise _HttpError(e.code, body, f"{service} API error ({e.code}): {msg}")
+    except Exception as e:
+        raise RuntimeError(f"Network error calling {service}: {e}")
+
+
+class _HttpError(RuntimeError):
+    def __init__(self, code: int, body: str, message: str):
+        super().__init__(message)
+        self.code = code
+        self.body = body
+
+
+class ImageProvider:
+    """An AI service that redraws a picture as an icon. Subclasses send the actual request."""
+
+    id = ""
+    name = ""
+    key_url = ""
+    key_note = ""
+    default_model = ""
+    # Tried in order after the chosen model, but only when a model does not exist (HTTP 404)
+    fallback_models: List[str] = []
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or config_manager.gemini_api_key
+        self._api_key = api_key
+
+    @property
+    def api_key(self) -> str:
+        return self._api_key or config_manager.api_key(self.id)
+
+    @api_key.setter
+    def api_key(self, value: str):
+        self._api_key = value
+
+    def models_to_try(self, model: Optional[str] = None) -> List[str]:
+        preferred = model or config_manager.ai_model(self.id) or self.default_model
+        return list(dict.fromkeys(m for m in [preferred] + self.fallback_models if m))
+
+    def redraw(self, picture: Image.Image, preset: str = DEFAULT_PRESET, custom: str = "",
+               model: Optional[str] = None) -> Image.Image:
+        """Sends the picture with the preset's instruction and returns the service's picture, as is."""
+        if not self.api_key:
+            raise ValueError(f"{self.name} needs an API key. Add one under Settings in the main window.")
+        prompt = build_prompt(preset, custom)
+        last_err: Optional[Exception] = None
+        for m in self.models_to_try(model):
+            try:
+                return self._redraw(picture, prompt, m)
+            except ModelNotFoundError as e:
+                last_err = e
+        raise last_err or RuntimeError(f"{self.name} could not make the icon.")
+
+    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
+        raise NotImplementedError
+
+
+class GeminiProvider(ImageProvider):
+    id = "gemini"
+    name = "Gemini"
+    key_url = "https://aistudio.google.com/app/apikey"
+    key_note = ("Image generation needs billing enabled on your Google AI Studio project. "
+                "Free alternative: make the picture at gemini.google.com and open or paste it in the editor.")
+    default_model = DEFAULT_GEMINI_IMAGE_MODEL
+    fallback_models = [
+        "gemini-3.1-flash-image",
+        "gemini-3.1-flash-lite-image",
+        "gemini-2.5-flash-image",
+        "gemini-3-pro-image",
+    ]
+
+    def models_to_try(self, model: Optional[str] = None) -> List[str]:
+        preferred = model or config_manager.gemini_model
+        return list(dict.fromkeys(m for m in [preferred] + self.fallback_models if m))
 
     def _call_gemini_rest(self, model: str, payload: dict) -> dict:
-        key = self.api_key or config_manager.gemini_api_key
-        if not key:
-            raise ValueError("Gemini API key is not set. Please enter your API key in settings.")
-
         # The key goes in a header, never the URL, so it cannot leak through logs or proxies
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        data = json.dumps(payload).encode("utf-8")
-
-        req = urllib.request.Request(
-            url,
-            data=data,
-            headers={
-                "Content-Type": "application/json",
-                "User-Agent": "PrintLabel-Studio/2.0",
-                "x-goog-api-key": key,
-            },
-            method="POST",
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            err_body = e.read().decode("utf-8", errors="replace")
-            if e.code == 429 or "limit: 0" in err_body or "quota" in err_body.lower():
-                msg = (
+            return _post(url, json.dumps(payload).encode("utf-8"),
+                         {"Content-Type": "application/json", "x-goog-api-key": self.api_key}, "Gemini")
+        except _HttpError as e:
+            if e.code == 429 or "limit: 0" in e.body or "quota" in e.body.lower():
+                raise RuntimeError(
                     "Google AI Studio Quota Limit (Free Tier):\n"
                     "Google currently requires a billing account enabled on your AI Studio / Google Cloud project "
                     "for direct image-generation models (the free-tier quota for *-image models is set to 0 by Google).\n\n"
                     "Free alternative: make the picture in Gemini on the web (gemini.google.com), "
                     "save or copy it, then open or paste it in the icon editor."
                 )
-            else:
-                try:
-                    err_json = json.loads(err_body)
-                    msg = err_json.get("error", {}).get("message", err_body)
-                except Exception:
-                    msg = err_body
             if e.code == 404:
-                raise ModelNotFoundError(f"Gemini model '{model}' was not found: {msg}")
-            raise RuntimeError(f"Gemini API Error ({e.code}): {msg}")
-        except Exception as e:
-            raise RuntimeError(f"Network error calling Gemini API: {e}")
+                raise ModelNotFoundError(f"Gemini model '{model}' was not found: {e}")
+            raise RuntimeError(str(e))
 
-    def generate_from_image(
-        self,
-        input_image: Image.Image,
-        custom_instructions: str = "",
-        model: Optional[str] = None,
-        style: str = DEFAULT_STYLE,
-        line_thickness: int = 1,
-        return_raw: bool = False,
-    ) -> Image.Image:
-        """
-        Takes a real-world photo, sends it to Gemini with our thermal icon prompt,
-        and returns a post-processed pure monochrome icon.
-        """
-        # Compress / resize input image to reasonable size for API transfer (max 1024x1024)
-        img_copy = input_image.convert("RGBA")
-        img_copy.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-        # JPEG has no transparency; show see-through parts as white rather than black
-        flat = Image.new("RGBA", img_copy.size, (255, 255, 255, 255))
-        flat.alpha_composite(img_copy)
-        buf = io.BytesIO()
-        flat.convert("RGB").save(buf, format="JPEG", quality=85)
-        b64_image = base64.b64encode(buf.getvalue()).decode("utf-8")
-
-        prompt_text = (
-            f"{THERMAL_WIREFRAME_SYSTEM_PROMPT}\n\n"
-            "TASK: Make a label icon of the item shown in the attached photo.\n"
-            f"STYLE: {ICON_STYLES.get(style, ICON_STYLES[DEFAULT_STYLE])}\n"
-            "Ignore the photo's background, lighting and anything that is not the item itself.\n"
-        )
-        if custom_instructions.strip():
-            prompt_text += f"Additional user specification: {custom_instructions.strip()}\n"
-
+    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
         payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt_text},
-                        {
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": b64_image,
-                            }
-                        },
-                    ]
-                }
-            ],
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"],
-            },
+            "contents": [{"parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": "image/jpeg",
+                                 "data": base64.b64encode(_picture_bytes(picture, "JPEG")).decode("ascii")}},
+            ]}],
+            "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
         }
+        res = self._call_gemini_rest(model, payload)
+        candidates = res.get("candidates", [])
+        if not candidates:
+            raise RuntimeError(f"No picture came back from {model}.")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        for part in parts:
+            if "inlineData" in part:
+                return Image.open(io.BytesIO(base64.b64decode(part["inlineData"]["data"])))
+        text = " ".join(p.get("text", "") for p in parts)
+        raise RuntimeError(f"Model {model} returned text instead of a picture: {text[:200]}")
 
-        return self._generate_image(payload, model, line_thickness, return_raw)
 
-    def generate_from_text(
-        self,
-        prompt: str,
-        model: Optional[str] = None,
-        style: str = DEFAULT_STYLE,
-        line_thickness: int = 1,
-        return_raw: bool = False,
-    ) -> Image.Image:
-        """
-        Generates an icon from a text description using Gemini image generation.
-        """
-        full_prompt = (
-            f"{THERMAL_WIREFRAME_SYSTEM_PROMPT}\n\n"
-            f"TASK: Make a label icon of: {prompt}.\n"
-            f"STYLE: {ICON_STYLES.get(style, ICON_STYLES[DEFAULT_STYLE])}\n"
-        )
+def _picture_from_images_api(res: dict, service: str) -> Image.Image:
+    """Reads the picture from an OpenAI-style images response: data[0].b64_json."""
+    data = res.get("data") or []
+    if data and data[0].get("b64_json"):
+        return Image.open(io.BytesIO(base64.b64decode(data[0]["b64_json"])))
+    raise RuntimeError(f"No picture came back from {service}.")
 
+
+class OpenAIProvider(ImageProvider):
+    id = "openai"
+    name = "OpenAI"
+    key_url = "https://platform.openai.com/api-keys"
+    key_note = "Uses the OpenAI Images API, billed to your OpenAI account."
+    default_model = "gpt-image-2"
+    fallback_models = ["gpt-image-1.5", "gpt-image-1"]
+
+    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
+        boundary = f"----CubeLabeler{uuid.uuid4().hex}"
+        fields = [("model", model), ("prompt", prompt), ("size", "1024x1024")]
+        body = io.BytesIO()
+        for name, value in fields:
+            body.write(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n"
+                       .encode("utf-8"))
+        body.write(f"--{boundary}\r\nContent-Disposition: form-data; name=\"image[]\"; filename=\"picture.png\"\r\n"
+                   "Content-Type: image/png\r\n\r\n".encode("utf-8"))
+        body.write(_picture_bytes(picture, "PNG"))
+        body.write(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+        try:
+            res = _post("https://api.openai.com/v1/images/edits", body.getvalue(), {
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "Authorization": f"Bearer {self.api_key}",
+            }, "OpenAI")
+        except _HttpError as e:
+            if e.code == 404 or "model_not_found" in e.body or "does not exist" in e.body:
+                raise ModelNotFoundError(f"OpenAI model '{model}' was not found: {e}")
+            raise RuntimeError(str(e))
+        return _picture_from_images_api(res, "OpenAI")
+
+
+class OpenRouterProvider(ImageProvider):
+    id = "openrouter"
+    name = "OpenRouter"
+    key_url = "https://openrouter.ai/settings/keys"
+    key_note = ("One key for image models from many companies, paid from your OpenRouter credits. "
+                "Any image model that takes a picture works, e.g. openai/gpt-image-2.")
+    default_model = "google/gemini-2.5-flash-image"
+
+    def _redraw(self, picture: Image.Image, prompt: str, model: str) -> Image.Image:
+        data_url = "data:image/png;base64," + base64.b64encode(_picture_bytes(picture, "PNG")).decode("ascii")
         payload = {
-            "contents": [{"parts": [{"text": full_prompt}]}],
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"],
-            },
+            "model": model,
+            "prompt": prompt,
+            "input_references": [{"type": "image_url", "image_url": {"url": data_url}}],
         }
-
-        return self._generate_image(payload, model, line_thickness, return_raw)
-
-    @staticmethod
-    def _models_to_try(model: Optional[str]) -> List[str]:
-        preferred = model or config_manager.gemini_model
-        ordered = [preferred] + FALLBACK_IMAGE_MODELS
-        return list(dict.fromkeys(m for m in ordered if m))
-
-    def _generate_image(
-        self, payload: dict, model: Optional[str], line_thickness: int, return_raw: bool
-    ) -> Image.Image:
-        """
-        Calls the preferred model and returns its image. Falls back to the next model only
-        when a model does not exist, so a real failure is never retried (and billed) again.
-        """
-        last_err: Optional[Exception] = None
-        for m in self._models_to_try(model):
-            try:
-                res = self._call_gemini_rest(m, payload)
-            except ModelNotFoundError as e:
-                last_err = e
-                continue
-
-            candidates = res.get("candidates", [])
-            if not candidates:
-                raise RuntimeError(f"No candidate received from {m}.")
-
-            parts = candidates[0].get("content", {}).get("parts", [])
-            for part in parts:
-                if "inlineData" in part:
-                    img_bytes = base64.b64decode(part["inlineData"]["data"])
-                    raw_result = Image.open(io.BytesIO(img_bytes))
-                    if return_raw:
-                        return raw_result
-                    return post_process_thermal(raw_result, line_thickness=line_thickness)
-
-            text_content = " ".join(p.get("text", "") for p in parts)
-            raise RuntimeError(f"Model {m} returned text instead of an image: {text_content[:200]}")
-
-        raise last_err or RuntimeError("Failed to generate wireframe image with Gemini.")
+        try:
+            res = _post("https://openrouter.ai/api/v1/images", json.dumps(payload).encode("utf-8"), {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            }, "OpenRouter")
+        except _HttpError as e:
+            if e.code == 404:
+                raise ModelNotFoundError(f"OpenRouter model '{model}' was not found: {e}")
+            raise RuntimeError(str(e))
+        return _picture_from_images_api(res, "OpenRouter")
 
 
-# Global generator instance
-ai_generator = GeminiWireframeGenerator()
+PROVIDERS: Dict[str, ImageProvider] = {p.id: p for p in (GeminiProvider(), OpenAIProvider(), OpenRouterProvider())}
+
+
+def current_provider() -> ImageProvider:
+    """The service chosen under Settings."""
+    return PROVIDERS.get(config_manager.ai_provider, PROVIDERS["gemini"])
+
+
+def provider_by_name(name: str) -> Optional[ImageProvider]:
+    return next((p for p in PROVIDERS.values() if p.name == name), None)

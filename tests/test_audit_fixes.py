@@ -17,9 +17,11 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
+from PIL import Image
+
 from core import printer as printer_mod
 from core import secret_store
-from core.ai_generator import GeminiWireframeGenerator, ModelNotFoundError
+from core.ai_generator import GeminiProvider, ModelNotFoundError
 from core.cli import cli_main
 from core.config import ConfigManager, DEFAULT_GEMINI_IMAGE_MODEL
 from core.inventory_renderer import ComponentLabelConfig, FastenerLabelConfig
@@ -250,14 +252,14 @@ class TestConfigAndAI(unittest.TestCase):
             captured["key"] = req.get_header("X-goog-api-key")
             return _Resp(b"{}")
 
-        gen = GeminiWireframeGenerator(api_key="SECRET_KEY")
+        gen = GeminiProvider(api_key="SECRET_KEY")
         with mock.patch.object(urllib.request, "urlopen", fake_urlopen):
             gen._call_gemini_rest("some-model", {})
         self.assertNotIn("SECRET_KEY", captured["url"])
         self.assertEqual(captured["key"], "SECRET_KEY")
 
     def test_falls_back_only_on_missing_model(self):
-        gen = GeminiWireframeGenerator(api_key="K")
+        gen = GeminiProvider(api_key="K")
         calls = []
 
         def fake_call(model, payload):
@@ -268,7 +270,7 @@ class TestConfigAndAI(unittest.TestCase):
 
         with mock.patch.object(gen, "_call_gemini_rest", fake_call):
             with self.assertRaisesRegex(RuntimeError, "500"):
-                gen.generate_from_text("gear", model="missing-model")
+                gen.redraw(Image.new("RGB", (8, 8), "white"), model="missing-model")
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[0], "missing-model")
 

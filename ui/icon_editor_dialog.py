@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Icon editor for Cube Labeler: one window for importing a picture, making an icon with
-Gemini and editing one of the user's icons later.
+Icon editor for Cube Labeler: one window for importing a picture, redrawing it with an
+AI service and editing one of the user's icons later.
 
 The picture on the left is the original. The settings in the middle turn it into the icon
 on the right, which can be touched up dot by dot. The original, the settings and the
@@ -20,7 +20,7 @@ from PIL import Image, ImageTk
 
 from core import icon_editor as ie
 from core.icon_editor import DRAWING, OUTLINE, SILHOUETTE, IconEdit
-from core.ai_generator import ai_generator, ICON_STYLES, DEFAULT_STYLE
+from core.ai_generator import CUSTOM, DEFAULT_PRESET, PRESET_LABELS, current_provider, preset_mode
 from core.config import config_manager
 from core.icon_manager import USER_CATEGORY, IconItem, icon_manager, parse_keywords
 
@@ -81,7 +81,7 @@ class IconEditorDialog(ctk.CTkToplevel):
         self._base_mask: Optional[Image.Image] = None
         self._base_key = None
         self._result_mask: Optional[Image.Image] = None
-        self._picture_before_gemini: Optional[Image.Image] = None
+        self._picture_before_ai: Optional[Image.Image] = None
         self._render_job = None
         self._crop_start = None
         self._picture_box = (0, 0, 1, 1)  # where the picture sits on its canvas: x, y, w, h
@@ -184,34 +184,44 @@ class IconEditorDialog(ctk.CTkToplevel):
         ctk.CTkButton(row, text="Paste  (Ctrl+V)", width=150, fg_color="gray30", hover_color="gray40",
                       command=self._paste_picture).pack(side="right")
 
-        gem = ctk.CTkFrame(panel)
-        gem.pack(fill="x", padx=10, pady=(12, 10))
-        ctk.CTkLabel(gem, text="Make it with Gemini", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=8, pady=(6, 2))
-        self.style_menu = ctk.CTkOptionMenu(gem, values=list(ICON_STYLES), height=28)
-        self.style_menu.set(DEFAULT_STYLE)
-        self.style_menu.pack(fill="x", padx=8, pady=(0, 4))
-        self.entry_prompt = ctk.CTkEntry(gem, placeholder_text="Describe it, e.g. M3 nylon lock nut", height=28)
-        self.entry_prompt.pack(fill="x", padx=8, pady=(0, 4))
-        self.entry_prompt.bind("<Return>", lambda e: self._gemini_from_text())
-        gem_row = ctk.CTkFrame(gem, fg_color="transparent")
-        gem_row.pack(fill="x", padx=8, pady=(0, 4))
-        self.btn_gem_text = ctk.CTkButton(gem_row, text="Draw from description", width=150, height=28,
-                                          fg_color="#8B5CF6", hover_color="#7C3AED", command=self._gemini_from_text)
-        self.btn_gem_text.pack(side="left")
-        self.btn_gem_photo = ctk.CTkButton(gem_row, text="Redraw my picture", width=140, height=28,
-                                           fg_color="#8B5CF6", hover_color="#7C3AED", command=self._gemini_from_picture)
-        self.btn_gem_photo.pack(side="right")
-        self.btn_restore = ctk.CTkButton(gem, text="Use my own picture again", height=26, fg_color="gray30",
+        ai = ctk.CTkFrame(panel)
+        ai.pack(fill="x", padx=10, pady=(12, 10))
+        self.lbl_ai_title = ctk.CTkLabel(ai, text="", font=ctk.CTkFont(size=12, weight="bold"))
+        self.lbl_ai_title.pack(anchor="w", padx=8, pady=(6, 2))
+        self.preset_menu = ctk.CTkOptionMenu(ai, values=PRESET_LABELS, height=28, command=self._on_preset)
+        self.preset_menu.set(DEFAULT_PRESET)
+        self.preset_menu.pack(fill="x", padx=8, pady=(0, 4))
+        # Only shown for the Custom preset
+        self.entry_custom = ctk.CTkEntry(
+            ai, height=28, placeholder_text="Your instructions, e.g. front view, keep the two screw holes")
+        self.entry_custom.bind("<Return>", lambda e: self._redraw_with_ai())
+        self.btn_ai = ctk.CTkButton(ai, text="Redraw my picture", height=28, fg_color="#8B5CF6",
+                                    hover_color="#7C3AED", command=self._redraw_with_ai)
+        self.btn_ai.pack(fill="x", padx=8, pady=(0, 4))
+        self.btn_restore = ctk.CTkButton(ai, text="Use my own picture again", height=26, fg_color="gray30",
                                          hover_color="gray40", command=self._restore_picture)
-        key_note = (
-            "Uses the Gemini API key from Settings."
-            if config_manager.gemini_api_key
-            else "Needs a Gemini API key, added under Settings in the main window. Or make the picture "
-                 "at gemini.google.com and open or paste it here."
-        )
-        self.lbl_key_note = ctk.CTkLabel(gem, text=key_note, font=ctk.CTkFont(size=11), text_color=MUTED,
+        self.lbl_key_note = ctk.CTkLabel(ai, text="", font=ctk.CTkFont(size=11), text_color=MUTED,
                                          wraplength=int(300 * self._scale), justify="left")
         self.lbl_key_note.pack(anchor="w", padx=8, pady=(0, 6))
+        self._show_provider()
+
+    def _show_provider(self):
+        provider = current_provider()
+        self.lbl_ai_title.configure(text=f"Redraw it with {provider.name}")
+        if provider.api_key:
+            note = f"Uses the {provider.name} API key from Settings."
+        else:
+            note = f"Needs your own {provider.name} API key, added under Settings in the main window."
+            if provider.id == "gemini":
+                note += " Or make the picture at gemini.google.com and open or paste it here."
+        self.lbl_key_note.configure(text=note)
+
+    def _on_preset(self, label: str):
+        if label == CUSTOM:
+            self.entry_custom.pack(fill="x", padx=8, pady=(0, 4), before=self.btn_ai)
+            self.entry_custom.focus_set()
+        else:
+            self.entry_custom.pack_forget()
 
     def _build_settings_panel(self, panel):
         self._section(panel, "Read the picture as", top=4)
@@ -330,7 +340,7 @@ class IconEditorDialog(ctk.CTkToplevel):
         except Exception as e:
             messagebox.showerror("Open picture", f"Could not read that picture:\n{e}", parent=self)
             return False
-        self._picture_before_gemini = None
+        self._picture_before_ai = None
         self.btn_restore.pack_forget()
         self._set_source(image, suggested_name(path))
         self._status(f"Opened {os.path.basename(path)}")
@@ -384,7 +394,7 @@ class IconEditorDialog(ctk.CTkToplevel):
             messagebox.showinfo("Paste", "There is no picture on the clipboard. Copy a picture or a picture file first.",
                                 parent=self)
             return
-        self._picture_before_gemini = None
+        self._picture_before_ai = None
         self.btn_restore.pack_forget()
         self._set_source(data, "Pasted picture")
         self._status("Pasted a picture")
@@ -437,7 +447,7 @@ class IconEditorDialog(ctk.CTkToplevel):
         c.delete("all")
         cw, ch = int(c["width"]), int(c["height"])
         if self.source is None:
-            c.create_text(cw // 2, ch // 2, text="Open or paste a picture,\nor make one with Gemini below",
+            c.create_text(cw // 2, ch // 2, text="Open or paste a picture to start.\nAn AI service can redraw it below.",
                           fill="#4B5563", justify="center", font=("Segoe UI", 11))
             return
         shown = ie.orient(self.source, self.edit)
@@ -600,7 +610,7 @@ class IconEditorDialog(ctk.CTkToplevel):
         state = "normal" if has_icon else "disabled"
         self.btn_save.configure(state=state)
         self.btn_save_insert.configure(state=state)
-        self.btn_gem_photo.configure(state="normal" if self.source is not None and not self._busy else "disabled")
+        self.btn_ai.configure(state="normal" if self.source is not None and not self._busy else "disabled")
 
     def _apply_touch(self):
         if self._base_mask is None:
@@ -643,49 +653,31 @@ class IconEditorDialog(ctk.CTkToplevel):
     def _status(self, text: str, color=MUTED):
         self.lbl_status.configure(text=text, text_color=color)
 
-    # ----- Gemini -----
+    # ----- AI redraw -----
 
-    def _gemini_key(self) -> str:
-        key = config_manager.gemini_api_key
-        if not key:
-            messagebox.showwarning(
-                "Add a Gemini API key",
-                "Gemini needs an API key. Add one under Settings in the main window.\n\n"
-                "Or make the picture in Gemini on the web, then open or paste it here.",
-                parent=self,
-            )
-        return key
+    def _redraw_with_ai(self):
+        if self.source is None or self._busy:
+            return
+        provider = current_provider()
+        if not provider.api_key:
+            extra = ("\n\nOr make the picture in Gemini on the web, then open or paste it here."
+                     if provider.id == "gemini" else "")
+            messagebox.showwarning(f"Add your {provider.name} API key",
+                                   f"{provider.name} needs an API key. Add one under Settings in the main window."
+                                   + extra, parent=self)
+            return
+        preset = self.preset_menu.get()
+        custom = self.entry_custom.get().strip()
+        if preset == CUSTOM and not custom:
+            messagebox.showinfo("Custom instructions", "Type how the picture should be redrawn first.", parent=self)
+            self.entry_custom.focus_set()
+            return
+        picture = self._picture_before_ai or self.source
+        self._run_ai(provider.name, lambda: provider.redraw(picture, preset, custom))
 
-    def _gemini_from_text(self):
-        prompt = self.entry_prompt.get().strip()
-        if not prompt:
-            messagebox.showinfo("Describe the icon", "Type what the icon should show first.", parent=self)
-            return
-        key = self._gemini_key()
-        if not key:
-            return
-        ai_generator.api_key = key
-        style = self.style_menu.get()
-        if not self.entry_name.get().strip():
-            self.entry_name.insert(0, prompt[:40])
-        self._run_gemini(lambda: ai_generator.generate_from_text(prompt, style=style, return_raw=True))
-
-    def _gemini_from_picture(self):
-        if self.source is None:
-            return
-        key = self._gemini_key()
-        if not key:
-            return
-        ai_generator.api_key = key
-        style = self.style_menu.get()
-        picture = self._picture_before_gemini or self.source
-        details = self.entry_prompt.get().strip()
-        self._run_gemini(lambda: ai_generator.generate_from_image(
-            picture, custom_instructions=details, style=style, return_raw=True))
-
-    def _run_gemini(self, generate: Callable[[], Image.Image]):
+    def _run_ai(self, service: str, generate: Callable[[], Image.Image]):
         """
-        Runs a Gemini call on a worker thread. Tkinter is not thread-safe, so the worker only
+        Runs an AI call on a worker thread. Tkinter is not thread-safe, so the worker only
         puts its result on a queue and the Tk main loop polls it.
         """
         results: "queue.Queue" = queue.Queue()
@@ -706,39 +698,36 @@ class IconEditorDialog(ctk.CTkToplevel):
                 return
             self._set_busy(False)
             if ok:
-                self._on_gemini_picture(value)
+                self._on_ai_picture(value, service)
             else:
-                self._status("Gemini could not make the icon", ERROR_RED)
-                messagebox.showerror("Gemini could not make the icon", value, parent=self)
+                self._status(f"{service} could not make the icon", ERROR_RED)
+                messagebox.showerror(f"{service} could not make the icon", value, parent=self)
 
         self._set_busy(True)
-        self._status("Asking Gemini for an icon…", BUSY_BLUE)
+        self._status(f"Asking {service} for an icon…", BUSY_BLUE)
         threading.Thread(target=worker, daemon=True).start()
         self.after(100, poll)
 
     def _set_busy(self, busy: bool):
         self._busy = busy
-        state = "disabled" if busy else "normal"
-        self.btn_gem_text.configure(state=state)
-        self.btn_gem_photo.configure(state="disabled" if busy or self.source is None else "normal")
+        self.btn_ai.configure(state="disabled" if busy or self.source is None else "normal")
 
-    def _on_gemini_picture(self, picture: Image.Image):
-        if self.source is not None and self._picture_before_gemini is None:
-            self._picture_before_gemini = self.source
-        filled = self.style_menu.get() == DEFAULT_STYLE
+    def _on_ai_picture(self, picture: Image.Image, service: str):
+        if self.source is not None and self._picture_before_ai is None:
+            self._picture_before_ai = self.source
         self._set_source(picture)
-        self.edit = IconEdit(mode=SILHOUETTE if filled else DRAWING)
+        self.edit = IconEdit(mode=preset_mode(self.preset_menu.get()))
         self._sync_controls()
         self._render_now()
-        if self._picture_before_gemini is not None:
+        if self._picture_before_ai is not None:
             self.btn_restore.pack(fill="x", padx=8, pady=(0, 6), before=self.lbl_key_note)
-        self._status("Gemini's icon is ready. Tune it or touch it up, then save.", OK_GREEN)
+        self._status(f"{service}'s icon is ready. Tune it or touch it up, then save.", OK_GREEN)
 
     def _restore_picture(self):
-        if self._picture_before_gemini is None:
+        if self._picture_before_ai is None:
             return
-        picture = self._picture_before_gemini
-        self._picture_before_gemini = None
+        picture = self._picture_before_ai
+        self._picture_before_ai = None
         self.btn_restore.pack_forget()
         self._set_source(picture)
         self._status("Back to your own picture")

@@ -17,7 +17,7 @@ from core.icon_manager import IconManager, IconItem, load_catalog
 from core.ai_generator import (
     post_process_thermal,
     local_edge_filter,
-    GeminiWireframeGenerator,
+    GeminiProvider,
     THERMAL_WIREFRAME_SYSTEM_PROMPT,
 )
 
@@ -138,7 +138,7 @@ class TestAIGenerator(unittest.TestCase):
         self.assertEqual(edge_img.mode, "RGBA")
 
     def test_gemini_prompt_and_client(self):
-        gen = GeminiWireframeGenerator(api_key="TEST_KEY")
+        gen = GeminiProvider(api_key="TEST_KEY")
         self.assertEqual(gen.api_key, "TEST_KEY")
         self.assertIn("BOLD & THICK LINEWORK", THERMAL_WIREFRAME_SYSTEM_PROMPT)
         self.assertIn("AGGRESSIVE SIMPLIFICATION & ABSTRACTION", THERMAL_WIREFRAME_SYSTEM_PROMPT)
