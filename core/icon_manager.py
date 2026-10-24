@@ -67,7 +67,8 @@ def load_catalog(icons_dir: str) -> Dict[str, Any]:
 def print_preview(image_path: str, dots: int = PRINT_PREVIEW_DOTS) -> Optional[Image.Image]:
     """The icon as it comes out on tape: cropped to its ink, shrunk to `dots` and cut to black and white."""
     try:
-        img = Image.open(image_path).convert("RGBA")
+        with Image.open(image_path) as src:
+            img = src.convert("RGBA")
     except Exception:
         return None
     flat = Image.new("RGBA", img.size, "white")

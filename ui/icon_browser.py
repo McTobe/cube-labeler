@@ -226,7 +226,8 @@ class IconBrowserDialog(ctk.CTkToplevel):
         if key in self._ctk_image_cache:
             return self._ctk_image_cache[key]
         try:
-            pil_img = Image.open(file_path).convert("RGBA")
+            with Image.open(file_path) as src:
+                pil_img = src.convert("RGBA")
             pil_img.thumbnail((size, size), Image.Resampling.LANCZOS)
             ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
             self._ctk_image_cache[key] = ctk_img
@@ -426,7 +427,8 @@ class IconBrowserDialog(ctk.CTkToplevel):
             return
         try:
             from core.ai_generator import post_process_thermal
-            cleaned = post_process_thermal(Image.open(path), target_size=(256, 256))
+            with Image.open(path) as picked:
+                cleaned = post_process_thermal(picked, target_size=(256, 256))
         except Exception as e:
             messagebox.showerror("Import image", f"Could not read that picture:\n{e}", parent=self)
             return
