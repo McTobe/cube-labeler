@@ -7,15 +7,17 @@ which is how tests/test_web_bridge.py checks it.
 """
 
 import dataclasses
+import hashlib
 import io
 import os
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from core import protocol
 from core.specs import TAPE_SPECS
 
 USER_FONT_DIR = os.path.join(tempfile.gettempdir(), "cube-labeler-fonts")
+IMAGE_DIR = os.path.join(tempfile.gettempdir(), "cube-labeler-images")
 
 _renderer = None
 
@@ -69,24 +71,93 @@ def add_font(filename: str, data: Any) -> Optional[str]:
     return font_manager.register_custom_font(path)
 
 
+def _image_path(data: Any) -> str:
+    """Writes picture bytes to a file named by their hash (once) and returns its path."""
+    raw = _to_bytes(data)
+    os.makedirs(IMAGE_DIR, exist_ok=True)
+    path = os.path.join(IMAGE_DIR, hashlib.sha1(raw).hexdigest())
+    if not os.path.exists(path):
+        with open(path, "wb") as f:
+            f.write(raw)
+    return path
+
+
+def _png(image) -> bytes:
+    out = io.BytesIO()
+    image.save(out, format="PNG")
+    return out.getvalue()
+
+
 def render_label(options: Any) -> Dict[str, Any]:
     """
     Renders one text label. Options use LabelConfig field names (text, font_name,
     tape_width_mm, auto_fit_font, fixed_font_size, alignment, qr_enabled, qr_data, ...);
-    unknown keys are ignored. Returns the preview PNG, the print raster and the metrics.
+    unknown keys are ignored. A picture comes as bytes in image_data instead of image_path.
+    Returns the preview PNG, the print dots as a PNG that reads like the preview, the print
+    raster and the metrics.
     """
+    from PIL import ImageOps
     from core.label_renderer import LabelConfig
     fields = {f.name for f in dataclasses.fields(LabelConfig)}
-    opts = {k: v for k, v in _to_dict(options).items() if k in fields}
-    preview, _, raster, metrics = _get_renderer().render(LabelConfig(**opts))
+    raw = _to_dict(options)
+    opts = {k: v for k, v in raw.items() if k in fields and k != "image_path"}
+    if raw.get("image_data") is not None:
+        opts["image_path"] = _image_path(raw["image_data"])
+    preview, raster_image, raster, metrics = _get_renderer().render(LabelConfig(**opts))
 
-    png = io.BytesIO()
-    preview.save(png, format="PNG")
+    # The raster runs down the tape the way the printer feeds it; turn it back to read like the label
+    dots = ImageOps.mirror(raster_image.convert("L")).rotate(90, expand=True)
     return {
-        "preview_png": png.getvalue(),
+        "preview_png": _png(preview),
+        "dots_png": _png(ImageOps.invert(dots)),
         "raster": raster,
         "metrics": dataclasses.asdict(metrics),
     }
+
+
+# --- Text editor helpers: the same styling rules as the desktop editor (core/rich_text.py) ---
+
+def toggle_style(text: str, start: int, end: int, style: str) -> List[Any]:
+    """Adds or removes bold, italic, underline or invert around text[start:end]: [text, start, end]."""
+    from core import rich_text
+    return list(rich_text.toggle_style(text, int(start), int(end), style))
+
+
+def _line_span(text: str, start: int, end: int) -> range:
+    first = text.count("\n", 0, int(start))
+    last = text.count("\n", 0, int(end))
+    return range(first, last + 1)
+
+
+def restyle_lines(text: str, start: int, end: int, changes: Any) -> str:
+    """
+    Sets the size and/or alignment prefix of every line the selection touches. changes holds
+    "size" ("large", "medium", "normal", "small") and/or "align" ("left", "center", "right",
+    or None for the label's alignment).
+    """
+    from core import rich_text
+    changes = _to_dict(changes)
+    kwargs = {}
+    if "size" in changes:
+        kwargs["size"] = changes["size"]
+    if "align" in changes:
+        kwargs["align"] = changes["align"]
+    lines = text.split("\n")
+    for n in _line_span(text, start, end):
+        lines[n] = rich_text.set_line_style(lines[n], **kwargs)
+    return "\n".join(lines)
+
+
+def line_style_at(text: str, pos: int) -> List[Any]:
+    """The size and alignment of the line holding position pos: [size, align or None]."""
+    from core import rich_text
+    n = text.count("\n", 0, int(pos))
+    return list(rich_text.line_style(text.split("\n")[n]))
+
+
+def blank_raster(length_mm: float) -> bytes:
+    """An empty raster that feeds length_mm of tape when printed (like the desktop's Feed tape)."""
+    return bytes(protocol.LINE_BYTES * protocol.feed_dots(float(length_mm)))
 
 
 def raster_lines(raster: Any) -> int:

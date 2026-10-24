@@ -8,6 +8,7 @@ Builds the Cube Labeler web app into web/dist/, a static folder any web server c
 The page needs a secure context for Web Serial: localhost works, anything else needs HTTPS.
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -18,7 +19,8 @@ WEB_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(WEB_DIR)
 DIST_DIR = os.path.join(WEB_DIR, "dist")
 
-PAGE_FILES = ["index.html", "app.js", "printer.js", "style.css"]
+PAGE_FILES = ["index.html", "printer.js", "style.css"]
+PAGE_DIRS = ["js", "vendor"]
 
 # The parts of core/ the web app runs; the rest needs the desktop (tkinter, pyserial, registry)
 CORE_MODULES = [
@@ -72,6 +74,26 @@ def build_icons() -> None:
         )
 
 
+def build_service_worker() -> None:
+    """Writes sw.js with the list of the app's files and a build id that changes with them."""
+    files, digest = [], hashlib.sha256()
+    for root, _, names in sorted(os.walk(DIST_DIR)):
+        for name in sorted(names):
+            path = os.path.join(root, name)
+            rel = os.path.relpath(path, DIST_DIR).replace(os.sep, "/")
+            files.append(rel)
+            digest.update(rel.encode())
+            with open(path, "rb") as f:
+                digest.update(f.read())
+    files = ["./"] + [f for f in files if f != "index.html"] + ["index.html"]
+    with open(os.path.join(WEB_DIR, "sw.js"), encoding="utf-8") as f:
+        source = f.read()
+    source = source.replace("'__BUILD__'", json.dumps(digest.hexdigest()[:12]))
+    source = source.replace("__APP_FILES__", json.dumps(files))
+    with open(os.path.join(DIST_DIR, "sw.js"), "w", encoding="utf-8") as f:
+        f.write(source)
+
+
 def main() -> int:
     # Empty the folder rather than deleting it, so a server running from it keeps working
     os.makedirs(DIST_DIR, exist_ok=True)
@@ -84,10 +106,13 @@ def main() -> int:
 
     for name in PAGE_FILES:
         shutil.copy2(os.path.join(WEB_DIR, name), DIST_DIR)
+    for name in PAGE_DIRS:
+        shutil.copytree(os.path.join(WEB_DIR, name), os.path.join(DIST_DIR, name))
     build_core_zip(os.path.join(DIST_DIR, "cube_core.zip"))
     build_icons()
     with open(os.path.join(DIST_DIR, "manifest.webmanifest"), "w", encoding="utf-8") as f:
         json.dump(MANIFEST, f, indent=2)
+    build_service_worker()
 
     print(f"Built {DIST_DIR}")
     return 0

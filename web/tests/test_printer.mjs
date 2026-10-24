@@ -7,7 +7,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadPyodide } from 'pyodide';
-import { SerialTransport, queryStatus, printRaster, errorMessage } from '../printer.js';
+import { SerialTransport, queryStatus, printRaster, feedTape, errorMessage } from '../printer.js';
 
 const WEB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CORE_DIR = join(WEB_DIR, '..', 'core');
@@ -158,6 +158,31 @@ test('a port can be used again after a job', async () => {
   await printRaster(transport, py, RASTER);
   assert.equal(port.opened, 2);
   assert.equal(port.closed, 2);
+});
+
+test('feeds tape with an uncompressed blank job, like the desktop app', async () => {
+  const port = new FakePrinterPort();
+  const messages = [];
+  const result = await feedTape(new SerialTransport(port), py, 25, (m) => messages.push(m));
+  assert.deepEqual(result, { confirmed: true });
+  const blank = pyBytes(py.blank_raster(25));
+  const expected = [
+    ...pyBytes(py.status_query()),
+    ...pyBytes(py.print_job(statusBytes(), blank, { compress: false })),
+    PRINT,
+    ...pyBytes(py.reset_sequence()),
+  ];
+  assert.deepEqual(port.written, expected);
+  assert.equal(messages.at(-1), 'Tape fed.');
+});
+
+test('works with a bridge whose calls return promises', async () => {
+  // The app talks to Python through a worker, so every call it makes is async
+  const asyncPy = new Proxy({}, { get: (_, name) => async (...args) => py[name](...args) });
+  const status = await queryStatus(new SerialTransport(new FakePrinterPort()), asyncPy);
+  assert.equal(status.tape_width_mm, 12);
+  const result = await printRaster(new SerialTransport(new FakePrinterPort()), asyncPy, RASTER);
+  assert.deepEqual(result, { confirmed: true });
 });
 
 test('errorMessage keeps the last line of a Python traceback', () => {

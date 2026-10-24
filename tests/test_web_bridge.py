@@ -54,6 +54,32 @@ class TestWebRender(unittest.TestCase):
         result = cube_web.render_label({"text": "Hi", "not_a_field": 1})
         self.assertGreater(cube_web.raster_lines(result["raster"]), 0)
 
+    def test_dots_view_reads_like_the_preview(self):
+        result = cube_web.render_label({"text": "Wide label text", "tape_width_mm": 12.0})
+        preview = Image.open(io.BytesIO(result["preview_png"]))
+        dots = Image.open(io.BytesIO(result["dots_png"]))
+        # The raster runs down the tape; turned back, it is as long as the label
+        self.assertEqual(dots.width, result["metrics"]["raster_lines"])
+        self.assertEqual(dots.height, 128)
+        self.assertGreater(dots.width, dots.height)
+        self.assertEqual(preview.width, dots.width)
+
+    def test_picture_from_bytes(self):
+        picture = Image.new("RGB", (40, 40), "white")
+        picture.paste((0, 0, 0), (10, 10, 30, 30))
+        data = io.BytesIO()
+        picture.save(data, format="PNG")
+        without = cube_web.render_label({"text": "Box"})
+        with_picture = cube_web.render_label({"text": "Box", "image_data": data.getvalue()})
+        self.assertGreater(with_picture["metrics"]["raster_lines"], without["metrics"]["raster_lines"])
+        # The same picture again reuses its file
+        again = cube_web.render_label({"text": "Box", "image_data": data.getvalue()})
+        self.assertEqual(again["raster"], with_picture["raster"])
+
+    def test_image_path_option_is_not_taken_from_the_page(self):
+        result = cube_web.render_label({"text": "Hi", "image_path": "/etc/passwd"})
+        self.assertEqual(result["raster"], cube_web.render_label({"text": "Hi"})["raster"])
+
     def test_add_font_rejects_non_fonts(self):
         self.assertIsNone(cube_web.add_font("notes.ttf", b"not a font"))
 
@@ -62,6 +88,31 @@ class TestWebRender(unittest.TestCase):
             name = cube_web.add_font("Arimo-Bold.ttf", f.read())
         self.assertEqual(name, "[Custom] Arimo-Bold")
         self.assertIn(name, cube_web.font_names())
+
+
+class TestWebTextEditing(unittest.TestCase):
+    def test_toggle_style(self):
+        self.assertEqual(cube_web.toggle_style("M3 screw", 0, 2, "bold"), ["**M3** screw", 2, 4])
+        self.assertEqual(cube_web.toggle_style("**M3** screw", 2, 4, "bold"), ["M3 screw", 0, 2])
+
+    def test_restyle_lines_touches_only_selected_lines(self):
+        text = "Top\nMiddle\nBottom"
+        self.assertEqual(cube_web.restyle_lines(text, 5, 5, {"size": "large"}), "Top\n# Middle\nBottom")
+        self.assertEqual(cube_web.restyle_lines(text, 0, 6, {"align": "right"}), ">> Top\n>> Middle\nBottom")
+        styled = "# >> Top"
+        self.assertEqual(cube_web.restyle_lines(styled, 0, 0, {"align": None}), "# Top")
+        self.assertEqual(cube_web.restyle_lines(styled, 0, 0, {"size": "normal"}), ">> Top")
+
+    def test_line_style_at(self):
+        text = "Plain\n-# << small left"
+        self.assertEqual(cube_web.line_style_at(text, 0), ["normal", None])
+        self.assertEqual(cube_web.line_style_at(text, len(text)), ["small", "left"])
+
+    def test_blank_raster_feeds_the_desktop_length(self):
+        from core import protocol
+        raster = cube_web.blank_raster(25)
+        self.assertEqual(cube_web.raster_lines(raster), protocol.feed_dots(25))
+        self.assertFalse(any(raster))
 
 
 class TestWebPrintJob(unittest.TestCase):

@@ -2,6 +2,9 @@
 //
 // The bytes come from the Python core (cube_web.py, running in Pyodide); this file only moves
 // them over Web Serial and follows the same steps as core/printer.py on the desktop.
+//
+// `py` is the cube_web module: the app passes its worker bridge, where every call returns a
+// promise; the tests pass Pyodide's module directly. Every call is awaited, so both work.
 
 // Serial Port Profile: the Bluetooth Classic service the PT-P300BT exposes
 export const SPP_UUID = '00001101-0000-1000-8000-00805f9b34fb';
@@ -158,7 +161,7 @@ export function errorMessage(err) {
 }
 
 async function readStatus(transport, py) {
-  const size = py.status_packet_size();
+  const size = await py.status_packet_size();
   const raw = await transport.read(size, STATUS_TIMEOUT_MS);
   if (raw.length !== size) {
     throw new Error(`Expected ${size} bytes status response, received ${raw.length} bytes. `
@@ -173,29 +176,29 @@ async function withPrinter(transport, py, job) {
     return await job();
   } finally {
     // Like the desktop app: reset the printer before letting go of the port
-    try { await transport.write(toBytes(py.reset_sequence())); } catch (err) { /* ignored */ }
+    try { await transport.write(toBytes(await py.reset_sequence())); } catch (err) { /* ignored */ }
     await transport.close();
   }
 }
 
 export async function queryStatus(transport, py) {
   return withPrinter(transport, py, async () => {
-    await transport.write(toBytes(py.status_query()));
-    return toPlain(py.describe_status(await readStatus(transport, py)));
+    await transport.write(toBytes(await py.status_query()));
+    return toPlain(await py.describe_status(await readStatus(transport, py)));
   });
 }
 
 // Prints one raster. Resolves to {confirmed: bool}; rejects with a readable error message.
 export async function printRaster(transport, py, raster, options = {}, onStatus = () => {}) {
-  const lines = py.raster_lines(raster);
+  const lines = await py.raster_lines(raster);
   return withPrinter(transport, py, async () => {
     onStatus('Checking printer status...');
-    await transport.write(toBytes(py.status_query()));
+    await transport.write(toBytes(await py.status_query()));
     const status = await readStatus(transport, py);
 
     let job;
     try {
-      job = toBytes(py.print_job(status, raster, options));
+      job = toBytes(await py.print_job(status, raster, options));
     } catch (err) {
       throw new Error(errorMessage(err));
     }
@@ -203,10 +206,10 @@ export async function printRaster(transport, py, raster, options = {}, onStatus 
     onStatus(`Sending ${lines} lines...`);
     await transport.write(job);
     onStatus('Printing label...');
-    await transport.write(toBytes(py.print_command()));
+    await transport.write(toBytes(await py.print_command()));
 
-    const deadline = Date.now() + py.completion_timeout(lines) * 1000;
-    const size = py.status_packet_size();
+    const deadline = Date.now() + (await py.completion_timeout(lines)) * 1000;
+    const size = await py.status_packet_size();
     while (Date.now() < deadline) {
       const raw = await transport.read(size, deadline - Date.now());
       if (raw.length !== size) {
@@ -215,7 +218,7 @@ export async function printRaster(transport, py, raster, options = {}, onStatus 
       }
       let state;
       try {
-        state = py.job_state(raw);
+        state = await py.job_state(raw);
       } catch (err) {
         throw new Error(errorMessage(err));
       }
@@ -226,5 +229,13 @@ export async function printRaster(transport, py, raster, options = {}, onStatus 
     }
     onStatus('Print sent, but the printer did not confirm completion.');
     return { confirmed: false };
+  });
+}
+
+// Feeds blank tape so the last label clears the cutter, like the desktop's Feed tape
+export async function feedTape(transport, py, lengthMm, onStatus = () => {}) {
+  const raster = toBytes(await py.blank_raster(lengthMm));
+  return printRaster(transport, py, raster, { compress: false }, (message) => {
+    onStatus(message === 'Print complete!' ? 'Tape fed.' : message.replace('Printing label', 'Feeding tape').replace('Print sent', 'Feed sent'));
   });
 }

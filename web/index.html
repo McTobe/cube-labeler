@@ -2,100 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#1f2430">
+  <meta name="description" content="Design and print labels on the Brother PT-P300BT.">
   <title>Cube Labeler</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/pyodide/v0.29.5/full/pyodide.js"></script>
-  <script type="module" src="app.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "preact": "./vendor/preact.module.js",
+        "preact/hooks": "./vendor/preact-hooks.module.js"
+      }
+    }
+  </script>
+  <script type="module" src="js/main.js"></script>
 </head>
 <body>
-  <header>
-    <h1>Cube Labeler</h1>
-    <span id="serial-badge" class="badge">Checking browser...</span>
-  </header>
-
-  <p id="serial-help" class="notice" hidden>
-    This browser can't talk to the printer. Use Chrome or Edge on Android, Windows, macOS or Linux.
-    You can still design labels and save them as pictures here.
-  </p>
-
-  <div id="loading" class="loading">
-    <div class="spinner" aria-hidden="true"></div>
-    <p id="loading-text">Starting...</p>
-    <p class="hint">The first start downloads about 15 MB. After that it loads from the browser cache.</p>
+  <div id="root">
+    <div class="boot">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Starting Cube Labeler...</p>
+      <noscript><p>Cube Labeler needs JavaScript.</p></noscript>
+    </div>
   </div>
-
-  <main id="app" hidden>
-    <section class="preview-card">
-      <img id="preview" alt="Label preview">
-      <p id="metrics" class="metrics"></p>
-      <p id="warning" class="warning" hidden></p>
-    </section>
-
-    <section class="card">
-      <label for="text">Text</label>
-      <textarea id="text" rows="2" placeholder="Type your label">Cube Labeler</textarea>
-      <p class="hint">**bold** *italic* __underline__ ==inverted== · line start: # large, -# small, &lt;&lt; left, &gt;&gt; right · a line with --- starts a new column</p>
-
-      <div class="row">
-        <div>
-          <label for="tape">Tape</label>
-          <select id="tape"></select>
-        </div>
-        <div>
-          <label for="align">Alignment</label>
-          <select id="align">
-            <option value="left">Left</option>
-            <option value="center" selected>Center</option>
-            <option value="right">Right</option>
-          </select>
-        </div>
-        <div>
-          <label for="frame">Frame</label>
-          <select id="frame">
-            <option value="none" selected>None</option>
-            <option value="box">Box</option>
-            <option value="rounded">Rounded</option>
-          </select>
-        </div>
-      </div>
-
-      <label for="font">Font</label>
-      <div class="row">
-        <select id="font"></select>
-        <label class="button secondary file-button">Add font
-          <input id="font-file" type="file" accept=".ttf,.otf,.ttc">
-        </label>
-      </div>
-
-      <div class="row">
-        <label class="check"><input id="auto-fit" type="checkbox" checked> Fit to tape</label>
-        <div>
-          <label for="font-size">Size</label>
-          <input id="font-size" type="number" min="6" max="200" value="40" disabled>
-        </div>
-      </div>
-
-      <label class="check"><input id="qr-enabled" type="checkbox"> QR code</label>
-      <input id="qr-data" type="text" placeholder="Link or text for the QR code" disabled>
-    </section>
-
-    <section class="card">
-      <div class="row">
-        <h2>Printer</h2>
-      </div>
-      <p id="printer" class="printer">Not connected</p>
-      <div class="actions">
-        <button id="connect" class="secondary">Connect printer</button>
-        <button id="check-status" class="secondary">Check status</button>
-        <button id="save" class="secondary">Save picture</button>
-        <button id="print">Print</button>
-      </div>
-      <p id="log" class="log" role="status"></p>
-    </section>
-  </main>
 </body>
 </html>
