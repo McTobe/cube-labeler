@@ -597,6 +597,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .tape-strip img { max-height: 200px; }
 }
 
+/* Wide screens: a bigger preview, and the settings in two columns so they fit without scrolling */
+@media (min-width: 1440px) {
+  .page-label main { max-width: 1760px; padding-left: 24px; padding-right: 24px; }
+  .label-page { grid-template-columns: minmax(0, 1fr) minmax(680px, 860px); gap: 24px; }
+  .label-edit-col { columns: 2; column-gap: 12px; }
+  .label-edit-col > * { break-inside: avoid; }
+  .label-edit-col > .text-card, .label-edit-col > .mode-switch { column-span: all; }
+  .tape-scroll, .preview .stage-message { min-height: 300px; }
+  .tape-strip img { max-height: 280px; }
+}
+
 /* --- Sheets (dialogs) ---------------------------------------------------------------------- */
 
 .sheet {
