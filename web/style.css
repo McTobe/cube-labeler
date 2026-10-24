@@ -683,6 +683,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* --- Other pages --------------------------------------------------------------------------- */
 
 .settings-page { max-width: 680px; }
+/* Wide screens: the cards in two columns instead of one narrow strip */
+@media (min-width: 1400px) {
+  .settings-page { max-width: 1400px; columns: 2; column-gap: 16px; }
+  .settings-page > * { break-inside: avoid; }
+}
 .settings-page .toggle { margin-top: 16px; }
 
 
@@ -940,3 +945,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .ai-box .primary { width: 100%; }
 .browser-grid .icon-title, .details-panel h2 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; }
 .details-panel h2 { text-align: left; }
+
+/* --- Automatic backups ---------------------------------------------------------------------- */
+.auto-backup { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.auto-backup h3 { font-size: 0.95rem; margin: 0 0 6px; }
+.auto-on { display: flex; align-items: baseline; gap: 8px; }
+.auto-on .dot { width: 9px; height: 9px; border-radius: 50%; background: #e0a100; flex: none; }
+.auto-on .dot.on { background: #2fb36d; }

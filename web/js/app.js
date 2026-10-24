@@ -351,6 +351,7 @@ export const templatePresets = () => py.template_presets();
 export const templateFromDesktop = (data) => py.template_from_desktop(data);
 export const templateToDesktop = (item) => py.template_to_desktop(item);
 export const makeBackup = (data) => py.make_backup(data);
+export const backupDigest = (data) => py.backup_digest(data);
 export const openBackup = (data) => py.open_backup(data);
 export const pythonReady = () => py !== null;
 

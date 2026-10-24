@@ -5,6 +5,7 @@ import { Segmented, Select, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateSettings } from '../app.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
+import { autoBackup, chooseFolder, allowFolder, stopAutoBackup } from '../autobackup.js';
 import { ai, loadAi, setKey, setModel } from '../ai.js';
 import { errorMessage } from '../../printer.js';
 import { PrinterPanel } from '../printer-ui.js';
@@ -130,8 +131,44 @@ function BackupCard() {
       <input ref=${fileRef} type="file" accept=".cubebackup,.cubeicons,application/zip" hidden onChange=${onFile} />
     </div>
     ${message.text && html`<p class=${`status-line${message.error ? ' error' : ''}`} role="status">${message.text}</p>`}
+    <${AutoBackup} ready=${ready} />
     <${RestoreSheet} opened=${opened} onClose=${() => setOpened(null)} onDone=${done} />
   </section>`;
+}
+
+// Automatic backups to a folder, which can be one that Google Drive, OneDrive or Dropbox syncs
+function AutoBackup({ ready }) {
+  const auto = useStore(autoBackup);
+  const [error, setError] = useState('');
+  const run = async (action) => {
+    setError('');
+    try { await action(); } catch (err) { setError(errorMessage(err)); }
+  };
+  let state;
+  if (!auto.supported) {
+    state = html`<p class="hint">Automatic backups need Chrome or Edge on a computer. On this device, save a backup by hand now and then.</p>`;
+  } else if (!auto.folder) {
+    state = html`<p class="hint">Pick a folder and a backup is saved there a few seconds after your icons, templates or settings change. The newest 10 are kept.
+      Pick a folder that Google Drive, OneDrive or Dropbox syncs to keep them in the cloud.</p>
+      <div class="button-row"><button class="secondary" disabled=${!ready || auto.busy} onClick=${() => run(chooseFolder)}>Choose a folder</button></div>`;
+  } else {
+    const where = html`<strong>${auto.folder.name}</strong>`;
+    state = html`
+      ${auto.allowed
+        ? html`<p class="auto-on"><span class="dot on"></span><span>On, saving to ${where}.${auto.last ? ` Last: ${formatDate(auto.last)}.` : ''}</span></p>`
+        : html`<p class="auto-on"><span class="dot"></span><span>Paused: the browser needs your OK to save in ${where} again.</span></p>`}
+      ${auto.error && html`<p class="status-line error">${auto.error}</p>`}
+      <div class="button-row">
+        ${!auto.allowed && html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(allowFolder)}>Allow</button>`}
+        <button class="secondary" disabled=${!ready || auto.busy} onClick=${() => run(chooseFolder)}>Change folder</button>
+        <button class="secondary" disabled=${auto.busy} onClick=${() => run(stopAutoBackup)}>Turn off</button>
+      </div>`;
+  }
+  return html`<div class="auto-backup">
+    <h3>Automatic backups</h3>
+    ${state}
+    ${error && html`<p class="status-line error">${error}</p>`}
+  </div>`;
 }
 
 function AiCard() {

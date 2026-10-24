@@ -280,6 +280,20 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         self.assertNotIn("gemini_api_key", read.settings)
         self.assertEqual(list(read.templates), ["templates/Shelf A.json"])
 
+    def test_backup_digest_ignores_time_and_recent_icons(self):
+        contents = {
+            "created": "2026-10-24T20:00:00+02:00",
+            "icons": [{"file": "washer.png", "favourite": False, "icon": self._png(), "meta": {"title": "Washer"}}],
+            "settings": {"label_language": "sv", "icon_recent": ["user/washer.png"]},
+            "templates": [],
+        }
+        first = cube_web.backup_digest(contents)
+        later = dict(contents, created="2026-10-25T08:00:00+02:00", settings={"label_language": "sv", "icon_recent": []})
+        self.assertEqual(cube_web.backup_digest(later), first)
+        changed = dict(contents, icons=[dict(contents["icons"][0], icon=self._png("red"))])
+        self.assertNotEqual(cube_web.backup_digest(changed), first)
+        self.assertNotEqual(cube_web.backup_digest(dict(contents, settings={"label_language": "en"})), first)
+
     def test_desktop_backup_opens_in_the_web_version(self):
         from core import backup
         layer = Image.new("L", (64, 64), 0)

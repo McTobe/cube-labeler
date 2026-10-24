@@ -13,7 +13,7 @@ const WEB_SETTINGS = ['theme', 'match_printer_tape'];
 // AI settings shared with the desktop app (the keys never go in a backup)
 const AI_SERVICES = ['gemini', 'openai', 'openrouter'];
 
-function localTime(date = new Date()) {
+export function localTime(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
   const offset = -date.getTimezoneOffset();
   const sign = offset >= 0 ? '+' : '-';
@@ -34,18 +34,25 @@ async function backupSettings() {
   return out;
 }
 
-export async function saveBackup() {
+// What goes in a backup, for makeBackup and backupDigest
+export async function collectBackup(created = localTime()) {
   if (!templates.get().ready) await loadTemplates();
-  const created = localTime();
-  const data = await makeBackup({
+  return {
     created,
     icons: iconsForBackup(),
     settings: await backupSettings(),
     templates: await Promise.all(templates.get().mine.map(async (t) => ({ name: t.name, json: await templateToDesktop(t.item) }))),
-  });
-  const stamp = created.slice(0, 16).replace('T', ' ').replace(':', '-');
-  downloadBlob(new Blob([data], { type: 'application/zip' }), `Cube Labeler backup ${stamp}.cubebackup`);
-  await storage.save('lastBackup', created);
+  };
+}
+
+// "2026-10-24T21:05:09+02:00" -> "2026-10-24 21-05"
+const fileStamp = (created) => created.slice(0, 16).replace('T', ' ').replace(':', '-');
+
+export async function saveBackup() {
+  const contents = await collectBackup();
+  const data = await makeBackup(contents);
+  downloadBlob(new Blob([data], { type: 'application/zip' }), `Cube Labeler backup ${fileStamp(contents.created)}.cubebackup`);
+  await storage.save('lastBackup', contents.created);
   return { icons: library.get().user.length, templates: templates.get().mine.length };
 }
 
