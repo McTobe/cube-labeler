@@ -6,8 +6,10 @@ import { Icon } from './icons.js';
 import { PrinterChip } from './printer-ui.js';
 import { LabelPage } from './pages/label.js';
 import { SettingsPage } from './pages/settings.js';
+import { QueuePage } from './pages/queue.js';
 import { SoonPage } from './pages/soon.js';
-import { start } from './app.js';
+import { app, start } from './app.js';
+import { useStore } from './state.js';
 
 const PAGES = [
   { id: 'label', title: 'Label', icon: 'label' },
@@ -24,6 +26,7 @@ function currentPage() {
 
 function App() {
   const [page, setPage] = useState(currentPage);
+  const { queue } = useStore(app);
   useEffect(() => {
     const onHash = () => { setPage(currentPage()); window.scrollTo(0, 0); };
     window.addEventListener('hashchange', onHash);
@@ -33,6 +36,7 @@ function App() {
 
   let body;
   if (page.id === 'label') body = html`<${LabelPage} />`;
+  else if (page.id === 'queue') body = html`<${QueuePage} />`;
   else if (page.id === 'settings') body = html`<${SettingsPage} />`;
   else body = html`<${SoonPage} page=${page.id} title=${page.title} />`;
 
@@ -41,7 +45,7 @@ function App() {
       <a class="brand" href="#/label"><img src="icon-192.png" alt="" width="28" height="28" /><span>Cube Labeler</span></a>
       ${PAGES.map((p) => html`<a href=${`#/${p.id}`} class=${p.id === page.id ? 'active' : ''}
         aria-current=${p.id === page.id ? 'page' : undefined}>
-        <${Icon} name=${p.icon} /><span>${p.title}</span></a>`)}
+        <${Icon} name=${p.icon} /><span>${p.title}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queue.length}</span>`}</a>`)}
     </nav>
     <div class="main-col">
       <header class="topbar">

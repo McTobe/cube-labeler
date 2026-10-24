@@ -106,32 +106,120 @@ def _hide_cut_line(preview, config):
     return out
 
 
-def render_label(options: Any) -> Dict[str, Any]:
+def _known(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+    names = {f.name for f in dataclasses.fields(cls)}
+    return {k: v for k, v in data.items() if k in names}
+
+
+def _bin_config(data: Dict[str, Any]):
     """
-    Renders one text label. Options use LabelConfig field names (text, font_name,
-    tape_width_mm, auto_fit_font, fixed_font_size, alignment, qr_enabled, qr_data, ...);
-    unknown keys are ignored. A picture comes as bytes in image_data instead of image_path.
-    Returns the preview PNG, the print dots as a PNG that reads like the preview, the print
-    raster and the metrics.
+    A bin label from the page: {"kind": "fastener" or "component", ...FastenerLabelConfig or
+    ComponentLabelConfig fields}. Its own icon comes as bytes in icon_data; icon paths from
+    the page are ignored.
     """
-    from PIL import ImageOps
+    from core.inventory_renderer import ComponentLabelConfig, FastenerLabelConfig
+    data = dict(data)
+    icon = data.pop("icon_data", None)
+    if data.get("kind") == "component":
+        fields = _known(ComponentLabelConfig, data)
+        fields.pop("custom_icon_path", None)
+        cfg = ComponentLabelConfig(**fields)
+        if cfg.icon_type == "custom":
+            cfg.custom_icon_path = _image_path(icon) if icon is not None else None
+            if cfg.custom_icon_path is None:
+                cfg.icon_type = "none"
+    else:
+        fields = _known(FastenerLabelConfig, data)
+        fields.pop("custom_tool_icon_path", None)
+        cfg = FastenerLabelConfig(**fields)
+        if cfg.tool_type == "custom":
+            cfg.custom_tool_icon_path = _image_path(icon) if icon is not None else None
+            if cfg.custom_tool_icon_path is None:
+                cfg.tool_type = "none"
+    cfg.tape_width_mm = 12
+    return cfg
+
+
+def _label_config(options: Any):
+    """
+    LabelConfig from the page's options: LabelConfig field names (text, font_name,
+    tape_width_mm, auto_fit_font, ...), a picture as bytes in image_data, and a bin label in
+    "bin" (see _bin_config). Unknown keys are ignored.
+    """
     from core.label_renderer import LabelConfig
-    fields = {f.name for f in dataclasses.fields(LabelConfig)}
+    from core.specs import INVENTORY_TAPE_WIDTH_MM
     raw = _to_dict(options)
-    opts = {k: v for k, v in raw.items() if k in fields and k != "image_path"}
+    opts = _known(LabelConfig, raw)
+    opts.pop("image_path", None)
+    opts.pop("inventory_config", None)
     if raw.get("image_data") is not None:
         opts["image_path"] = _image_path(raw["image_data"])
-    config = LabelConfig(**opts)
-    preview, raster_image, raster, metrics = _get_renderer().render(config)
+    if raw.get("bin") is not None:
+        opts["inventory_config"] = _bin_config(raw["bin"])
+        opts["tape_width_mm"] = INVENTORY_TAPE_WIDTH_MM
+    return LabelConfig(**opts)
 
+
+def _render_result(rendered) -> Dict[str, Any]:
+    from PIL import ImageOps
+    preview, raster_image, raster, metrics = rendered
     # The raster runs down the tape the way the printer feeds it; turn it back to read like the label
     dots = ImageOps.mirror(raster_image.convert("L")).rotate(90, expand=True)
     return {
-        "preview_png": _png(_hide_cut_line(preview, config)),
+        "preview_png": _png(preview),
         "dots_png": _png(ImageOps.invert(dots)),
         "raster": raster,
         "metrics": dataclasses.asdict(metrics),
     }
+
+
+def render_label(options: Any) -> Dict[str, Any]:
+    """
+    Renders one label: a text label, or a bin label when options has "bin". Returns the
+    preview PNG, the print dots as a PNG that reads like the preview, the print raster and
+    the metrics.
+    """
+    config = _label_config(options)
+    preview, *rest = _get_renderer().render(config)
+    return _render_result((_hide_cut_line(preview, config), *rest))
+
+
+def render_queue(labels: Any) -> Dict[str, Any]:
+    """Renders queued labels as one strip with cut lines between them, like the desktop queue."""
+    if hasattr(labels, "to_py"):
+        labels = labels.to_py()
+    configs = [_label_config(label) for label in labels]
+    return _render_result(_get_renderer().render_batch(configs))
+
+
+def label_thumbnail(options: Any, height: int = 48) -> bytes:
+    """A small preview PNG of one label, for lists."""
+    from PIL import Image
+    preview = _get_renderer().render(_label_config(options))[0]
+    width = max(1, round(preview.width * height / preview.height))
+    return _png(preview.resize((width, int(height)), Image.Resampling.LANCZOS))
+
+
+def bin_defaults(lang: str = "en") -> Dict[str, Any]:
+    """The starting fastener and part labels (presets A2 and B1), in the label language."""
+    from core.label_language import build_presets
+    presets = build_presets(lang)
+    fastener = dataclasses.asdict(presets["A2"].config)
+    component = dataclasses.asdict(presets["B1"].config)
+    fastener["kind"], component["kind"] = "fastener", "component"
+    # The editor has one note line for a single bin (as on the desktop)
+    fastener["standard_line1"], fastener["standard_line2"] = "", ""
+    return {"fastener": fastener, "component": component}
+
+
+def bin_name_suggestions(lang: str = "en") -> Dict[str, List[str]]:
+    from core.label_language import component_categories, fastener_categories
+    return {"fastener": fastener_categories(lang), "component": component_categories(lang)}
+
+
+def label_languages() -> List[List[str]]:
+    from core.label_language import LANGUAGES
+    return [[code, name] for code, name in LANGUAGES.items()]
 
 
 # --- Text editor helpers: the same styling rules as the desktop editor (core/rich_text.py) ---

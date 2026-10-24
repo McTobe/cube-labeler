@@ -27,8 +27,14 @@ function useFitWidth(stageRef, natural, wide) {
   return Math.max(40, Math.floor(natural[0] * scale));
 }
 
-export function Preview() {
-  const { render, renderError, label } = useStore(app);
+// Shows the label being edited, or the strip passed in (the queue page passes its strip)
+export function Preview({ strip, empty }) {
+  const state = useStore(app);
+  const render = strip === undefined ? state.render : strip;
+  const renderError = strip === undefined ? state.renderError : null;
+  const { label } = state;
+  // Rulers and the printable area are drawn on text labels
+  const aids = strip === undefined && state.mode === 'text';
   const { phase, text, error } = useStore(boot);
   const [view, setView] = useState('tape');
   const [zoom, setZoom] = useState('fit');
@@ -40,6 +46,8 @@ export function Preview() {
   let stage;
   if (phase === 'failed') {
     stage = html`<div class="stage-message error">Could not start: ${error}. Reload the page to try again.</div>`;
+  } else if (!render && empty && phase === 'ready') {
+    stage = html`<div class="stage-message">${empty}</div>`;
   } else if (!render) {
     stage = html`<div class="stage-message"><div class="spinner" aria-hidden="true"></div>
       <span>${phase === 'loading' ? text : 'Drawing...'}</span>
@@ -47,7 +55,7 @@ export function Preview() {
     </div>`;
   } else {
     const dots = view === 'dots';
-    const tape = dots ? '#ffffff' : render.label.tape_bg_color;
+    const tape = dots ? '#ffffff' : render.tape_bg_color;
     const fit = zoom === 'fit' && fitWidth;
     stage = html`<div ref=${stageRef} class=${`tape-scroll zoom-${zoom}${fit ? ' fitted' : ''}`}>
       <div class="tape-strip" style=${{ background: tape }}>
@@ -63,19 +71,19 @@ export function Preview() {
   return html`<section class="card preview" aria-label="Preview">
     ${stage}
     <div class="preview-bar">
-      <span class="metrics">${m ? `${m.print_length_mm} mm label · ${m.total_used_length_mm} mm of tape · about ${Math.max(1, Math.round(m.print_duration_sec))} s` : ''}</span>
+      <span class="metrics">${m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`} · ${m.total_used_length_mm} mm of tape · about ${Math.max(1, Math.round(m.print_duration_sec))} s` : ''}</span>
       <span class="preview-controls">
         <span class="chip-group" role="group" aria-label="Preview view">
           <button class=${view === 'tape' ? 'on' : ''} onClick=${() => setView('tape')}>Tape</button>
           <button class=${view === 'dots' ? 'on' : ''} onClick=${() => setView('dots')}>Print dots</button>
         </span>
-        <span class="chip-group" role="group" aria-label="Measuring aids">
+        ${aids && html`<span class="chip-group" role="group" aria-label="Measuring aids">
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}
             onClick=${() => updateLabel({ show_rulers: !label.show_rulers })}>Rulers</button>
           <button class=${label.show_guides ? 'on' : ''} aria-pressed=${label.show_guides}
             title="Shows the part of the tape the printer can print on"
             onClick=${() => updateLabel({ show_guides: !label.show_guides })}>Printable area</button>
-        </span>
+        </span>`}
         <span class="chip-group" role="group" aria-label="Zoom">
           ${ZOOMS.map(([value, name]) => html`<button class=${zoom === value ? 'on' : ''} onClick=${() => setZoom(value)}>${name}</button>`)}
         </span>

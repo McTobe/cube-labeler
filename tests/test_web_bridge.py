@@ -116,6 +116,50 @@ class TestWebRender(unittest.TestCase):
         self.assertIn(name, cube_web.font_names())
 
 
+class TestWebBinLabelsAndQueue(unittest.TestCase):
+    def test_bin_label_matches_desktop_renderer(self):
+        from core.inventory_renderer import FastenerLabelConfig
+        fastener = cube_web.bin_defaults("en")["fastener"]
+        result = cube_web.render_label({"bin": fastener, "tape_width_mm": 6.0})
+        fields = {k: v for k, v in fastener.items() if k != "kind"}
+        _, _, raster, _ = LabelRenderer().render(
+            LabelConfig(inventory_config=FastenerLabelConfig(**fields), tape_width_mm=12.0)
+        )
+        self.assertEqual(result["raster"], raster)
+
+    def test_part_label_with_own_icon(self):
+        part = dict(cube_web.bin_defaults("en")["component"], icon_type="custom")
+        picture = Image.new("RGB", (30, 30), "white")
+        picture.paste((0, 0, 0), (5, 5, 25, 25))
+        data = io.BytesIO()
+        picture.save(data, format="PNG")
+        with_icon = cube_web.render_label({"bin": dict(part, icon_data=data.getvalue())})
+        # Without the picture bytes, a custom icon falls back to no icon instead of failing
+        without = cube_web.render_label({"bin": part})
+        self.assertNotEqual(with_icon["raster"], without["raster"])
+
+    def test_bin_icon_paths_from_the_page_are_ignored(self):
+        part = dict(cube_web.bin_defaults("en")["component"], icon_type="custom", custom_icon_path="/etc/passwd")
+        self.assertGreater(cube_web.render_label({"bin": part})["metrics"]["raster_lines"], 0)
+
+    def test_queue_prints_as_one_strip(self):
+        labels = [{"text": "One"}, {"bin": cube_web.bin_defaults("en")["component"]}, {"text": "Three"}]
+        result = cube_web.render_queue(labels)
+        self.assertEqual(result["metrics"]["label_count"], 3)
+        self.assertEqual(result["metrics"]["tape_saved_mm"], 50.0)
+        configs = [cube_web._label_config(label) for label in labels]
+        self.assertEqual(result["raster"], LabelRenderer().render_batch(configs)[2])
+
+    def test_bin_defaults_and_suggestions_follow_the_language(self):
+        self.assertEqual(cube_web.bin_defaults("sv")["fastener"]["category"], "SKRUV")
+        self.assertIn("KULLAGER", cube_web.bin_name_suggestions("sv")["component"])
+        self.assertIn(["sv", "Svenska"], cube_web.label_languages())
+
+    def test_thumbnail_height(self):
+        png = cube_web.label_thumbnail({"text": "Hello"}, 40)
+        self.assertEqual(Image.open(io.BytesIO(png)).height, 40)
+
+
 class TestWebTextEditing(unittest.TestCase):
     def test_toggle_style(self):
         self.assertEqual(cube_web.toggle_style("M3 screw", 0, 2, "bold"), ["**M3** screw", 2, 4])

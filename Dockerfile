@@ -12,6 +12,7 @@ WORKDIR /src
 COPY constraints.txt .
 RUN pip install --no-cache-dir pillow -c constraints.txt
 COPY assets/icon.ico assets/icon.ico
+COPY assets/icons/ assets/icons/
 COPY core/ core/
 COPY web/ web/
 RUN python web/build.py

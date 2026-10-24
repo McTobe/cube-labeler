@@ -15,6 +15,9 @@ const PATHS = {
   feed: html`<path d="M4 12h12M12 7l5 5-5 5M20 5v14"/>`,
   help: html`<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>`,
   column: html`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>`,
+  edit: html`<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>`,
+  up: html`<path d="M12 19V5M6 11l6-6 6 6"/>`,
+  down: html`<path d="M12 5v14M6 13l6 6 6-6"/>`,
   refresh: html`<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>`,
 };
 

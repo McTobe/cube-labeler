@@ -27,6 +27,7 @@ CORE_MODULES = [
     "__init__.py",
     "font_manager.py",
     "inventory_renderer.py",
+    "label_language.py",
     "label_renderer.py",
     "protocol.py",
     "ptcbp.py",
@@ -60,6 +61,12 @@ def build_core_zip(path: str) -> None:
         zf.write(os.path.join(WEB_DIR, "cube_web.py"), "cube_web.py")
         for name in FONTS:
             zf.write(os.path.join(WEB_DIR, "fonts", name), f".fonts/{name}")
+        # The icon library: bin labels draw their drive and part icons from it
+        icons_dir = os.path.join(PROJECT_ROOT, "assets", "icons")
+        for root, _, names in os.walk(icons_dir):
+            for name in sorted(names):
+                path = os.path.join(root, name)
+                zf.write(path, "assets/icons/" + os.path.relpath(path, icons_dir).replace(os.sep, "/"))
 
 
 def build_icons() -> None:

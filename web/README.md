@@ -9,9 +9,11 @@ It is becoming the main way to use Cube Labeler (version 2.0). Done so far: the 
 (tabs on a phone, a sidebar on a wide screen), text labels with the styling toolbar, fonts,
 frames, QR codes (with a Wi-Fi helper), a picture, tape width, length and the advanced
 settings, the tape and print-dot preview, the printer panel (connect, status, feed tape),
-saving the label as a picture, and settings. The label, settings and added fonts are kept in
-the browser, and after the first visit the app also starts offline. Bin labels, the queue,
-icons, templates, backups and AI icons follow.
+saving the label as a picture, and settings. Bin labels (fasteners and parts, with their
+drive and part icons or your own picture) and the print queue (one strip with cut lines,
+reorder, edit, remove) are in too. The label, queue, settings and added fonts are kept in the
+browser, and after the first visit the app also starts offline. Icons, templates, backups and
+AI icons follow.
 
 ## Browser support
 
