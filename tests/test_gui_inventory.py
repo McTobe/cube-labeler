@@ -92,7 +92,7 @@ def test_gui_inventory():
     assert app.config.inventory_config.simple_drive_icon is False
 
     # Own icon via the Library…/File… buttons: the dropdown reads "Custom"; a built-in drive replaces it
-    icon_path = os.path.join(BASE_DIR, "assets", "icons", "fasteners", "robertson.png")
+    icon_path = os.path.join(BASE_DIR, "assets", "icons", "screw_drives", "robertson.png")
     tab._set_tool_icon_path(icon_path)
     assert app.config.inventory_config.tool_type == "custom"
     assert tab.drive_combo.get() == "Custom"
