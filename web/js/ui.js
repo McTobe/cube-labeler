@@ -1,5 +1,5 @@
 // Shared controls. They are plain inputs underneath, so the keyboard and screen readers work.
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { Icon } from './icons.js';
 
@@ -106,4 +106,18 @@ export function Menu({ open, onClose, items }) {
         ${item.icon && html`<${Icon} name=${item.icon} />`}<span>${item.label}</span>
       </button>`)}
     </div>`;
+}
+
+// True while the window is at least `width` pixels wide (the desktop layout starts at 900)
+export function useWide(width = 900) {
+  const query = `(min-width: ${width}px)`;
+  const [wide, setWide] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const onChange = () => setWide(list.matches);
+    list.addEventListener('change', onChange);
+    onChange();
+    return () => list.removeEventListener('change', onChange);
+  }, [query]);
+  return wide;
 }

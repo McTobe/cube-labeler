@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Icon } from '../icons.js';
-import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle } from '../ui.js';
+import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
 import {
@@ -29,13 +29,16 @@ const STYLE_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
 const pct = (v) => `${Math.round(v * 100)}%`;
 
 export function LabelPage() {
+  // On a wide screen the text sits under the preview, so both stay in view while typing
+  const wide = useWide();
   return html`<div class="label-page">
     <div class="label-preview-col">
       <${Preview} />
       <${ActionBar} />
+      ${wide && html`<${TextCard} />`}
     </div>
     <div class="label-edit-col">
-      <${TextCard} />
+      ${!wide && html`<${TextCard} />`}
       <${FontSection} />
       <${QrSection} />
       <${PictureSection} />
