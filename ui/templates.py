@@ -152,6 +152,10 @@ def config_from_dict(data: dict) -> LabelConfig:
     data = dict(data)
     inv_data = data.pop("inventory_config", None)
     inv_type = data.pop("inventory_type", None)
+    # Older templates turned cut lines off and the printer's auto-cut flag on;
+    # every label now uses the app's own cut lines instead
+    for key in ("cut_line", "cut_line_style", "cut_line_position", "auto_cut_hardware"):
+        data.pop(key, None)
 
     cfg = LabelConfig(**_known_fields(LabelConfig, data))
 

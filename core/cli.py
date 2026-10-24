@@ -80,8 +80,8 @@ def print_label(
     font_size: Optional[int] = None,
     image_path: Optional[str] = None,
     no_feed: bool = False,
-    auto_cut: bool = True,
-    cut_guide: bool = False,
+    auto_cut: bool = False,
+    cut_guide: bool = True,
     end_margin_dots: int = 0,
     preview_only: bool = False,
     save_png: Optional[str] = None,
@@ -221,14 +221,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Disable feeding at end of print (for continuous chaining).",
     )
     parser.add_argument(
+        "--auto-cut",
+        action="store_true",
+        help="Send the printer's auto-cut flag (the PT-P300BT prints a ':' cut mark for it).",
+    )
+    parser.add_argument(
         "--no-cut",
         action="store_true",
-        help="Disable auto-cutting flag.",
+        help=argparse.SUPPRESS,  # Old flag; auto-cut is now off unless --auto-cut is given
+    )
+    parser.add_argument(
+        "--no-cut-guide",
+        action="store_true",
+        help="Leave out the dotted cut line at the start of the label.",
     )
     parser.add_argument(
         "--cut-guide",
         action="store_true",
-        help="Print cut guide line at label boundary.",
+        help=argparse.SUPPRESS,  # Old flag; cut lines are now on by default
     )
     parser.add_argument(
         "--save-png",
@@ -302,8 +312,8 @@ def cli_main(args: Optional[List[str]] = None) -> int:
         font_size=parsed.font_size,
         image_path=parsed.image,
         no_feed=parsed.no_feed,
-        auto_cut=not parsed.no_cut,
-        cut_guide=parsed.cut_guide,
+        auto_cut=parsed.auto_cut and not parsed.no_cut,
+        cut_guide=not parsed.no_cut_guide,
         preview_only=parsed.preview,
         save_png=parsed.save_png,
         virtual=parsed.virtual,

@@ -146,7 +146,7 @@ def print_job(raw_status: Any, raster: Any, options: Any = None) -> bytes:
         protocol.tape_dim(status),
         compress=compress,
         chaining=bool(opts.get("chaining", False)),
-        auto_cut=bool(opts.get("auto_cut", True)),
+        auto_cut=bool(opts.get("auto_cut", False)),
         end_margin=int(opts.get("end_margin", 0)),
     ) + protocol.raster_lines(data, compress)
 

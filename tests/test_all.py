@@ -172,6 +172,17 @@ class TestLabelRenderer(unittest.TestCase):
             prev, rast, rbytes, metrics = self.renderer.render(config)
             self.assertEqual(rast.size[0], 128)
 
+    def test_single_label_has_own_cut_lines_by_default(self):
+        config = LabelConfig(text="CUT TEST")
+        self.assertFalse(config.auto_cut_hardware)
+        _, rast, rbytes, _ = self.renderer.render(config)
+        line = LabelRenderer.PRINTHEAD_DOTS // 8
+        # The first raster line is the dotted cut line; the end stops at the cutter, so it has none
+        self.assertTrue(any(rbytes[:line]))
+        self.assertFalse(any(rbytes[-line:]))
+        _, _, plain, _ = self.renderer.render(LabelConfig(text="CUT TEST", cut_line=False))
+        self.assertFalse(any(plain[:line]))
+
     def test_cut_line_rendering(self):
         config = LabelConfig(
             text="CUT TEST",

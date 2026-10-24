@@ -109,8 +109,8 @@ def test_gui_queue():
     app.update()
     assert app.config.tape_bg_color == "#FFFFFF", "Tape background should reset to white"
     assert app.config.show_guides is False, "Guides should reset to False"
-    assert app.config.auto_cut_hardware is True, "Auto-cut flag should stay at its default"
-    assert app.config.cut_line is False, "Cut guide lines should be False for single labels"
+    assert app.config.auto_cut_hardware is False, "The printer auto-cut flag should stay off"
+    assert app.config.cut_line is True, "Single labels should get the app's own cut lines"
 
     # Printer panel opens and closes from the chip
     app.printer_chip.invoke()

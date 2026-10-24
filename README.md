@@ -15,7 +15,7 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 ## Features
 
 - **Live preview.** See the label on a simulated tape cartridge in its real colors, or switch to *Print dots* to see exactly what the print head will print. Label length, tape used and print time are shown as you type.
-- **Less tape waste.** Queue several labels and print them as one continuous strip with cut guides between them. Each extra label saves about 25 mm of tape.
+- **Less tape waste.** Queue several labels and print them as one continuous strip with cut guides between them. Every label, queued or not, starts with a dotted cut line in place of the printer's own ":" cut mark. Each extra label saves about 25 mm of tape.
 - **Bin labels.** A dedicated editor for fastener and parts bins: size block, name, one, two or four length boxes and a drive icon (Allen, Hex, PH, PZ, Torx, Slot), in English or Swedish.
 - **Text, QR codes and images.** Any installed or imported font, auto-fit to the tape height, alignment and outline. Add QR codes (including Wi-Fi guest login codes), icons or your own pictures.
 - **Icon library.** Monochrome icons for fasteners, screw drives, mechanical parts, electronics, wiring, tools, home & kitchen and safety marks, plus your own icons in `~/.printlabel/icons/`. Browse and manage them on the **Icons** page.
@@ -90,7 +90,7 @@ CubeLabeler.exe COM4 --feed                   # feed 25 mm of tape
 CubeLabeler.exe --virtual "Test" --preview --save-png test.png  # no printer needed
 ```
 
-`CubeLabeler.exe --help` lists every option, including `--font`, `--font-size`, `--width`, `--image`, `--cut-guide` and `--no-cut`.
+`CubeLabeler.exe --help` lists every option, including `--font`, `--font-size`, `--width`, `--image`, `--no-cut-guide` and `--auto-cut`.
 
 ## Building from source
 

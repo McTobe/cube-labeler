@@ -41,12 +41,23 @@ class TestLabelSpacing(unittest.TestCase):
         self.assertGreater(bottom[0], top[0] + 10)
 
     def test_single_bin_label_has_side_padding(self):
-        cfg = LabelConfig(inventory_config=build_presets("en")["A2"].config)
+        cfg = LabelConfig(inventory_config=build_presets("en")["A2"].config, cut_line=False)
         preview = self.renderer.render(cfg)[0]
         left, _, right, _ = _ink_bbox(preview)
         pad = round(SINGLE_BIN_PADDING_MM / DOT_PITCH_MM)
         self.assertEqual(left, pad)
         self.assertEqual(preview.width - right, pad)
+
+    def test_single_label_matches_a_queued_one(self):
+        # Same half-gap as in a queue, a cut line at the start and none at the end
+        cfg = LabelConfig(inventory_config=build_presets("en")["A2"].config)
+        canvas = self.renderer._render_base_canvas(cfg)[0]
+        preview = self.renderer.render(cfg)[0].convert("L")
+        margin = BATCH_GAP_DOTS // 2
+        self.assertEqual(preview.width, canvas.width + 2 * margin)
+        column = lambda x: sum(1 for y in range(preview.height) if preview.getpixel((x, y)) < 128)
+        self.assertGreater(column(0), 0)
+        self.assertEqual(column(preview.width - 1), 0)
 
     def test_every_queued_label_has_equal_cut_margins(self):
         configs = [
@@ -58,15 +69,17 @@ class TestLabelSpacing(unittest.TestCase):
         strip = self.renderer.render_batch(configs)[0].convert("L")
         margin = BATCH_GAP_DOTS // 2
 
-        # Cut lines: both strip ends and the middle of each gap
+        # Cut lines: the strip start and the middle of each gap. The strip end has none,
+        # since it stops at the cutter.
         cuts, x = [0], margin
         for i, width in enumerate(widths):
             x += width
             cuts.append(x + margin if i < len(widths) - 1 else strip.width - 1)
             x += BATCH_GAP_DOTS
-        for cut in cuts:
-            dark = sum(1 for y in range(strip.height) if strip.getpixel((cut, y)) < 128)
-            self.assertGreater(dark, 0, f"no cut line at x={cut}")
+        dark = lambda cut: sum(1 for y in range(strip.height) if strip.getpixel((cut, y)) < 128)
+        for cut in cuts[:-1]:
+            self.assertGreater(dark(cut), 0, f"no cut line at x={cut}")
+        self.assertEqual(dark(cuts[-1]), 0, "the strip end should have no cut line")
 
         for i in range(len(configs)):
             region = strip.crop((cuts[i] + 1, 0, cuts[i + 1], strip.height))

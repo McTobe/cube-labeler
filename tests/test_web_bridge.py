@@ -67,6 +67,7 @@ class TestWebPrintJob(unittest.TestCase):
 
     def test_job_bytes_match_desktop_driver(self):
         cases = [
+            ({}, {}),
             ({"auto_cut": True}, {"auto_cut": True}),
             ({"auto_cut": False, "compress": False}, {"auto_cut": False, "nocomp": True}),
             ({"auto_cut": True, "end_margin": 14, "chaining": True},
