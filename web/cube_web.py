@@ -361,24 +361,87 @@ def icon_print_preview(data: Any, dots: int = 56) -> bytes:
     return _png(print_dots(_open_picture(data), int(dots)))
 
 
-def make_icon(data: Any, edit: Any = None, touch: Any = None) -> Dict[str, Any]:
-    """
-    Turns a picture into a black-and-white icon with the editor's settings (defaults when
-    edit is None). Returns the icon PNG, the original as it is kept with the icon, the
-    settings used, and whether the icon has any ink.
-    """
+# The icon editor calls edit_icon on every change, so the picture and the last masks are kept
+_EDIT_SOURCES: Dict[str, Any] = {}
+_EDIT_MASKS: Dict[Any, Any] = {}
+
+
+def _remember(cache: Dict[Any, Any], key: Any, value: Any, keep: int) -> Any:
+    cache.pop(key, None)
+    cache[key] = value
+    while len(cache) > keep:
+        cache.pop(next(iter(cache)))
+    return value
+
+
+def _touch_layer(touch: Any):
+    """Touch-ups as the editor's grid: raw cells from the page, or a PNG from a desktop backup."""
     from PIL import Image
-    from core.icon_editor import IconEdit, has_ink, ink_mask, apply_touch, mask_to_icon, prepare_original
-    original = prepare_original(_open_picture(data))
+    from core.icon_editor import TOUCH_GRID
+    if touch is None:
+        return None
+    data = _to_bytes(touch)
+    if len(data) == TOUCH_GRID * TOUCH_GRID:
+        return Image.frombytes("L", (TOUCH_GRID, TOUCH_GRID), data)
+    with Image.open(io.BytesIO(data)) as src:
+        layer = src.convert("L")
+    return layer if layer.size == (TOUCH_GRID, TOUCH_GRID) else None
+
+
+def touch_cells(touch: Any) -> Optional[bytes]:
+    """Touch-ups as raw grid cells (one byte each), from either form edit_icon takes."""
+    layer = _touch_layer(touch)
+    return layer.tobytes() if layer is not None else None
+
+
+def touch_png(cells: Any) -> Optional[bytes]:
+    """Raw touch-up cells as the PNG the desktop app keeps next to an icon."""
+    layer = _touch_layer(cells)
+    return _png(layer) if layer is not None else None
+
+
+def prepare_icon_original(data: Any) -> bytes:
+    """A picture as it is kept with an icon: upright, at most 1024 pixels across, PNG."""
+    from core.icon_editor import prepare_original
+    return _png(prepare_original(_open_picture(data)))
+
+
+def edit_icon(original: Any, edit: Any = None, touch: Any = None, view: int = 480) -> Dict[str, Any]:
+    """
+    Everything the icon editor shows for a picture and its settings:
+    base_png, the icon before touch-ups (the page draws touch-ups over it while you draw),
+    icon_png with touch-ups as it is saved, print_png as it prints on a
+    12 mm bin label, the darkness cutoff used, whether there is any ink, the settings as
+    read, and view_png, the picture turned and mirrored the way the crop box refers to it.
+    """
+    from core.icon_editor import (
+        IconEdit, apply_touch, has_ink, ink_mask, mask_to_icon, orient, print_dots, threshold_for,
+    )
+    data = _to_bytes(original)
+    digest = hashlib.sha1(data).hexdigest()
+    source = _EDIT_SOURCES.get(digest)
+    if source is None:
+        source = _open_picture(data)
+    _remember(_EDIT_SOURCES, digest, source, 2)
+
     settings = IconEdit.from_dict(_to_dict(edit) if edit is not None else None)
-    touch_layer = None
-    if touch is not None:
-        with Image.open(io.BytesIO(_to_bytes(touch))) as src:
-            touch_layer = src.convert("L")
-    mask = apply_touch(ink_mask(original, settings), touch_layer)
+    key = (digest, repr(sorted(settings.to_dict().items())))
+    cached = _EDIT_MASKS.get(key)
+    if cached is None:
+        cached = (ink_mask(source, settings), threshold_for(source, settings))
+    _remember(_EDIT_MASKS, key, cached, 6)
+    mask, threshold = cached
+
+    full = apply_touch(mask, _touch_layer(touch))
+    icon = mask_to_icon(full)
+    oriented = orient(source, settings).copy()
+    oriented.thumbnail((int(view), int(view)))
     return {
-        "icon_png": _png(mask_to_icon(mask)),
-        "original_png": _png(original),
+        "base_png": _png(mask_to_icon(mask)),
+        "icon_png": _png(icon),
+        "print_png": _png(print_dots(icon)) if has_ink(full) else None,
+        "threshold": threshold,
+        "has_ink": has_ink(full),
         "edit": settings.to_dict(),
-        "has_ink": has_ink(mask),
+        "view_png": _png(oriented),
     }

@@ -7,9 +7,9 @@ import { Icon } from '../icons.js';
 import { Field, Sheet } from '../ui.js';
 import { useStore } from '../state.js';
 import {
-  app, boot, say, setMode, setImageBytes, setBinIconBytes, iconPrintPreview, makeIcon,
+  app, boot, say, setMode, setImageBytes, setBinIconBytes, iconPrintPreview,
 } from '../app.js';
-import { errorMessage } from '../../printer.js';
+import { IconEditorSheet } from './icon-editor.js';
 import {
   library, views, listIcons, viewCount, iconUrl, iconBytes, isFavourite, toggleFavourite, markUsed,
   parseKeywords, saveUserIcon, updateUserIcon, deleteUserIcon, ALL, USER_CATEGORY,
@@ -113,7 +113,7 @@ function UserIconFields({ icon }) {
   </div>`;
 }
 
-function IconDetails({ iconKey, onClose }) {
+function IconDetails({ iconKey, onClose, onEdit }) {
   const lib = useStore(library);
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => setConfirmDelete(false), [iconKey]);
@@ -155,6 +155,9 @@ function IconDetails({ iconKey, onClose }) {
         <button class=${favourite ? 'link-button on' : 'link-button'} aria-pressed=${favourite} onClick=${() => toggleFavourite(icon)}>
           <${Icon} name="star" size=${18} filled=${favourite} />${favourite ? 'Favourite' : 'Add to favourites'}
         </button>
+        ${icon.user
+          ? html`<button class="link-button" onClick=${() => onEdit({ kind: 'edit', icon })}><${Icon} name="edit" size=${18} />Edit</button>`
+          : html`<button class="link-button" onClick=${() => onEdit({ kind: 'copy', icon })}><${Icon} name="edit" size=${18} />Make my own copy</button>`}
         <button class="link-button" onClick=${download}><${Icon} name="download" size=${18} />Download</button>
         ${icon.user && (confirmDelete
           ? html`<button class="link-button danger" onClick=${remove}><${Icon} name="trash" size=${18} />Delete for good</button>`
@@ -164,55 +167,37 @@ function IconDetails({ iconKey, onClose }) {
   <//>`;
 }
 
-// Picks a picture and turns it into a black-and-white icon of the user's
-function useImportIcon(onAdded) {
-  const fileRef = useRef(null);
-  const [busy, setBusy] = useState(false);
-  const onFile = async (e) => {
-    const file = e.currentTarget.files[0];
-    e.currentTarget.value = '';
-    if (!file) return;
-    setBusy(true);
-    try {
-      const original = new Uint8Array(await file.arrayBuffer());
-      const made = await makeIcon(original);
-      if (!made.has_ink) {
-        say(`${file.name} came out blank. Try a picture with a clear dark shape on a light background.`, true);
-        return;
-      }
-      const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
-      const icon = saveUserIcon({
-        title, category: USER_CATEGORY, png: made.icon_png, original: made.original_png, edit: made.edit,
-      });
-      say(`Added ${icon.title} to My Icons.`);
-      onAdded(icon);
-    } catch (err) {
-      say(`Could not read ${file.name}: ${errorMessage(err)}`, true);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const input = html`<input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />`;
-  return { input, busy, choose: () => fileRef.current.click() };
-}
-
 export function IconsPage() {
   const { phase } = useStore(boot);
   const { status } = useStore(app);
   const browser = useBrowserState();
   const [selected, setSelected] = useState(null);
-  const importer = useImportIcon((icon) => { browser.setView(USER_CATEGORY); browser.setQuery(''); setSelected(icon.key); });
+  const [editing, setEditing] = useState(null);
+  const fileRef = useRef(null);
+  const onFile = async (e) => {
+    const file = e.currentTarget.files[0];
+    e.currentTarget.value = '';
+    if (file) setEditing({ kind: 'picture', data: new Uint8Array(await file.arrayBuffer()), name: file.name });
+  };
+  const edit = (start) => { setSelected(null); setEditing(start); };
+  const saved = (icon) => {
+    say(`Saved ${icon.title}.`);
+    browser.setQuery('');
+    browser.setView(icon.category);
+    setSelected(icon.key);
+  };
   return html`<section class="icons-page">
     <header class="page-head">
       <p class="hint">Tap an icon to see how it prints and put it on a label.</p>
-      <button class="secondary" disabled=${phase !== 'ready' || importer.busy} onClick=${importer.choose}>
-        <${Icon} name="plus" size=${18} />${importer.busy ? 'Adding…' : 'Add your own'}
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>
+        <${Icon} name="plus" size=${18} />Add your own
       </button>
-      ${importer.input}
+      <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
     </header>
     ${status.text && html`<p class=${`status-line${status.error ? ' error' : ''}`} role="status">${status.text}</p>`}
     <div class="card"><${IconBrowser} ...${browser} onPick=${(icon) => setSelected(icon.key)} /></div>
-    <${IconDetails} iconKey=${selected} onClose=${() => setSelected(null)} />
+    <${IconDetails} iconKey=${selected} onClose=${() => setSelected(null)} onEdit=${edit} />
+    <${IconEditorSheet} start=${editing} onClose=${() => setEditing(null)} onSaved=${saved} />
   </section>`;
 }
 

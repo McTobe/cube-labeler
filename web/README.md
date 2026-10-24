@@ -12,9 +12,11 @@ settings, the tape and print-dot preview, the printer panel (connect, status, fe
 saving the label as a picture, and settings. Bin labels (fasteners and parts, with their
 drive and part icons or your own picture) and the print queue (one strip with cut lines,
 reorder, edit, remove) are in too, and so is the icon library (search, categories, favourites,
-recently used, a print preview, your own icons made from pictures). The label, queue, icons,
+recently used, a print preview) and the icon editor (crop, drawing, silhouette or outline,
+darkness, thickness, clean-up, turn and mirror, pencil and eraser touch-ups, kept with the icon
+so it can be changed again). The label, queue, icons,
 settings and added fonts are kept in the browser, and after the first visit the app also starts
-offline. The icon editor, templates, backups and AI icons follow.
+offline. Templates, backups and AI icons follow.
 
 ## Browser support
 

@@ -76,7 +76,7 @@ export function Section({ id, title, summary, defaultOpen = true, children }) {
 }
 
 // A dialog that slides up from the bottom on a phone and sits in the middle on a wide screen
-export function Sheet({ open, title, onClose, children }) {
+export function Sheet({ open, title, onClose, children, wide = false }) {
   const ref = useRef(null);
   useEffect(() => {
     const dialog = ref.current;
@@ -84,7 +84,9 @@ export function Sheet({ open, title, onClose, children }) {
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
   }, [open]);
-  return html`<dialog ref=${ref} class="sheet" onClose=${onClose}
+  // Escape asks onClose like the close button does, so a sheet with unsaved work can say no
+  return html`<dialog ref=${ref} class=${wide ? 'sheet wide' : 'sheet'} onClose=${onClose}
+    onCancel=${(e) => { e.preventDefault(); onClose(); }}
     onClick=${(e) => { if (e.target === ref.current) onClose(); }}>
     <div class="sheet-body">
       <header class="sheet-head">

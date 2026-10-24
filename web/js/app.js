@@ -330,7 +330,8 @@ export function setImageBytes(name, data) {
 // --- Icons ---------------------------------------------------------------------------------
 
 export const iconPrintPreview = (data) => py.icon_print_preview(data);
-export const makeIcon = (data, edit = null, touch = null) => py.make_icon(data, edit, touch);
+export const prepareIconOriginal = (data) => py.prepare_icon_original(data);
+export const editIcon = (original, edit, touch) => py.edit_icon(original, edit, touch);
 
 // --- Printer -------------------------------------------------------------------------------
 

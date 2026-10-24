@@ -187,19 +187,38 @@ class TestWebIcons(unittest.TestCase):
         preview = Image.open(io.BytesIO(cube_web.icon_print_preview(self._picture())))
         self.assertEqual(max(preview.size), 56)
 
-    def test_make_icon_from_a_photo(self):
-        made = cube_web.make_icon(self._picture())
-        self.assertTrue(made["has_ink"])
-        self.assertEqual(Image.open(io.BytesIO(made["icon_png"])).format, "PNG")
-        self.assertEqual(made["edit"]["mode"], "drawing")
-        # The same settings again give the same icon
-        again = cube_web.make_icon(made["original_png"], made["edit"])
-        self.assertEqual(again["icon_png"], made["icon_png"])
+    def test_editor_matches_the_desktop_editor(self):
+        from core import icon_editor as ie
+        original = cube_web.prepare_icon_original(self._picture())
+        edit = {"mode": "outline", "thickness": 1, "rotate": 1}
+        touch = bytearray(ie.TOUCH_GRID * ie.TOUCH_GRID)
+        touch[0] = ie.TOUCH_INK
+        result = cube_web.edit_icon(original, edit, bytes(touch))
+        source = Image.open(io.BytesIO(original)).convert("RGBA")
+        layer = Image.frombytes("L", (ie.TOUCH_GRID, ie.TOUCH_GRID), bytes(touch))
+        expected = ie.render_icon(source, ie.IconEdit.from_dict(edit), layer)
+        self.assertEqual(Image.open(io.BytesIO(result["icon_png"])).convert("RGBA").tobytes(), expected.tobytes())
+        self.assertTrue(result["has_ink"])
+        self.assertEqual(result["edit"]["mode"], "outline")
+        # Turned a quarter, the 200 x 120 picture stands up
+        view = Image.open(io.BytesIO(result["view_png"]))
+        self.assertGreater(view.height, view.width)
+        self.assertEqual(max(Image.open(io.BytesIO(result["print_png"])).size), ie.PRINT_DOTS)
+
+    def test_touch_ups_from_a_desktop_backup(self):
+        from core import icon_editor as ie
+        layer = ie.new_touch_layer()
+        layer.putpixel((3, 4), ie.TOUCH_ERASE)
+        cells = cube_web.touch_cells(cube_web._png(layer))
+        self.assertEqual(cells[4 * ie.TOUCH_GRID + 3], ie.TOUCH_ERASE)
+        self.assertEqual(cube_web.touch_cells(cube_web.touch_png(cells)), cells)
 
     def test_blank_picture_has_no_ink(self):
         data = io.BytesIO()
         Image.new("RGB", (50, 50), "white").save(data, format="PNG")
-        self.assertFalse(cube_web.make_icon(data.getvalue())["has_ink"])
+        result = cube_web.edit_icon(cube_web.prepare_icon_original(data.getvalue()))
+        self.assertFalse(result["has_ink"])
+        self.assertIsNone(result["print_png"])
 
 
 class TestWebTextEditing(unittest.TestCase):
