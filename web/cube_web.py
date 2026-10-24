@@ -88,6 +88,24 @@ def _png(image) -> bytes:
     return out.getvalue()
 
 
+def _hide_cut_line(preview, config):
+    """
+    The preview of one label without its cut line, which only helps where labels meet in a
+    strip; it is still printed, and the print dots view still shows it.
+    """
+    if not config.cut_line or preview.width < 3:
+        return preview
+    out = preview.copy()
+    columns = []
+    if config.cut_line_position in ("both", "start"):
+        columns.append((0, 1))
+    if config.cut_line_position in ("both", "end"):
+        columns.append((out.width - 1, out.width - 2))
+    for column, beside in columns:
+        out.paste(preview.crop((beside, 0, beside + 1, out.height)), (column, 0))
+    return out
+
+
 def render_label(options: Any) -> Dict[str, Any]:
     """
     Renders one text label. Options use LabelConfig field names (text, font_name,
@@ -103,12 +121,13 @@ def render_label(options: Any) -> Dict[str, Any]:
     opts = {k: v for k, v in raw.items() if k in fields and k != "image_path"}
     if raw.get("image_data") is not None:
         opts["image_path"] = _image_path(raw["image_data"])
-    preview, raster_image, raster, metrics = _get_renderer().render(LabelConfig(**opts))
+    config = LabelConfig(**opts)
+    preview, raster_image, raster, metrics = _get_renderer().render(config)
 
     # The raster runs down the tape the way the printer feeds it; turn it back to read like the label
     dots = ImageOps.mirror(raster_image.convert("L")).rotate(90, expand=True)
     return {
-        "preview_png": _png(preview),
+        "preview_png": _png(_hide_cut_line(preview, config)),
         "dots_png": _png(ImageOps.invert(dots)),
         "raster": raster,
         "metrics": dataclasses.asdict(metrics),

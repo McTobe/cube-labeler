@@ -67,6 +67,15 @@ class TestWebRender(unittest.TestCase):
         self.assertEqual(result["metrics"]["raster_lines"], metrics.raster_lines)
         self.assertEqual(Image.open(io.BytesIO(result["preview_png"])).format, "PNG")
 
+    def test_preview_leaves_out_the_cut_line(self):
+        result = cube_web.render_label({"text": "Hi", "tape_bg_color": "#FFFFFF"})
+        preview = Image.open(io.BytesIO(result["preview_png"])).convert("L")
+        dots = Image.open(io.BytesIO(result["dots_png"])).convert("L")
+        column = [preview.getpixel((0, y)) for y in range(preview.height)]
+        self.assertEqual(min(column), 255)
+        # The printer still prints it
+        self.assertLess(min(dots.getpixel((0, y)) for y in range(dots.height)), 128)
+
     def test_unknown_options_are_ignored(self):
         result = cube_web.render_label({"text": "Hi", "not_a_field": 1})
         self.assertGreater(cube_web.raster_lines(result["raster"]), 0)
