@@ -18,10 +18,10 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 - **Less tape waste.** Queue several labels and print them as one continuous strip with cut guides between them. Each extra label saves about 25 mm of tape.
 - **Bin labels.** A dedicated editor for fastener and parts bins: size block, name, one, two or four length boxes and a drive icon (Allen, Hex, PH, PZ, Torx, Slot), in English or Swedish.
 - **Text, QR codes and images.** Any installed or imported font, auto-fit to the tape height, alignment and outline. Add QR codes (including Wi-Fi guest login codes), icons or your own pictures.
-- **Icon library.** Monochrome icons for fasteners, screw drives, mechanical parts, electronics, wiring, tools, home & kitchen and safety marks, plus your own icons in `~/.printlabel/icons/`.
+- **Icon library.** Monochrome icons for fasteners, screw drives, mechanical parts, electronics, wiring, tools, home & kitchen and safety marks, plus your own icons in `~/.printlabel/icons/`. Browse and manage them on the **Icons** page.
 - **Icon editor.** Import or paste any picture and tune how it turns into black and white (drawing, filled silhouette or photo outline, cutoff, line thickness, crop, clean-up) with a live dot-for-dot print preview, then touch it up with a pencil and eraser. Your icons keep their original picture, so you can edit them again later.
-- **Icon backups.** Export all your icons to one `.cubeicons` file and import it on another PC, or turn on automatic backups to a folder that Google Drive, OneDrive or Dropbox syncs (the newest 10 are kept). Open **Backups…** in the icon library.
-- **Templates.** Ready-made starting points (storage box, cable flag, Wi-Fi QR, spice jar, asset tag, name badge) and saving or opening your own templates as JSON.
+- **Backups.** Export your icons, saved templates and settings to one `.cubebackup` file and restore all or part of it on another PC, or turn on automatic backups to a folder that Google Drive, OneDrive or Dropbox syncs (the newest 10 are kept). API keys are left out. Open **Backups…** on the Icons page or in Settings; older `.cubeicons` backups still restore.
+- **Templates.** Ready-made starting points (storage box, cable flag, Wi-Fi QR, spice jar, asset tag, name badge) and your own templates, saved in the app under **My templates** (template JSON files can still be opened).
 - **Printer status.** Battery level, loaded tape width and color, and clear messages for errors such as an open cover or missing tape.
 - **Simulation mode.** Design and "print" labels with no printer connected.
 - **Optional AI icons.** Have Google Gemini, OpenAI or OpenRouter redraw a photo or picture as a printable icon, with ready-made presets (filled silhouette like the built-in icons, bold line drawing, flat symbol, clean up and keep the shape) or your own instructions, then finish it in the icon editor (needs your own API key for the service, chosen under Settings).
@@ -63,7 +63,8 @@ The window has a **left rail** for switching views, the **tape preview** in the 
 | **Bin label** | Labels for fastener or parts bins. Pick *Fasteners* or *Parts* under *Label for*; fields are listed in the order they appear on the label. |
 | **Queue** | Labels added with **Add to queue** print as one strip. Reorder, edit or remove them before printing. |
 | **Templates** | Ready-made labels and your own saved templates. |
-| **Settings** | Bin label language, AI service (Gemini, OpenAI or OpenRouter) with its API key and model, and simulation mode. |
+| **Icons** | The icon library: browse, search, import, make, edit and back up icons. |
+| **Settings** | Bin label language, AI service (Gemini, OpenAI or OpenRouter) with its API key and model, backups and simulation mode. |
 
 The preview can show the whole label (**Fit**) or zoom to 100–300%, where long labels scroll sideways. The **•••** menu next to **Print** has *Export PNG* and *Feed tape*.
 

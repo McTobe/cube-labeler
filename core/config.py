@@ -7,7 +7,7 @@ Persists settings (AI API keys, custom directories, defaults) to ~/.printlabel/c
 import os
 import sys
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from core import secret_store
 
@@ -27,11 +27,24 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 
+# Settings that belong to this PC or are secrets, so a backup never carries them to another one:
+# API keys are encrypted for this Windows user, ports and the backup folder differ per PC
+_LOCAL_KEYS = ("last_serial_port",)
+_LOCAL_PREFIXES = ("icon_backup_",)
+_LOCAL_SUFFIXES = ("_api_key", "_api_key_protected")
+
+
+def is_local_setting(key: str) -> bool:
+    return key in _LOCAL_KEYS or key.startswith(_LOCAL_PREFIXES) or key.endswith(_LOCAL_SUFFIXES)
+
+
 class ConfigManager:
     """Manages persistent application settings in ~/.printlabel/config.json."""
 
     def __init__(self):
         self._config: Dict[str, Any] = dict(DEFAULT_CONFIG)
+        # Called after every save, e.g. to write an automatic backup
+        self.change_listeners: List[Callable[[], None]] = []
         self._load()
         self._migrate_plaintext_api_key()
 
@@ -63,12 +76,31 @@ class ConfigManager:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(self._config, f, indent=2)
             os.replace(tmp_path, CONFIG_FILE)
+            self._changed()
         except Exception as e:
             print(f"Warning: could not save settings to {CONFIG_FILE}: {e}", file=sys.stderr)
             try:
                 os.remove(tmp_path)
             except OSError:
                 pass
+
+    def _changed(self):
+        for listener in list(self.change_listeners):
+            try:
+                listener()
+            except Exception as e:
+                print(f"Warning: after the settings changed: {e}", file=sys.stderr)
+
+    def backup_settings(self) -> Dict[str, Any]:
+        """Every setting that may go in a backup, so settings added later are backed up too."""
+        return {k: v for k, v in self._config.items() if not is_local_setting(k)}
+
+    def restore_settings(self, data: Dict[str, Any]):
+        """Takes over the settings from a backup; this PC's own settings and keys stay."""
+        for key, value in data.items():
+            if isinstance(key, str) and not is_local_setting(key):
+                self._config[key] = value
+        self.save()
 
     def get(self, key: str, default: Any = None) -> Any:
         return self._config.get(key, default)
@@ -139,6 +171,12 @@ class ConfigManager:
     def last_serial_port(self, value: str):
         self._config["last_serial_port"] = value.strip()
         self.save()
+
+    @property
+    def user_templates_dir(self) -> str:
+        path = os.path.join(CONFIG_DIR, "templates")
+        os.makedirs(path, exist_ok=True)
+        return path
 
     @property
     def user_icons_dir(self) -> str:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Settings view: label language, AI service and API key, and simulation mode.
+Settings view: label language, AI service and API key, backups and simulation mode.
 """
 
 import webbrowser
@@ -94,6 +94,24 @@ class SettingsView(ctk.CTkFrame):
         self.provider_menu.set(current_provider().name)
         self._show_provider()
 
+        # Backups
+        backup_card = self._card("Backups")
+        ctk.CTkLabel(
+            backup_card,
+            text="Back up your icons, saved templates and settings to a file, or automatically to a "
+                 "Google Drive, OneDrive or Dropbox folder.",
+            anchor="w",
+            justify="left",
+            wraplength=560,
+            text_color=MUTED_TEXT,
+        ).pack(fill="x", pady=(0, 6))
+        backup_row = ctk.CTkFrame(backup_card, fg_color="transparent")
+        backup_row.pack(fill="x")
+        ctk.CTkButton(backup_row, text="Backups…", width=110, command=self._open_backups).pack(side="left")
+        self.lbl_backup = ctk.CTkLabel(backup_row, text="", anchor="w", font=ctk.CTkFont(size=12))
+        self.lbl_backup.pack(side="left", padx=12)
+        self.refresh_backup_status()
+
         # Simulation
         sim_card = self._card("Simulation")
         ctk.CTkLabel(
@@ -121,6 +139,18 @@ class SettingsView(ctk.CTkFrame):
         code = next((c for c, name in LANGUAGES.items() if name == display_name), None)
         if code:
             self._on_language_changed(code)
+
+    def refresh_backup_status(self):
+        from ui.backup_dialog import backup_status
+
+        text, colour, _on = backup_status()
+        self.lbl_backup.configure(text=text, text_color=colour)
+
+    def _open_backups(self):
+        from ui.backup_dialog import BackupDialog
+
+        dialog = BackupDialog(self.winfo_toplevel(), on_changed=lambda: None)
+        dialog.bind("<Destroy>", lambda e: e.widget is dialog and self.after(10, self.refresh_backup_status), add="+")
 
     def _provider(self):
         return provider_by_name(self.provider_menu.get()) or current_provider()

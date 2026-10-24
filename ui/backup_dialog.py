@@ -1,24 +1,32 @@
 #!/usr/bin/env python3
 """
-Backups window for the user's icons: export and import a backup file, and automatic
-backups to a folder that a cloud sync app (Google Drive, OneDrive, Dropbox) uploads.
+Backups window: export and restore a backup of the icons, settings and templates, and
+automatic backups to a folder that a cloud sync app (Google Drive, OneDrive, Dropbox) uploads.
 """
 
 import os
 from datetime import datetime
 from tkinter import filedialog, messagebox
-from typing import Callable, Optional
+from typing import Callable, Dict, Optional, Tuple
 
 import customtkinter as ctk
 
-from core import icon_backup
-from core.icon_backup import BACKUP_EXTENSION, KEEP_BOTH, REPLACE, SKIP, BackupError, auto_backup
+from core import backup as bk
+from core.backup import (
+    BACKUP_EXTENSION, ICONS, KEEP_BOTH, OLD_ICON_EXTENSION, REPLACE, SETTINGS, SKIP, TEMPLATES,
+    BackupError, auto_backup,
+)
 from core.icon_manager import icon_manager
 from ui.widgets import MUTED_TEXT
 
 ERROR_RED = "#DC2626"
+OK_GREEN = ("#047857", "#34D399")
 BACKUP_SUBFOLDER = "Cube Labeler backups"
-FILE_TYPES = [("Cube Labeler icon backups", f"*{BACKUP_EXTENSION}"), ("All files", "*.*")]
+FILE_TYPES = [
+    ("Cube Labeler backups", f"*{BACKUP_EXTENSION} *{OLD_ICON_EXTENSION}"),
+    ("All files", "*.*"),
+]
+CLASH_CHOICES = (("Keep both", KEEP_BOTH), ("Replace mine", REPLACE), ("Skip them", SKIP))
 
 
 def _when(iso: str) -> str:
@@ -28,28 +36,79 @@ def _when(iso: str) -> str:
         return iso or "an unknown time"
 
 
-class ClashDialog(ctk.CTkToplevel):
-    """Asks what to do with backed-up icons whose names are already taken."""
+def backup_place(folder: str) -> str:
+    """Where automatic backups go, as the user knows it: the cloud service's name, or the folder's."""
+    norm = os.path.normcase(os.path.normpath(folder))
+    for name, path in bk.cloud_folders():
+        root = os.path.normcase(os.path.normpath(path))
+        if norm == root or norm.startswith(root + os.sep):
+            return name
+    return os.path.basename(os.path.normpath(folder)) or folder
 
-    def __init__(self, parent, count: int, names: str):
+
+def backup_status() -> Tuple[str, object, bool]:
+    """A one-line status of automatic backup for the library and Settings: (text, colour, on)."""
+    folder = auto_backup.folder
+    if not folder:
+        return "Auto-backup off", MUTED_TEXT, False
+    place = backup_place(folder)
+    if auto_backup.last_error:
+        return f"● Auto-backup to {place} failed", ERROR_RED, True
+    if auto_backup.last_backup:
+        return f"● Auto-backup on: {place} · last {_when(auto_backup.last_backup)}", OK_GREEN, True
+    return f"● Auto-backup on: {place}", OK_GREEN, True
+
+
+class RestoreDialog(ctk.CTkToplevel):
+    """Asks which parts of a backup to restore, and what to do with names already taken."""
+
+    PART_LABELS = {ICONS: "Icons", SETTINGS: "Settings", TEMPLATES: "Templates"}
+
+    def __init__(self, parent, backup: bk.Backup, plan: bk.ImportPlan):
         super().__init__(parent)
-        self.choice: Optional[str] = None
-        self.title("Icons with the same name")
+        self.choice: Optional[Tuple[set, str]] = None
+        self.title("Restore backup")
         self.resizable(False, False)
         self.transient(parent)
 
-        what = "1 icon in the backup has" if count == 1 else f"{count} icons in the backup have"
-        ctk.CTkLabel(
-            self, text=f"{what} the same name as one of your icons, with a different picture:\n{names}",
-            justify="left", anchor="w", wraplength=420,
-        ).pack(fill="x", padx=16, pady=(16, 10))
+        ctk.CTkLabel(self, text=f"Backup made {_when(backup.created)}", font=ctk.CTkFont(size=14, weight="bold"),
+                     anchor="w").pack(fill="x", padx=16, pady=(16, 2))
+        ctk.CTkLabel(self, text="Choose what to restore:", anchor="w", text_color=MUTED_TEXT).pack(
+            fill="x", padx=16, pady=(0, 6))
+
+        counts = {
+            ICONS: f"{len(backup.icons)} icons" + (f", {len(plan.unchanged)} already here" if plan.unchanged else ""),
+            SETTINGS: "replaces your settings; your API keys and this PC's printer and backup folder stay",
+            TEMPLATES: f"{len(backup.templates)} templates"
+                       + (f", {len(plan.unchanged_templates)} already here" if plan.unchanged_templates else ""),
+        }
+        self.part_vars: Dict[str, ctk.BooleanVar] = {}
+        for part in backup.parts:
+            var = ctk.BooleanVar(value=True)
+            self.part_vars[part] = var
+            ctk.CTkCheckBox(self, text=f"{self.PART_LABELS[part]}  ({counts[part]})", variable=var,
+                            command=self._update).pack(anchor="w", padx=16, pady=2)
+
+        clashes = [e.title for e in plan.conflicts] + [bk.template_title(p) for p in plan.template_conflicts]
+        self.clash_var = ctk.StringVar(value=CLASH_CHOICES[0][0])
+        self.clash_box = ctk.CTkFrame(self, fg_color="transparent")
+        if clashes:
+            self.clash_box.pack(fill="x", padx=16, pady=(10, 0))
+            names = ", ".join(clashes[:6]) + (" …" if len(clashes) > 6 else "")
+            what = "1 has" if len(clashes) == 1 else f"{len(clashes)} have"
+            ctk.CTkLabel(self.clash_box, text=f"{what} the same name as one of yours, but differs: {names}",
+                         anchor="w", justify="left", wraplength=440).pack(fill="x")
+            ctk.CTkSegmentedButton(self.clash_box, values=[label for label, _ in CLASH_CHOICES],
+                                   variable=self.clash_var).pack(anchor="w", pady=(4, 0))
+
         row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="x", padx=16, pady=(0, 16))
-        for text, choice in (("Keep both", KEEP_BOTH), ("Replace mine", REPLACE), ("Skip them", SKIP)):
-            ctk.CTkButton(row, text=text, width=110, command=lambda c=choice: self._pick(c)).pack(side="left", padx=(0, 8))
-        ctk.CTkButton(row, text="Cancel", width=80, fg_color="gray30", hover_color="gray40",
-                      command=self.destroy).pack(side="right")
+        row.pack(fill="x", padx=16, pady=16)
+        self.btn_restore = ctk.CTkButton(row, text="Restore", width=110, command=self._restore)
+        self.btn_restore.pack(side="right")
+        ctk.CTkButton(row, text="Cancel", width=90, fg_color="gray30", hover_color="gray40",
+                      command=self.destroy).pack(side="right", padx=8)
         self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self._update()
         self.after(50, self._grab)
 
     def _grab(self):
@@ -59,8 +118,13 @@ class ClashDialog(ctk.CTkToplevel):
         except Exception:
             pass
 
-    def _pick(self, choice: str):
-        self.choice = choice
+    def _update(self):
+        self.btn_restore.configure(state="normal" if any(v.get() for v in self.part_vars.values()) else "disabled")
+
+    def _restore(self):
+        parts = {part for part, var in self.part_vars.items() if var.get()}
+        clash = next(choice for label, choice in CLASH_CHOICES if label == self.clash_var.get())
+        self.choice = (parts, clash)
         self.destroy()
 
 
@@ -68,8 +132,8 @@ class BackupDialog(ctk.CTkToplevel):
     def __init__(self, parent, on_changed: Callable[[], None]):
         super().__init__(parent)
         self._on_changed = on_changed
-        self.title("Icon backups")
-        self.geometry("560x510")
+        self.title("Backups")
+        self.geometry("560x530")
         self.resizable(False, False)
         self.transient(parent)
         self._build()
@@ -94,30 +158,30 @@ class BackupDialog(ctk.CTkToplevel):
         return inner
 
     def _build(self):
-        ctk.CTkLabel(self, text="Icon backups", font=ctk.CTkFont(size=18, weight="bold"), anchor="w").pack(
+        ctk.CTkLabel(self, text="Backups", font=ctk.CTkFont(size=18, weight="bold"), anchor="w").pack(
             fill="x", padx=16, pady=(14, 10))
         count = len(icon_manager.user_icons())
         files = self._card(
             "Backup file",
-            f"One file with all your icons ({count}), with their names, categories, search words, "
-            "favourites and original pictures, so they can still be edited after a restore.",
+            f"One file with your icons ({count}), with their original pictures so they can still be edited, "
+            "your saved templates and all settings. API keys are left out: paste them again after a restore.",
         )
         row = ctk.CTkFrame(files, fg_color="transparent")
         row.pack(fill="x")
         ctk.CTkButton(row, text="Export backup…", width=140, command=self._export).pack(side="left")
-        ctk.CTkButton(row, text="Import backup…", width=140, command=self._import).pack(side="left", padx=8)
+        ctk.CTkButton(row, text="Restore backup…", width=140, command=self._import).pack(side="left", padx=8)
 
         auto = self._card(
             "Automatic backup",
             "Pick a folder that your cloud app syncs, like Google Drive, OneDrive or Dropbox. "
-            f"A backup is saved there a few seconds after your icons change, and the newest {auto_backup.keep} are kept.",
+            f"A backup is saved there a few seconds after something changes, and the newest {auto_backup.keep} are kept.",
         )
         self.lbl_folder = ctk.CTkLabel(auto, text="", anchor="w", justify="left", wraplength=500)
         self.lbl_folder.pack(fill="x")
         self.lbl_status = ctk.CTkLabel(auto, text="", anchor="w", justify="left", wraplength=500,
                                        font=ctk.CTkFont(size=11))
         self.lbl_status.pack(fill="x", pady=(0, 6))
-        clouds = icon_backup.cloud_folders()[:3]
+        clouds = bk.cloud_folders()[:3]
         if clouds:
             found = "Found on this PC: " + ", ".join(name for name, _ in clouds) + \
                 f". Pick one to save backups in a “{BACKUP_SUBFOLDER}” folder there."
@@ -164,9 +228,9 @@ class BackupDialog(ctk.CTkToplevel):
         self.btn_off.configure(state="normal" if on else "disabled")
 
     def _choose_folder(self):
-        clouds = icon_backup.cloud_folders()
+        clouds = bk.cloud_folders()
         start = auto_backup.folder or (clouds[0][1] if clouds else os.path.expanduser("~"))
-        folder = filedialog.askdirectory(parent=self, title="Folder for automatic icon backups", initialdir=start)
+        folder = filedialog.askdirectory(parent=self, title="Folder for automatic backups", initialdir=start)
         if folder:
             self._use_folder(folder)
 
@@ -184,74 +248,76 @@ class BackupDialog(ctk.CTkToplevel):
 
     def _backup_now(self, quiet: bool = False):
         try:
-            path = auto_backup.backup_now(force=not quiet)
+            auto_backup.backup_now(force=not quiet)
         except OSError:
-            path = None
+            pass
         self._refresh_auto()
-        if not quiet and path is None and not auto_backup.last_error:
-            messagebox.showinfo("Automatic backup", "You have no icons of your own to back up yet.", parent=self)
 
     # ----- Backup file -----
 
     def _export(self):
-        if not icon_manager.user_icons():
-            messagebox.showinfo("Export backup", "You have no icons of your own to back up yet.", parent=self)
-            return
-        name = f"Cube Labeler icons {datetime.now():%Y-%m-%d}{BACKUP_EXTENSION}"
-        path = filedialog.asksaveasfilename(parent=self, title="Export icon backup", initialfile=name,
-                                            defaultextension=BACKUP_EXTENSION, filetypes=FILE_TYPES)
+        name = f"Cube Labeler backup {datetime.now():%Y-%m-%d}{BACKUP_EXTENSION}"
+        path = filedialog.asksaveasfilename(parent=self, title="Export backup", initialfile=name,
+                                            defaultextension=BACKUP_EXTENSION,
+                                            filetypes=[("Cube Labeler backups", f"*{BACKUP_EXTENSION}")])
         if not path:
             return
         try:
-            count = icon_backup.export_backup(icon_manager, path)
+            backup = bk.export_backup(icon_manager, path)
         except OSError as e:
             messagebox.showerror("Export backup", f"The backup could not be saved:\n{e}", parent=self)
             return
-        messagebox.showinfo("Export backup", f"Saved {count} icons to\n{path}", parent=self)
+        messagebox.showinfo(
+            "Export backup",
+            f"Saved {len(backup.icons)} icons, {len(backup.templates)} templates and your settings to\n{path}",
+            parent=self,
+        )
 
     def _import(self):
-        path = filedialog.askopenfilename(parent=self, title="Import icon backup", filetypes=FILE_TYPES)
+        path = filedialog.askopenfilename(parent=self, title="Restore backup", filetypes=FILE_TYPES)
         if not path:
             return
         try:
             with open(path, "rb") as f:
-                backup = icon_backup.read_backup(f)
+                backup = bk.read_backup(f)
         except (BackupError, OSError) as e:
-            messagebox.showerror("Import backup", str(e), parent=self)
+            messagebox.showerror("Restore backup", str(e), parent=self)
             return
-        plan = icon_backup.plan_import(icon_manager, backup)
-        if not plan.new and not plan.conflicts:
-            messagebox.showinfo("Import backup", "You already have every icon in this backup.", parent=self)
+        if not backup.parts:
+            messagebox.showinfo("Restore backup", "This backup is empty.", parent=self)
             return
-
-        choice = SKIP
-        if plan.conflicts:
-            names = ", ".join(e.title for e in plan.conflicts[:6]) + (" …" if len(plan.conflicts) > 6 else "")
-            dialog = ClashDialog(self, len(plan.conflicts), names)
-            self.wait_window(dialog)
-            self._grab()
-            if dialog.choice is None:
-                return
-            choice = dialog.choice
-        elif not messagebox.askyesno(
-            "Import backup",
-            f"Add {len(plan.new)} icons from the backup made {_when(backup.created)}?",
-            parent=self,
-        ):
+        plan = bk.plan_import(icon_manager, backup)
+        dialog = RestoreDialog(self, backup, plan)
+        self.wait_window(dialog)
+        self._grab()
+        if dialog.choice is None:
             return
+        parts, clash = dialog.choice
 
         try:
-            result = icon_backup.restore_backup(icon_manager, backup, choice)
+            result = bk.restore_backup(icon_manager, backup, clash, parts=parts)
         except OSError as e:
-            messagebox.showerror("Import backup", f"The icons could not be restored:\n{e}", parent=self)
+            messagebox.showerror("Restore backup", f"The backup could not be restored:\n{e}", parent=self)
             self._on_changed()
             return
         self._on_changed()
-        done = [f"Added {result.added}"]
-        if result.replaced:
-            done.append(f"replaced {result.replaced}")
-        if result.skipped:
-            done.append(f"skipped {result.skipped}")
-        if result.unchanged:
-            done.append(f"{result.unchanged} were already there")
-        messagebox.showinfo("Import backup", ", ".join(done) + ".", parent=self)
+        done = []
+        if ICONS in parts:
+            line = f"Icons: added {result.added}"
+            if result.replaced:
+                line += f", replaced {result.replaced}"
+            if result.skipped:
+                line += f", skipped {result.skipped}"
+            if result.unchanged:
+                line += f", {result.unchanged} were already here"
+            done.append(line + ".")
+        if TEMPLATES in parts:
+            line = f"Templates: added {result.templates_added}"
+            if result.templates_replaced:
+                line += f", replaced {result.templates_replaced}"
+            if result.templates_skipped:
+                line += f", skipped {result.templates_skipped}"
+            done.append(line + ".")
+        if result.settings_restored:
+            done.append("Settings restored. Restart Cube Labeler to use all of them.")
+        messagebox.showinfo("Restore backup", "\n".join(done), parent=self)

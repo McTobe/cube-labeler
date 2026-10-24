@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Templates view: preset cards with preview pictures, plus saving and opening template files.
+Templates view: the user's own saved templates, preset cards with preview pictures, and
+opening template files.
 """
 
 import os
@@ -11,7 +12,7 @@ from typing import Callable, Dict, Optional
 import customtkinter as ctk
 from PIL import Image
 
-from ui.templates import BUILTIN_PRESETS
+from ui.templates import BUILTIN_PRESETS, delete_user_template, list_user_templates
 from ui.widgets import MUTED_TEXT
 
 CARD_IMAGE_SIZE = (220, 70)
@@ -36,35 +37,53 @@ class TemplatesView(ctk.CTkFrame):
         on_apply: Callable[[str], None],
         on_save: Callable[[], None],
         on_open: Callable[[], None],
+        on_open_user: Optional[Callable[[str], None]] = None,
+        templates_folder: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(master, fg_color="transparent", **kwargs)
         self._images: Dict[str, Optional[ctk.CTkImage]] = {}
+        self._on_open_user = on_open_user
+        self._templates_folder = templates_folder
 
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=4, pady=(4, 10))
         ctk.CTkLabel(top, text="Templates", font=ctk.CTkFont(size=18, weight="bold")).pack(side="left")
-        self.btn_load_template = ctk.CTkButton(top, text="Open template…", width=130, command=on_open)
-        self.btn_load_template.pack(side="right")
-        self.btn_save_template = ctk.CTkButton(
+        self.btn_load_template = ctk.CTkButton(
             top,
-            text="Save current label…",
-            width=150,
+            text="Open file…",
+            width=110,
             fg_color="transparent",
             border_width=1,
             text_color=("gray10", "gray90"),
-            command=on_save,
+            command=on_open,
         )
+        self.btn_load_template.pack(side="right")
+        self.btn_save_template = ctk.CTkButton(top, text="Save current label…", width=150, command=on_save)
         self.btn_save_template.pack(side="right", padx=8)
 
+        scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+
+        # The user's own templates
+        ctk.CTkLabel(scroll, text="My templates", font=ctk.CTkFont(size=14, weight="bold"), anchor="w").pack(
+            fill="x", padx=4, pady=(0, 4)
+        )
+        self.user_list = ctk.CTkFrame(scroll, fg_color="transparent")
+        self.user_list.pack(fill="x", padx=2, pady=(0, 14))
+        self.refresh_user_templates()
+
+        ctk.CTkLabel(scroll, text="Starting points", font=ctk.CTkFont(size=14, weight="bold"), anchor="w").pack(
+            fill="x", padx=4
+        )
         ctk.CTkLabel(
-            self,
+            scroll,
             text="Pick a starting point. It opens in the text label editor, where you can change anything.",
             anchor="w",
             text_color=MUTED_TEXT,
         ).pack(fill="x", padx=4, pady=(0, 8))
 
-        grid = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        grid = ctk.CTkFrame(scroll, fg_color="transparent")
         grid.pack(fill="both", expand=True)
         for col in range(COLUMNS):
             grid.grid_columnconfigure(col, weight=1, uniform="card")
@@ -74,6 +93,43 @@ class TemplatesView(ctk.CTkFrame):
             card = self._make_card(grid, key, preset, on_apply)
             card.grid(row=idx // COLUMNS, column=idx % COLUMNS, padx=6, pady=6, sticky="nsew")
             self.cards[key] = card
+
+    def refresh_user_templates(self):
+        """Lists the saved templates again, e.g. after saving one or restoring a backup."""
+        for child in self.user_list.winfo_children():
+            child.destroy()
+        templates = list_user_templates(self._templates_folder)
+        self.user_rows = {}
+        if not templates:
+            ctk.CTkLabel(
+                self.user_list,
+                text="Labels you save with “Save current label…” show up here, and are included in backups.",
+                anchor="w",
+                text_color=MUTED_TEXT,
+            ).pack(fill="x", padx=2)
+            return
+        for name, path in templates:
+            row = ctk.CTkFrame(self.user_list, corner_radius=8)
+            row.pack(fill="x", pady=2)
+            ctk.CTkLabel(row, text=name, anchor="w", font=ctk.CTkFont(size=13)).pack(
+                side="left", fill="x", expand=True, padx=12, pady=6
+            )
+            ctk.CTkButton(
+                row, text="Delete", width=70, height=26, fg_color="gray30", hover_color="#B91C1C",
+                command=lambda n=name, p=path: self._delete(n, p),
+            ).pack(side="right", padx=(4, 8))
+            ctk.CTkButton(
+                row, text="Open", width=70, height=26,
+                command=lambda p=path: self._on_open_user and self._on_open_user(p),
+            ).pack(side="right")
+            self.user_rows[name] = row
+
+    def _delete(self, name: str, path: str):
+        from tkinter import messagebox
+
+        if messagebox.askyesno("Delete template", f"Delete the template “{name}”?", parent=self):
+            delete_user_template(path)
+            self.refresh_user_templates()
 
     def _load_image(self, key: str) -> Optional[ctk.CTkImage]:
         path = preview_path_for(key)

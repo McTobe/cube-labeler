@@ -260,6 +260,35 @@ class TestIconBrowser(unittest.TestCase):
         self.assertIn("OpenAI's icon is ready", ed.lbl_status.cget("text"))
         self.assertIsNotNone(ed._picture_before_ai)
 
+    def test_icons_page_has_nothing_to_insert(self):
+        with patch("ui.backup_dialog.backup_status", lambda: ("Auto-backup off", "gray", False)):
+            page = browser.IconLibraryPage(self.root)
+        self.addCleanup(page.destroy)
+        page.pack(fill="both", expand=True)
+        page.update()
+        page._select_path(self.mgr.get_icon_by_id("torx").file_path)
+        page._confirm_selection()
+        self.assertEqual(self.chosen, [])
+        self.assertTrue(page.winfo_exists())
+        self.assertEqual(page.lbl_backup.cget("text"), "Auto-backup off")
+        self.assertEqual(page.btn_backups.cget("text"), "Backups…")
+        with patch.object(page, "_take_grab"):
+            ed = page._open_editor(picture_path=self._picture())
+        self.addCleanup(lambda: ed.winfo_exists() and ed.destroy())
+        ed.update()
+        self.assertEqual(ed.btn_save_insert.winfo_manager(), "")
+        ed._save(insert=False)
+        page.refresh()
+        self.assertEqual(page.selected_icon.title, "M3 hex nut")
+
+    def test_picker_shows_backup_status(self):
+        dlg = self._open()
+        with patch("ui.backup_dialog.backup_status", lambda: ("● Auto-backup on: OneDrive", "green", True)):
+            dlg._refresh_backup_status()
+        self.assertEqual(dlg.lbl_backup.cget("text"), "● Auto-backup on: OneDrive")
+        self.assertEqual(dlg.btn_backups.cget("text"), "Backups ✓")
+        self.assertEqual(dlg.btn_use.cget("text"), "Insert icon")
+
 
 if __name__ == "__main__":
     unittest.main()
