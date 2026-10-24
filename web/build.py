@@ -94,20 +94,29 @@ def build_service_worker() -> None:
         f.write(source)
 
 
-def main() -> int:
-    # Empty the folder rather than deleting it, so a server running from it keeps working
+def empty_dist() -> None:
+    """
+    Removes the files of the last build but keeps its folders: a server running from dist/
+    keeps working, and Windows often refuses to delete a folder that Explorer, the search
+    indexer or a virus scanner is looking at. Folders left empty are tidied up if possible.
+    """
     os.makedirs(DIST_DIR, exist_ok=True)
-    for name in os.listdir(DIST_DIR):
-        path = os.path.join(DIST_DIR, name)
-        if os.path.isdir(path):
-            shutil.rmtree(path)
-        else:
-            os.remove(path)
+    for root, dirs, files in os.walk(DIST_DIR, topdown=False):
+        for name in files:
+            os.remove(os.path.join(root, name))
+        for name in dirs:
+            try:
+                os.rmdir(os.path.join(root, name))
+            except OSError:
+                pass  # in use; the build fills it again or leaves it empty
 
+
+def main() -> int:
+    empty_dist()
     for name in PAGE_FILES:
         shutil.copy2(os.path.join(WEB_DIR, name), DIST_DIR)
     for name in PAGE_DIRS:
-        shutil.copytree(os.path.join(WEB_DIR, name), os.path.join(DIST_DIR, name))
+        shutil.copytree(os.path.join(WEB_DIR, name), os.path.join(DIST_DIR, name), dirs_exist_ok=True)
     build_core_zip(os.path.join(DIST_DIR, "cube_core.zip"))
     build_icons()
     with open(os.path.join(DIST_DIR, "manifest.webmanifest"), "w", encoding="utf-8") as f:

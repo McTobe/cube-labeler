@@ -40,6 +40,23 @@ class TestWebBuild(unittest.TestCase):
                     self.assertIn(f"{module}.py", build.CORE_MODULES)
 
 
+    def test_build_survives_folders_windows_will_not_delete(self):
+        import tempfile
+        from unittest import mock
+        import build
+        with tempfile.TemporaryDirectory() as tmp:
+            dist = os.path.join(tmp, "dist")
+            os.makedirs(os.path.join(dist, "js", "pages"))
+            with open(os.path.join(dist, "js", "pages", "old.js"), "w") as f:
+                f.write("stale")
+            denied = OSError(13, "Access is denied")
+            with mock.patch.object(build, "DIST_DIR", dist), mock.patch("os.rmdir", side_effect=denied):
+                self.assertEqual(build.main(), 0)
+            self.assertFalse(os.path.exists(os.path.join(dist, "js", "pages", "old.js")))
+            self.assertTrue(os.path.isfile(os.path.join(dist, "js", "main.js")))
+            self.assertTrue(os.path.isfile(os.path.join(dist, "sw.js")))
+
+
 class TestWebRender(unittest.TestCase):
     def test_render_matches_desktop_renderer(self):
         result = cube_web.render_label({"text": "M3 x 12", "tape_width_mm": 9.0, "font_name": "Arial"})
