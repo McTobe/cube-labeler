@@ -38,6 +38,11 @@ class TestUserTemplates(unittest.TestCase):
         self.assertTrue(tp.delete_user_template(path))
         self.assertEqual(tp.list_user_templates(self.folder), [])
 
+    def test_old_templates_get_the_apps_cut_lines(self):
+        cfg = tp.config_from_dict({"text": "Old", "cut_line": False, "auto_cut_hardware": True})
+        self.assertTrue(cfg.cut_line)
+        self.assertFalse(cfg.auto_cut_hardware)
+
     def test_names_windows_cannot_store(self):
         self.assertEqual(tp.template_file_name('M3: 10/20 "bolts"?'), "M3_ 10_20 _bolts__.json")
         self.assertEqual(tp.template_file_name("  ...  "), "My template.json")

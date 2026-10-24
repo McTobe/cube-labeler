@@ -20,7 +20,7 @@ from core.inventory_renderer import (
     PART_LIBRARY_ICONS,
     part_library_icon,
 )
-from core.label_renderer import SINGLE_BIN_PADDING_MM, LabelConfig, LabelRenderer
+from core.label_renderer import BATCH_GAP_DOTS, LabelConfig, LabelRenderer
 from core.specs import DOT_PITCH_MM
 from core.label_language import build_presets
 
@@ -136,8 +136,8 @@ class TestInventoryRenderer(unittest.TestCase):
 
         self.assertEqual(rast.size[0], 128)  # 128-dot Brother printhead width
         self.assertGreater(len(r_bytes), 1000)
-        # 38 mm label plus the blank tape left on each side of a single bin label
-        padding_mm = 2 * round(SINGLE_BIN_PADDING_MM / DOT_PITCH_MM) * DOT_PITCH_MM
+        # 38 mm label plus the same half-gap of tape on each side as in a queue
+        padding_mm = BATCH_GAP_DOTS * DOT_PITCH_MM
         self.assertAlmostEqual(metrics.print_length_mm, 38.0 + padding_mm, delta=1.5)
 
         # Batch rendering

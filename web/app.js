@@ -25,7 +25,6 @@ const el = {
   align: $('align'),
   qrEnabled: $('qr-enabled'),
   qrData: $('qr-data'),
-  autoCut: $('auto-cut'),
   preview: $('preview'),
   metrics: $('metrics'),
   warning: $('warning'),
@@ -178,7 +177,6 @@ async function print() {
   const raster = current.raster;
   await runJob(async () => {
     const result = await printRaster(transport, py, raster, {
-      auto_cut: el.autoCut.checked,
       required_tape_width_mm: Number(el.tape.value),
     }, (message) => log(message));
     if (!result.confirmed) log('Print sent, but the printer did not confirm completion.', true);

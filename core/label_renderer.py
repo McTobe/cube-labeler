@@ -88,11 +88,12 @@ class LabelConfig:
     show_guides: bool = False  # Show printable area and tape guides
     show_rulers: bool = False  # Show mm/inch rulers
 
-    # Cutting Lines (Batch Queue always inserts dotted cut lines; single prints default off)
-    cut_line: bool = False  # Print a vertical cut guide line on the tape
+    # Cut lines: the app prints its own dotted cut lines at both ends of every label,
+    # in place of the ":" cut mark the printer adds when it gets the auto-cut flag
+    cut_line: bool = True  # Print vertical cut lines on the tape
     cut_line_style: str = "dotted"  # "dotted", "solid", "ticks"
-    cut_line_position: str = "end"  # "end", "both"
-    auto_cut_hardware: bool = True  # Send hardware auto-cut flag to printer (default ON)
+    cut_line_position: str = "start"  # "start", "end", "both"; the end needs none, it lines up with the cutter
+    auto_cut_hardware: bool = False  # Hardware auto-cut flag; the PT-P300BT only prints a ":" mark for it
 
     # Hardware Inventory Design System (V2)
     inventory_config: Optional[object] = None  # FastenerLabelConfig or ComponentLabelConfig
@@ -409,22 +410,27 @@ class LabelRenderer:
             self._render_base_canvas(config)
         )
 
-        # Bin labels are drawn border to border; leave a little blank tape on each side
-        if getattr(config, "inventory_config", None) is not None:
+        # A label gets the same half-gap of tape as a label in a batch, so single and
+        # queued prints look alike. Bin labels are drawn border to border, so without
+        # cut lines they still get a little blank tape on each side.
+        pad = 0
+        if config.cut_line:
+            pad = BATCH_GAP_DOTS // 2
+        elif getattr(config, "inventory_config", None) is not None:
             pad = int(round(SINGLE_BIN_PADDING_MM / self.DOT_PITCH_MM))
+        if pad:
             padded = Image.new("RGB", (img_canvas.width + 2 * pad, img_canvas.height), "white")
             padded.paste(img_canvas, (pad, 0))
             img_canvas = padded
 
         draw = ImageDraw.Draw(img_canvas)
 
-        # Draw cut guide lines if enabled
         if config.cut_line:
             cut_positions = []
             if config.cut_line_position in ("both", "start"):
-                cut_positions.append(2)
+                cut_positions.append(0)
             if config.cut_line_position in ("both", "end"):
-                cut_positions.append(img_canvas.width - 3)
+                cut_positions.append(img_canvas.width - 1)
 
             for cx in cut_positions:
                 if config.cut_line_style == "dotted":
@@ -490,8 +496,8 @@ class LabelRenderer:
         """
         Renders a continuous batch chain of multiple labels with dotted cut lines in between,
         eliminating the ~25mm wasted tape between consecutive individual prints.
-        Every label gets the same half-gap of tape on both sides, first and last included,
-        with a cut line at each end of the strip.
+        Every label gets the same half-gap of tape on both sides, first and last included.
+        The strip starts with a cut line; its end needs none, since it stops at the cutter.
         """
         if not configs:
             return self.render(LabelConfig(text=""))
@@ -533,7 +539,6 @@ class LabelRenderer:
             if idx < len(canvases) - 1:
                 cut_line(cur_x + margin)
                 cur_x += gap_dots
-        cut_line(batch_canvas.width - 1)
 
         # 128-dot raster transformation
         rotated = ImageOps.invert(

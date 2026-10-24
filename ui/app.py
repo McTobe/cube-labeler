@@ -533,8 +533,8 @@ class PrintLabelApp(ctk.CTk):
             body, text="Show rulers", variable=self.chk_rulers_var, command=self._on_rulers_toggle
         )
         self.chk_rulers.pack(anchor="w", pady=(0, 8))
-        # No auto-cut option: the PT-P300BT has a manual cutter and ignores the flag
-        # (checked on hardware), so labels keep the default config.auto_cut_hardware.
+        # No auto-cut option: the PT-P300BT has a manual cutter and only prints a ":" mark
+        # for the flag, so every label gets the app's own cut lines instead.
         self.btn_reset_settings = ctk.CTkButton(
             body, text="Reset settings", fg_color="gray35", hover_color="gray25", command=self._on_reset_settings
         )
@@ -1196,11 +1196,7 @@ class PrintLabelApp(ctk.CTk):
         ):
             return
         cur_text = self.text_editor.get("1.0", "end-1c")
-        self.config = LabelConfig(
-            text=cur_text,
-            auto_cut_hardware=True,
-            cut_line=False,
-        )
+        self.config = LabelConfig(text=cur_text)
         self._update_ui_from_config(self.config)
         self._trigger_render()
         self.action_status_label.configure(text="Settings reset")
@@ -1587,7 +1583,6 @@ class PrintLabelApp(ctk.CTk):
         if self._exceeds_max_length(self._current_metrics):
             return
 
-        auto_cut = self.config.auto_cut_hardware
         data = self._current_raster_bytes
         required_width = (
             INVENTORY_TAPE_WIDTH_MM if getattr(self.config, "inventory_config", None) is not None else None
@@ -1596,7 +1591,6 @@ class PrintLabelApp(ctk.CTk):
         def _job(printer, prog, stat):
             return printer.print_raster_data(
                 data,
-                auto_cut=auto_cut,
                 progress_callback=prog,
                 status_callback=stat,
                 required_tape_width_mm=required_width,
@@ -1659,8 +1653,6 @@ class PrintLabelApp(ctk.CTk):
         if self._exceeds_max_length(metrics):
             return
 
-        # The batch is one strip with one cut at the end, so it follows the current auto-cut setting
-        auto_cut = self.config.auto_cut_hardware
         label_count = len(self.label_queue)
         tape_saved_mm = metrics.tape_saved_mm
         required_width = (
@@ -1672,7 +1664,6 @@ class PrintLabelApp(ctk.CTk):
         def _job(printer, prog, stat):
             return printer.print_raster_data(
                 r_bytes,
-                auto_cut=auto_cut,
                 progress_callback=prog,
                 status_callback=stat,
                 required_tape_width_mm=required_width,
