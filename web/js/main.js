@@ -8,8 +8,8 @@ import { LabelPage } from './pages/label.js';
 import { SettingsPage } from './pages/settings.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
-import { SoonPage } from './pages/soon.js';
-import { app, start } from './app.js';
+import { TemplatesPage } from './pages/templates.js';
+import { app, start, pageChanged } from './app.js';
 import { useStore } from './state.js';
 
 const PAGES = [
@@ -29,7 +29,7 @@ function App() {
   const [page, setPage] = useState(currentPage);
   const { queue } = useStore(app);
   useEffect(() => {
-    const onHash = () => { setPage(currentPage()); window.scrollTo(0, 0); };
+    const onHash = () => { pageChanged(); setPage(currentPage()); window.scrollTo(0, 0); };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
@@ -39,8 +39,8 @@ function App() {
   if (page.id === 'label') body = html`<${LabelPage} />`;
   else if (page.id === 'queue') body = html`<${QueuePage} />`;
   else if (page.id === 'icons') body = html`<${IconsPage} />`;
-  else if (page.id === 'settings') body = html`<${SettingsPage} />`;
-  else body = html`<${SoonPage} page=${page.id} title=${page.title} />`;
+  else if (page.id === 'templates') body = html`<${TemplatesPage} />`;
+  else body = html`<${SettingsPage} />`;
 
   return html`<div class=${`shell page-${page.id}`}>
     <nav class="nav" aria-label="Pages">

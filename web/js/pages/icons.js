@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Icon } from '../icons.js';
-import { Field, Sheet } from '../ui.js';
+import { Field, Sheet, downloadBlob } from '../ui.js';
 import { useStore } from '../state.js';
 import {
   app, boot, say, setMode, setImageBytes, setBinIconBytes, iconPrintPreview,
@@ -128,12 +128,7 @@ function IconDetails({ iconKey, onClose, onEdit }) {
     location.hash = '#/label';
     say(`${icon.title} is on the ${target === 'bin' ? 'bin label' : 'label'}.`);
   };
-  const download = async () => {
-    const url = URL.createObjectURL(new Blob([await iconBytes(icon)], { type: 'image/png' }));
-    const a = Object.assign(document.createElement('a'), { href: url, download: pngName(icon) });
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const download = async () => downloadBlob(new Blob([await iconBytes(icon)], { type: 'image/png' }), pngName(icon));
   const remove = () => {
     deleteUserIcon(icon.key);
     onClose();

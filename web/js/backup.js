@@ -1,0 +1,95 @@
+// Backups: the user's icons, settings and templates in one .cubebackup file, the same format
+// as the desktop app's, so a backup made in either one restores in the other.
+
+import * as storage from './storage.js';
+import { app, updateSettings, makeBackup, openBackup, templateToDesktop } from './app.js';
+import { library, iconsForBackup, planIcons, restoreIcons, restoreIconLists } from './library.js';
+import { templates, loadTemplates, findTemplate, putTemplate, freeTemplateName } from './templates.js';
+import { downloadBlob } from './ui.js';
+
+// Settings of the web version go in a backup with this prefix; the desktop app keeps them unused
+const WEB_PREFIX = 'web_';
+const WEB_SETTINGS = ['theme', 'match_printer_tape'];
+
+function localTime(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const offset = -date.getTimezoneOffset();
+  const sign = offset >= 0 ? '+' : '-';
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+    + `${sign}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
+}
+
+async function backupSettings() {
+  // Settings from a desktop backup that the web version has no use for are kept and passed on
+  const desktop = await storage.load('desktopSettings', {});
+  const { settings } = app.get();
+  const out = { ...desktop, label_language: settings.label_language };
+  for (const key of WEB_SETTINGS) out[WEB_PREFIX + key] = settings[key];
+  out.icon_favourites = library.get().favourites;
+  out.icon_recent = library.get().recent;
+  return out;
+}
+
+export async function saveBackup() {
+  if (!templates.get().ready) await loadTemplates();
+  const created = localTime();
+  const data = await makeBackup({
+    created,
+    icons: iconsForBackup(),
+    settings: await backupSettings(),
+    templates: await Promise.all(templates.get().mine.map(async (t) => ({ name: t.name, json: await templateToDesktop(t.item) }))),
+  });
+  const stamp = created.slice(0, 16).replace('T', ' ').replace(':', '-');
+  downloadBlob(new Blob([data], { type: 'application/zip' }), `Cube Labeler backup ${stamp}.cubebackup`);
+  await storage.save('lastBackup', created);
+  return { icons: library.get().user.length, templates: templates.get().mine.length };
+}
+
+export const lastBackup = () => storage.load('lastBackup', null);
+
+// Reads a backup file and works out what restoring it would do
+export async function readBackup(file) {
+  if (!templates.get().ready) await loadTemplates();
+  const opened = await openBackup(new Uint8Array(await file.arrayBuffer()));
+  const iconPlan = planIcons(opened.icons);
+  const templatePlan = { new: 0, conflicts: 0 };
+  for (const t of opened.templates) templatePlan[findTemplate(t.name) ? 'conflicts' : 'new']++;
+  return { ...opened, iconPlan, templatePlan };
+}
+
+// Restores the chosen parts ({icons, settings, templates}) of a read backup
+export async function restoreBackup(opened, parts, onConflict) {
+  const result = { icons: null, templates: null, settings: false };
+  if (parts.icons && opened.icons.length) result.icons = restoreIcons(opened.icons, onConflict);
+  if (parts.templates && opened.templates.length) {
+    const counts = { added: 0, replaced: 0, skipped: 0 };
+    for (const t of opened.templates) {
+      if (findTemplate(t.name)) {
+        if (onConflict === 'skip') { counts.skipped++; continue; }
+        if (onConflict === 'replace') { putTemplate(t.name, t.item); counts.replaced++; continue; }
+        putTemplate(freeTemplateName(t.name), t.item);
+      } else {
+        putTemplate(t.name, t.item);
+      }
+      counts.added++;
+    }
+    result.templates = counts;
+  }
+  if (parts.settings && opened.settings) {
+    const s = opened.settings;
+    const desktop = {};
+    const change = {};
+    for (const [key, value] of Object.entries(s)) {
+      if (key.startsWith(WEB_PREFIX) && WEB_SETTINGS.includes(key.slice(WEB_PREFIX.length))) change[key.slice(WEB_PREFIX.length)] = value;
+      else if (key !== 'icon_favourites' && key !== 'icon_recent' && key !== 'label_language') desktop[key] = value;
+    }
+    if (typeof s.label_language === 'string') change.label_language = s.label_language;
+    if (!['system', 'light', 'dark'].includes(change.theme)) delete change.theme;
+    if ('match_printer_tape' in change) change.match_printer_tape = !!change.match_printer_tape;
+    await storage.save('desktopSettings', desktop);
+    await updateSettings(change);
+    restoreIconLists(s.icon_favourites, s.icon_recent);
+    result.settings = true;
+  }
+  return result;
+}

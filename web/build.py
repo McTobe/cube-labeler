@@ -37,6 +37,8 @@ CORE_MODULES = [
     "specs.py",
 ]
 
+UI_MODULES = ["__init__.py", "templates.py"]
+
 FONTS = ["Arimo-Regular.ttf", "Arimo-Bold.ttf", "OFL.txt"]
 
 MANIFEST = {
@@ -60,6 +62,9 @@ def build_core_zip(path: str) -> None:
         for name in CORE_MODULES:
             zf.write(os.path.join(PROJECT_ROOT, "core", name), f"core/{name}")
         zf.write(os.path.join(WEB_DIR, "cube_web.py"), "cube_web.py")
+        # Template files are read and written the desktop app's way
+        for name in UI_MODULES:
+            zf.write(os.path.join(PROJECT_ROOT, "ui", name), f"ui/{name}")
         for name in FONTS:
             zf.write(os.path.join(WEB_DIR, "fonts", name), f".fonts/{name}")
         # The icon library: bin labels draw their drive and part icons from it

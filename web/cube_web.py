@@ -445,3 +445,302 @@ def edit_icon(original: Any, edit: Any = None, touch: Any = None, view: int = 48
         "edit": settings.to_dict(),
         "view_png": _png(oriented),
     }
+
+
+# --- Templates: the desktop app's template files, read and written by the web version ---
+
+def _web_font(name: Any) -> str:
+    """A font this browser has for a template's font: the same one, else Arimo (bold if it was)."""
+    names = font_names()
+    if name in names:
+        return name
+    bold = "Arimo Bold" if "bold" in str(name or "").lower() and "Arimo Bold" in names else None
+    return bold or ("Arimo" if "Arimo" in names else names[0])
+
+
+def _b64(data: Optional[bytes]) -> Optional[str]:
+    import base64
+    return base64.b64encode(data).decode("ascii") if data else None
+
+
+def _unb64(text: Any) -> Optional[bytes]:
+    import base64
+    import binascii
+    if not isinstance(text, str):
+        return None
+    try:
+        return base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _picture(saved: Any) -> Optional[Dict[str, Any]]:
+    """A picture kept in a template file by the web version: {"name", "data" as base64}."""
+    if not isinstance(saved, dict):
+        return None
+    data = _unb64(saved.get("data"))
+    return {"name": str(saved.get("name") or "picture.png"), "data": data} if data else None
+
+
+def template_from_desktop(data: Any) -> Dict[str, Any]:
+    """
+    A desktop template (the JSON text or the parsed object) as the page keeps a label:
+    {"mode": "text", "label": {...}} or {"mode": "bin", "bin": {"kind", ...}}. Pictures only
+    come along from templates the web version saved, since desktop ones point at files on a PC.
+    Raises ValueError with a readable message for anything that is not a template.
+    """
+    import json
+    from ui.templates import config_from_dict
+    if isinstance(data, (str, bytes, bytearray)) or hasattr(data, "to_bytes"):
+        text = _to_bytes(data).decode("utf-8-sig") if not isinstance(data, str) else data
+        try:
+            data = json.loads(text)
+        except ValueError as e:
+            raise ValueError(f"This is not a template file: {e}") from e
+    else:
+        data = _to_dict(data)
+    if not isinstance(data, dict):
+        raise ValueError("This is not a template file.")
+    try:
+        cfg = config_from_dict(data)
+    except TypeError as e:
+        raise ValueError(f"The template has values Cube Labeler cannot read: {e}") from e
+    inv = cfg.inventory_config
+    if inv is not None:
+        from core.inventory_renderer import ComponentLabelConfig
+        fields = dataclasses.asdict(inv)
+        kind = "component" if isinstance(inv, ComponentLabelConfig) else "fastener"
+        fields.pop("custom_icon_path", None)
+        fields.pop("custom_tool_icon_path", None)
+        fields["kind"] = kind
+        fields["icon"] = _picture(data.get("web_bin_icon"))
+        icon_field = "icon_type" if kind == "component" else "tool_type"
+        if fields[icon_field] == "custom" and fields["icon"] is None:
+            fields[icon_field] = "none"
+        return {"mode": "bin", "bin": fields}
+    label = dataclasses.asdict(cfg)
+    for key in ("inventory_config", "image_path", "cut_line", "cut_line_style", "cut_line_position", "auto_cut_hardware"):
+        label.pop(key, None)
+    label["text"] = label["text"].replace("\\n", "\n")
+    label["font_name"] = _web_font(label["font_name"])
+    label["image"] = _picture(data.get("web_picture"))
+    return {"mode": "text", "label": label}
+
+
+def template_to_desktop(item: Any) -> str:
+    """
+    A label from the page ({"mode", "label" or "bin"}, as template_from_desktop gives) as the
+    JSON of a desktop template file. Pictures go along as base64 for the web version; the
+    desktop app ignores them.
+    """
+    import json
+    from ui.templates import config_to_dict
+    item = _to_dict(item)
+    if item.get("mode") == "bin":
+        bin_data = _to_dict(item.get("bin"))
+        icon = bin_data.pop("icon", None)
+        icon = _to_dict(icon) if icon else None
+        options = {"bin": dict(bin_data, icon_data=icon["data"] if icon else None)}
+    else:
+        label = _to_dict(item.get("label"))
+        image = label.pop("image", None)
+        image = _to_dict(image) if image else None
+        options = dict(label, image_data=image["data"] if image else None)
+        icon = None
+    data = config_to_dict(_label_config(options))
+    data["image_path"] = None
+    inv = data.get("inventory_config")
+    if isinstance(inv, dict):
+        for key in ("custom_icon_path", "custom_tool_icon_path"):
+            if key in inv:
+                inv[key] = None
+    if item.get("mode") == "bin":
+        if icon:
+            data["web_bin_icon"] = {"name": icon.get("name"), "data": _b64(_to_bytes(icon["data"]))}
+    elif image:
+        data["web_picture"] = {"name": image.get("name"), "data": _b64(_to_bytes(image["data"]))}
+    return json.dumps(data, indent=2)
+
+
+def template_presets() -> List[Dict[str, Any]]:
+    """The desktop app's starting points: [{"key", "name", "description", "mode", "label"}]."""
+    from ui.templates import BUILTIN_PRESETS
+    out = []
+    for key, preset in BUILTIN_PRESETS.items():
+        item = template_from_desktop(preset["config"])
+        out.append({"key": key, "name": preset["name"], "description": preset["description"], **item})
+    return out
+
+
+# --- Backups: the desktop app's .cubebackup files (see core/backup.py for the format) ---
+
+BACKUP_FORMAT = "cube-labeler-backup"
+BACKUP_VERSION = 2
+OLD_ICON_FORMAT = "cube-labeler-icons"
+BACKUP_MAX_ICONS = 5000
+BACKUP_MAX_FILES = 2000
+BACKUP_MAX_FILE_BYTES = 25 * 1024 * 1024
+TOUCH_SUFFIX = ".touch.png"
+TEMPLATES_FOLDER = "templates"
+# Settings that belong to one device or are secrets never go in a backup (as on the desktop)
+_LOCAL_SUFFIXES = ("_api_key", "_api_key_protected")
+_LOCAL_KEYS = ("last_serial_port",)
+_LOCAL_PREFIXES = ("icon_backup_",)
+
+
+def _is_local_setting(key: str) -> bool:
+    return key in _LOCAL_KEYS or key.startswith(_LOCAL_PREFIXES) or key.endswith(_LOCAL_SUFFIXES)
+
+
+def _safe_icon_file(name: Any) -> bool:
+    return (isinstance(name, str) and name == os.path.basename(name) and "/" not in name and "\\" not in name
+            and not name.startswith(".") and name.lower().endswith(".png") and len(name) <= 120)
+
+
+def _is_png(data: bytes) -> bool:
+    from PIL import Image
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            if img.format != "PNG":
+                return False
+            img.verify()
+        return True
+    except Exception:
+        return False
+
+
+def template_file_name(name: str) -> str:
+    """The file a template called `name` is kept in on the desktop (as ui/templates.py names it)."""
+    from ui.templates import template_file_name as desktop_name
+    return desktop_name(name)
+
+
+def make_backup(data: Any) -> bytes:
+    """
+    A .cubebackup file the desktop app can restore, from what the page keeps:
+    {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch"}],
+     "settings": {...}, "templates": [{"name", "json"}]}. Icons, originals and touch-ups are
+    bytes; touch-ups may be the page's raw cells. Settings that belong to one device are left out.
+    """
+    import json
+    import zipfile
+    data = _to_dict(data)
+    icons, members = [], {}
+    for item in data.get("icons") or []:
+        item = _to_dict(item)
+        file = item.get("file")
+        if not _safe_icon_file(file):
+            continue
+        stem = os.path.splitext(file)[0]
+        meta = _to_dict(item.get("meta"))
+        members[f"icons/{file}"] = _to_bytes(item["icon"])
+        original = item.get("original")
+        if original is not None and meta.get("edit"):
+            members[f"originals/{stem}.png"] = _to_bytes(original)
+            touch = touch_png(item.get("touch")) if item.get("touch") is not None else None
+            if touch:
+                members[f"originals/{stem}{TOUCH_SUFFIX}"] = touch
+        else:
+            meta.pop("edit", None)
+        icons.append({"file": file, "favourite": bool(item.get("favourite")), "meta": meta})
+    files = {}
+    for template in data.get("templates") or []:
+        template = _to_dict(template)
+        files[f"{TEMPLATES_FOLDER}/{template_file_name(str(template.get('name') or 'My template'))}"] = (
+            str(template["json"]).encode("utf-8"))
+    settings = {k: v for k, v in _to_dict(data.get("settings")).items() if not _is_local_setting(k)}
+    manifest = {
+        "format": BACKUP_FORMAT,
+        "version": BACKUP_VERSION,
+        "created": str(data.get("created") or ""),
+        "icons": icons,
+        "settings": settings,
+        "files": sorted(files),
+    }
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False, default=str))
+        for name, content in members.items():
+            zf.writestr(name, content)
+        for name, content in sorted(files.items()):
+            zf.writestr(f"data/{name}", content)
+    return out.getvalue()
+
+
+def open_backup(data: Any) -> Dict[str, Any]:
+    """
+    Reads a .cubebackup (or an older .cubeicons) file from the desktop app or the web version:
+    {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch" as cells}],
+     "settings": {...} or None, "templates": [{"name", "item"}], "skipped_templates": [names]}.
+    Raises ValueError with a readable message when it is not a backup this version can read.
+    """
+    import json
+    import zipfile
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(_to_bytes(data)))
+    except (zipfile.BadZipFile, OSError):
+        raise ValueError("This is not a Cube Labeler backup.")
+
+    def member(name: str, required: bool = False) -> Optional[bytes]:
+        try:
+            info = zf.getinfo(name)
+        except KeyError:
+            if required:
+                raise ValueError(f"The backup is missing {name}.")
+            return None
+        if info.file_size > BACKUP_MAX_FILE_BYTES:
+            raise ValueError(f"{name} in the backup is too large.")
+        return zf.read(info)
+
+    with zf:
+        try:
+            manifest = json.loads(member("manifest.json", required=True).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            raise ValueError("The backup's list of contents is damaged.")
+        if not isinstance(manifest, dict) or manifest.get("format") not in (BACKUP_FORMAT, OLD_ICON_FORMAT):
+            raise ValueError("This is not a Cube Labeler backup.")
+        if not isinstance(manifest.get("version"), int) or manifest["version"] > BACKUP_VERSION:
+            raise ValueError("This backup was made by a newer version of Cube Labeler.")
+        listed = manifest.get("icons")
+        if not isinstance(listed, list) or len(listed) > BACKUP_MAX_ICONS:
+            raise ValueError("The backup's list of contents is damaged.")
+
+        icons, seen = [], set()
+        for item in listed:
+            if not isinstance(item, dict) or not _safe_icon_file(item.get("file")) or item["file"].lower() in seen:
+                continue
+            file = item["file"]
+            seen.add(file.lower())
+            stem = os.path.splitext(file)[0]
+            icon = member(f"icons/{file}", required=True)
+            if not _is_png(icon):
+                raise ValueError(f"{file} in the backup is not a readable picture.")
+            meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+            original = member(f"originals/{stem}.png")
+            if original is not None and not _is_png(original):
+                original = None
+            touch = member(f"originals/{stem}{TOUCH_SUFFIX}") if original is not None else None
+            if original is None:
+                meta.pop("edit", None)
+            icons.append({
+                "file": file, "meta": meta, "favourite": bool(item.get("favourite")), "icon": icon,
+                "original": original, "touch": touch_cells(touch) if touch and _is_png(touch) else None,
+            })
+
+        settings, templates, skipped = None, [], []
+        if manifest["format"] == BACKUP_FORMAT:
+            settings = manifest.get("settings") if isinstance(manifest.get("settings"), dict) else {}
+            listed_files = manifest.get("files") if isinstance(manifest.get("files"), list) else []
+            for path in listed_files[:BACKUP_MAX_FILES]:
+                if not isinstance(path, str) or not path.startswith(TEMPLATES_FOLDER + "/") or ".." in path:
+                    continue
+                name = os.path.splitext(path.split("/")[-1])[0]
+                content = member(f"data/{path}")
+                if content is None:
+                    continue
+                try:
+                    templates.append({"name": name, "item": template_from_desktop(content)})
+                except ValueError:
+                    skipped.append(name)
+    return {"created": str(manifest.get("created") or ""), "icons": icons, "settings": settings,
+            "templates": templates, "skipped_templates": skipped}

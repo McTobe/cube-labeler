@@ -169,3 +169,90 @@ export function deleteUserIcon(key) {
   storage.save('iconFavourites', library.get().favourites);
   storage.save('iconRecent', library.get().recent);
 }
+
+// --- Backups ------------------------------------------------------------------------------------
+
+const sameBytes = (a, b) => a && b && a.length === b.length && a.every((v, i) => v === b[i]);
+
+// The user's icons the way a desktop backup lists them
+export function iconsForBackup() {
+  const { user, favourites } = library.get();
+  return user.map((icon) => ({
+    file: icon.key.slice(5),
+    meta: { title: icon.title, category: icon.category, keywords: icon.keywords, ...(icon.original && icon.edit ? { edit: icon.edit } : {}) },
+    favourite: favourites.includes(icon.key),
+    icon: icon.png,
+    original: icon.original && icon.edit ? icon.original : null,
+    touch: icon.original && icon.edit ? icon.touch : null,
+  }));
+}
+
+// How the icons of a backup line up with the ones here: new, the same, or a different icon by the same name
+export function planIcons(entries) {
+  const byKey = new Map(library.get().user.map((icon) => [icon.key.toLowerCase(), icon]));
+  const plan = { new: 0, same: 0, conflicts: 0 };
+  for (const entry of entries) {
+    const here = byKey.get(`user/${entry.file}`.toLowerCase());
+    if (!here) plan.new++;
+    else if (sameBytes(here.png, entry.icon)) plan.same++;
+    else plan.conflicts++;
+  }
+  return plan;
+}
+
+// Adds a backup's icons. onConflict: 'skip', 'replace' or 'keep_both'. Returns how many were added.
+export function restoreIcons(entries, onConflict) {
+  let user = [...library.get().user];
+  const favourites = new Set(library.get().favourites);
+  const counts = { added: 0, replaced: 0, skipped: 0 };
+  const keys = () => new Set(user.map((icon) => icon.key.toLowerCase()));
+  for (const entry of entries) {
+    let key = `user/${entry.file}`;
+    const index = user.findIndex((icon) => icon.key.toLowerCase() === key.toLowerCase());
+    const meta = entry.meta || {};
+    const stem = entry.file.replace(/\.png$/i, '');
+    const icon = {
+      key, id: stem, title: meta.title || stem.replace(/_/g, ' '),
+      category: library.get().categories.includes(meta.category) ? meta.category : USER_CATEGORY,
+      keywords: Array.isArray(meta.keywords) ? meta.keywords.map(String) : [],
+      png: entry.icon, original: entry.original || null, edit: entry.original ? meta.edit || null : null, touch: entry.touch || null,
+    };
+    if (index >= 0) {
+      if (sameBytes(user[index].png, entry.icon)) continue;
+      if (onConflict === 'skip') { counts.skipped++; continue; }
+      if (onConflict === 'replace') {
+        forgetUrl(user[index].key);
+        icon.key = user[index].key;
+        user[index] = icon;
+        counts.replaced++;
+        if (entry.favourite) favourites.add(icon.key);
+        continue;
+      }
+      const taken = keys();
+      for (let n = 1; taken.has(key.toLowerCase()); n++) key = `user/${stem}_${n}.png`;
+      Object.assign(icon, { key, id: key.slice(5, -4) });
+    }
+    user.push(icon);
+    counts.added++;
+    if (entry.favourite) favourites.add(icon.key);
+  }
+  saveUser(user);
+  library.set({ favourites: [...favourites] });
+  storage.save('iconFavourites', library.get().favourites);
+  return counts;
+}
+
+// Favourites and recently used from a backup's settings, for the icons that exist here
+export function restoreIconLists(favouriteKeys, recentKeys) {
+  const known = new Set([...library.get().builtIn, ...library.get().user].map((icon) => icon.key));
+  if (Array.isArray(favouriteKeys)) {
+    const favourites = [...new Set([...library.get().favourites, ...favouriteKeys.filter((k) => known.has(k))])];
+    library.set({ favourites });
+    storage.save('iconFavourites', favourites);
+  }
+  if (Array.isArray(recentKeys)) {
+    const recent = recentKeys.filter((k) => known.has(k)).slice(0, RECENT_LIMIT);
+    library.set({ recent });
+    storage.save('iconRecent', recent);
+  }
+}

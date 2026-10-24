@@ -123,3 +123,11 @@ export function useWide(width = 900) {
   }, [query]);
   return wide;
 }
+
+// Hands a file to the browser to save
+export function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = Object.assign(document.createElement('a'), { href: url, download: fileName });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}

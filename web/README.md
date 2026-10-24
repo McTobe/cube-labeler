@@ -14,9 +14,10 @@ drive and part icons or your own picture) and the print queue (one strip with cu
 reorder, edit, remove) are in too, and so is the icon library (search, categories, favourites,
 recently used, a print preview) and the icon editor (crop, drawing, silhouette or outline,
 darkness, thickness, clean-up, turn and mirror, pencil and eraser touch-ups, kept with the icon
-so it can be changed again). The label, queue, icons,
+so it can be changed again), templates (your own and the starting points, as the desktop app's
+.json files) and backups (.cubebackup files that restore here or in the desktop app). The label, queue, icons,
 settings and added fonts are kept in the browser, and after the first visit the app also starts
-offline. Templates, backups and AI icons follow.
+offline. AI icons follow.
 
 ## Browser support
 

@@ -80,8 +80,17 @@ export const printer = createStore({
 
 let py = null;
 
+let saidAt = 0;
+
 export function say(text, error = false) {
+  saidAt = Date.now();
   app.set({ status: { text, error } });
+}
+
+// A message belongs to the page it was said on; one said just before moving to another page
+// (like "Opened Shelf A") goes along
+export function pageChanged() {
+  if (Date.now() - saidAt > 1000 && app.get().status.text) app.set({ status: { text: '', error: false } });
 }
 
 // --- Start ---------------------------------------------------------------------------------
@@ -221,11 +230,11 @@ function binOptions(cfg) {
 }
 
 // A queue item or the label being edited, as render options for Python
-function itemOptions(item) {
+export function itemOptions(item) {
   return item.mode === 'bin' ? binOptions(item.bin) : renderOptions(item.label);
 }
 
-function currentItem() {
+export function currentItem() {
   const { mode, label, bin } = app.get();
   return mode === 'bin' && bin ? { mode, bin: bin[bin.kind] } : { mode: 'text', label };
 }
@@ -332,6 +341,16 @@ export function setImageBytes(name, data) {
 export const iconPrintPreview = (data) => py.icon_print_preview(data);
 export const prepareIconOriginal = (data) => py.prepare_icon_original(data);
 export const editIcon = (original, edit, touch) => py.edit_icon(original, edit, touch);
+
+// --- Templates and backups (the desktop app's file formats, read and written in Python) ------
+
+export const labelThumbnail = (item, height = 48) => py.label_thumbnail(itemOptions(item), height);
+export const templatePresets = () => py.template_presets();
+export const templateFromDesktop = (data) => py.template_from_desktop(data);
+export const templateToDesktop = (item) => py.template_to_desktop(item);
+export const makeBackup = (data) => py.make_backup(data);
+export const openBackup = (data) => py.open_backup(data);
+export const pythonReady = () => py !== null;
 
 // --- Printer -------------------------------------------------------------------------------
 
@@ -505,8 +524,9 @@ export function keepPrintedQueue() {
 }
 
 // Opens a queued label in the editor; the queued copy stays in the queue
-export function editQueueItem(index) {
-  const item = structuredClone(app.get().queue[index]);
+// Puts a label (a queue item or a template: {mode, label} or {mode, bin}) in the editor
+export function openItem(item) {
+  item = structuredClone(item);
   if (item.mode === 'bin') {
     const bin = app.get().bin;
     app.set({ mode: 'bin', bin: { ...bin, kind: item.bin.kind, [item.bin.kind]: item.bin } });
@@ -517,8 +537,12 @@ export function editQueueItem(index) {
   }
   storage.save('mode', app.get().mode);
   renderNow();
-  say(`Editing queued label ${index + 1}. Add it to the queue again to keep your changes.`);
   location.hash = '#/label';
+}
+
+export function editQueueItem(index) {
+  openItem(app.get().queue[index]);
+  say(`Editing queued label ${index + 1}. Add it to the queue again to keep your changes.`);
 }
 
 let queueShown = false;

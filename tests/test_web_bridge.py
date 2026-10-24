@@ -27,8 +27,11 @@ class TestWebBuild(unittest.TestCase):
         import re
         import build
         core_dir = os.path.join(BASE_DIR, "core")
-        for name in build.CORE_MODULES:
-            with open(os.path.join(core_dir, name), encoding="utf-8") as f:
+        shipped = [os.path.join(core_dir, n) for n in build.CORE_MODULES]
+        shipped += [os.path.join(BASE_DIR, "ui", n) for n in build.UI_MODULES]
+        for path in shipped:
+            name = os.path.basename(path)
+            with open(path, encoding="utf-8") as f:
                 source = f.read()
             imported = set(re.findall(r"^\s*from core\.(\w+) import", source, re.M))
             for names in re.findall(r"^\s*from core import ([\w, ]+)", source, re.M):
@@ -219,6 +222,89 @@ class TestWebIcons(unittest.TestCase):
         result = cube_web.edit_icon(cube_web.prepare_icon_original(data.getvalue()))
         self.assertFalse(result["has_ink"])
         self.assertIsNone(result["print_png"])
+
+
+class TestWebTemplatesAndBackups(unittest.TestCase):
+    def _png(self, color="black"):
+        data = io.BytesIO()
+        Image.new("RGBA", (8, 8), color).save(data, format="PNG")
+        return data.getvalue()
+
+    def test_desktop_template_opens_in_the_web_version(self):
+        import json
+        from ui.templates import BUILTIN_PRESETS
+        item = cube_web.template_from_desktop(json.dumps(BUILTIN_PRESETS["Storage Box"]["config"]))
+        self.assertEqual(item["mode"], "text")
+        self.assertEqual(item["label"]["text"], "ELECTRONICS & CORDS\nShelf 2 - Row B")
+        self.assertIn(item["label"]["font_name"], cube_web.font_names())
+
+    def test_web_template_opens_on_the_desktop(self):
+        import json
+        from ui.templates import config_from_dict
+        text = {"mode": "text", "label": {"text": "Box 4", "qr_enabled": True, "qr_data": "x",
+                                         "image": {"name": "a.png", "data": self._png()}}}
+        saved = cube_web.template_to_desktop(text)
+        cfg = config_from_dict(json.loads(saved))
+        self.assertEqual(cfg.text, "Box 4")
+        self.assertIsNone(cfg.image_path)
+        again = cube_web.template_from_desktop(saved)
+        self.assertEqual(again["label"]["image"]["data"], self._png())
+        part = dict(cube_web.bin_defaults("en")["component"], icon_type="custom", icon={"name": "i.png", "data": self._png()})
+        cfg = config_from_dict(json.loads(cube_web.template_to_desktop({"mode": "bin", "bin": part})))
+        self.assertIsNone(cfg.inventory_config.custom_icon_path)
+        back = cube_web.template_from_desktop(cube_web.template_to_desktop({"mode": "bin", "bin": part}))
+        self.assertEqual(back["bin"]["icon_type"], "custom")
+        self.assertEqual(back["bin"]["kind"], "component")
+
+    def test_broken_template_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "not a template"):
+            cube_web.template_from_desktop("{nope")
+
+    def test_web_backup_restores_on_the_desktop(self):
+        from core import backup
+        cells = bytearray(64 * 64)
+        cells[5] = 1
+        data = cube_web.make_backup({
+            "created": "2026-10-24T20:00:00+02:00",
+            "icons": [{"file": "washer.png", "favourite": True, "icon": self._png(),
+                       "meta": {"title": "Washer", "category": "My Icons", "keywords": ["ring"], "edit": {"mode": "outline"}},
+                       "original": self._png("white"), "touch": bytes(cells)}],
+            "settings": {"label_language": "sv", "gemini_api_key": "secret", "icon_favourites": ["user/washer.png"]},
+            "templates": [{"name": "Shelf A", "json": cube_web.template_to_desktop({"mode": "text", "label": {"text": "A"}})}],
+        })
+        read = backup.read_backup(io.BytesIO(data))
+        self.assertEqual(read.icons[0].title, "Washer")
+        self.assertTrue(read.icons[0].favourite)
+        self.assertIsNotNone(read.icons[0].touch)
+        self.assertNotIn("gemini_api_key", read.settings)
+        self.assertEqual(list(read.templates), ["templates/Shelf A.json"])
+
+    def test_desktop_backup_opens_in_the_web_version(self):
+        from core import backup
+        layer = Image.new("L", (64, 64), 0)
+        layer.putpixel((1, 0), 2)
+        touch = io.BytesIO()
+        layer.save(touch, format="PNG")
+        made = backup.Backup(
+            created="2026-10-24T20:00:00+02:00",
+            icons=[backup.BackupIcon(file="nut.png", meta={"title": "Nut", "edit": {"mode": "drawing"}}, favourite=False,
+                                     icon=self._png(), original=self._png("white"), touch=touch.getvalue())],
+            settings={"label_language": "de"},
+            files={"templates/Bin.json": cube_web.template_to_desktop(
+                {"mode": "bin", "bin": cube_web.bin_defaults("en")["fastener"]}).encode(), "templates/Bad.json": b"{"},
+        )
+        out = io.BytesIO()
+        backup.write_backup(made, out)
+        opened = cube_web.open_backup(out.getvalue())
+        self.assertEqual(opened["icons"][0]["meta"]["title"], "Nut")
+        self.assertEqual(opened["icons"][0]["touch"][1], 2)
+        self.assertEqual(opened["settings"]["label_language"], "de")
+        self.assertEqual([t["name"] for t in opened["templates"]], ["Bin"])
+        self.assertEqual(opened["skipped_templates"], ["Bad"])
+
+    def test_not_a_backup(self):
+        with self.assertRaisesRegex(ValueError, "not a Cube Labeler backup"):
+            cube_web.open_backup(b"hello")
 
 
 class TestWebTextEditing(unittest.TestCase):
