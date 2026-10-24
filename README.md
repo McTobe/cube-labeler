@@ -1,22 +1,22 @@
 # Cube Labeler
 
-[![Tests](https://github.com/McTobe/printlabel-ui/actions/workflows/tests.yml/badge.svg)](https://github.com/McTobe/printlabel-ui/actions/workflows/tests.yml)
-[![Latest release](https://img.shields.io/github/v/release/McTobe/printlabel-ui)](https://github.com/McTobe/printlabel-ui/releases/latest)
+[![Tests](https://github.com/McTobe/cube-labeler/actions/workflows/tests.yml/badge.svg)](https://github.com/McTobe/cube-labeler/actions/workflows/tests.yml)
+[![Latest release](https://img.shields.io/github/v/release/McTobe/cube-labeler)](https://github.com/McTobe/cube-labeler/releases/latest)
 ![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-A desktop app for designing and printing labels on the **Brother P-touch Cube (PT-P300BT)** over Bluetooth. It shows an exact preview of the printed tape, prints several labels as one strip to save tape, and has a dedicated editor for storage bin labels.
+A desktop app for designing and printing labels on the **Brother P-touch Cube (PT-P300BT)** over Bluetooth. It shows an exact preview of the printed tape, prints several labels as one strip to save tape, has a dedicated editor for storage bin labels and comes with a library of 140 printable icons that you can add your own to.
 
-Cube Labeler runs on Windows as a single portable `.exe`, with no Python install needed. It also has a command-line mode for printing from scripts.
+Cube Labeler runs on Windows as a single portable `.exe`, with no Python install needed. It also has a command-line mode for printing from scripts, and a [web version](#web-version-preview) that prints from Chrome on Android and other systems.
 
-![Text label editor with live tape preview](docs/images/text-label.png)
+![Text label editor with styled text, a column divider and a rounded frame](docs/images/text-label.png)
 
 ## Features
 
 - **Live preview.** See the label on a simulated tape cartridge in its real colors, or switch to *Print dots* to see exactly what the print head will print. Label length, tape used and print time are shown as you type.
 - **Less tape waste.** Queue several labels and print them as one continuous strip with cut guides between them. Every label, queued or not, starts with a dotted cut line in place of the printer's own ":" cut mark. Each extra label saves about 25 mm of tape.
-- **Bin labels.** A dedicated editor for fastener and parts bins: size block, name, one, two or four length boxes and a drive icon (Allen, Hex, PH, PZ, Torx, Slot), in English or Swedish.
+- **Bin labels.** A dedicated editor for fastener and parts bins: size block, name, one, two or four length boxes and a drive icon (Allen, Hex, PH, PZ, Torx, Slot) for fasteners, or a part icon (bearing, spring, WAGO, terminal block, JST, fuse, resistor, capacitor, LED, or any icon from the library) for parts. Suggested names come in English or Swedish.
 - **Text, QR codes and images.** Any installed or imported font, auto-fit to the tape height, alignment and outline. Mix sizes per line, use bold, italic, underlined or inverted (white on black) text, align single lines, split the label into columns with a divider, and add a box or rounded frame. Add QR codes (including Wi-Fi guest login codes), icons or your own pictures.
 - **Icon library.** Monochrome icons for fasteners, screw drives, mechanical parts, electronics, wiring, tools, home & kitchen and safety marks, plus your own icons in `~/.printlabel/icons/`. Browse and manage them on the **Icons** page.
 - **Icon editor.** Import or paste any picture and tune how it turns into black and white (drawing, filled silhouette or photo outline, cutoff, line thickness, crop, clean-up) with a live dot-for-dot print preview, then touch it up with a pencil and eraser. Your icons keep their original picture, so you can edit them again later.
@@ -27,7 +27,16 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 - **Optional AI icons.** Have Google Gemini, OpenAI or OpenRouter redraw a photo or picture as a printable icon, with ready-made presets (filled silhouette like the built-in icons, bold line drawing, flat symbol, clean up and keep the shape) or your own instructions, then finish it in the icon editor (needs your own API key for the service, chosen under Settings).
 - **Export.** Save any label as a high-resolution PNG.
 
-![Bin label editor for fastener storage](docs/images/bin-label.png)
+## Screenshots
+
+| | |
+|---|---|
+| ![Bin label editor for fastener storage](docs/images/bin-label.png) | ![Three labels in the queue, printed as one strip](docs/images/queue.png) |
+| **Bin label** with size, two lengths and drive icon | **Queue**: three labels print as one strip and save 50 mm of tape |
+| ![Icons page with favourites and icon details](docs/images/icons-page.png) | ![Icon editor turning a picture into a printable icon](docs/images/icon-editor.png) |
+| **Icons** page: browse, search, favourite and manage icons | **Icon editor**: turn any picture into a printable icon |
+| ![Templates page with My templates preview cards](docs/images/templates.png) | ![Settings with the AI service, backups and simulation](docs/images/settings.png) |
+| **Templates**: your own templates as preview cards, plus starting points | **Settings**: AI service and key, backups and simulation |
 
 ## Supported hardware
 
@@ -35,16 +44,27 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 |---|---|
 | **Printer** | Brother P-touch Cube **PT-P300BT**, connected over Bluetooth (serial port) |
 | **Tape** | Brother TZe tape, 3.5 mm, 6 mm, 9 mm and 12 mm wide. Bin labels use 12 mm tape. |
-| **Computer** | 64-bit Windows 10 or 11 with Bluetooth |
+| **Computer** | 64-bit Windows 10 or 11 with Bluetooth for the desktop app. The web version needs Chrome or Edge with Bluetooth on Android, Windows, macOS or Linux. |
 
-Other Brother models are not tested. The printing code and the CLI also run on macOS and Linux, but the app is built and tested for Windows.
+Other Brother models are not tested. The printing code and the CLI also run on macOS and Linux, but the desktop app is built and tested for Windows.
 
 ## Installation
 
-1. Download `CubeLabeler.exe` from the [latest release](https://github.com/McTobe/printlabel-ui/releases/latest).
+1. Download `CubeLabeler.exe` from the [latest release](https://github.com/McTobe/cube-labeler/releases/latest).
 2. Put it anywhere you like and double-click it. There is nothing to install.
 
 Windows SmartScreen may warn you the first time because the file is not code-signed. Choose **More info**, then **Run anyway**.
+
+### Web version (preview)
+
+`web/` holds a browser version that runs the same Python label code in the browser and prints over Bluetooth from Chrome or Edge on Android, Windows, macOS and Linux (iPhone and iPad can't, as Safari has no Web Serial). It does text labels with the same text styling, frames and QR codes; bin labels, icons, the queue and templates are still to come.
+
+- **Try it on your PC and phone:** double-click `run_web.bat` (or run `python web/serve.py`). It opens the page and prints the address to open on your phone.
+- **Host it:** GitHub Actions publishes a Docker image (`ghcr.io/mctobe/cube-labeler-web`) that serves the site on port 80, behind a reverse proxy that adds HTTPS.
+
+<img src="docs/images/web.png" alt="The web version in Chrome on a phone, showing a styled label" width="300">
+
+See [web/README.md](web/README.md) for browser setup (Android needs the *Nearby devices* permission for Chrome) and hosting.
 
 ## Connecting the printer
 
@@ -112,8 +132,8 @@ CubeLabeler.exe --virtual "Test" --preview --save-png test.png  # no printer nee
 You need Python 3.10 or newer (releases are built with 3.11).
 
 ```powershell
-git clone https://github.com/McTobe/printlabel-ui.git
-cd printlabel-ui
+git clone https://github.com/McTobe/cube-labeler.git
+cd cube-labeler
 pip install -r requirements.txt -c constraints.txt
 python main.py          # or double-click run.bat
 ```
@@ -124,10 +144,6 @@ To build the portable executable, install PyInstaller and run the build script. 
 pip install pyinstaller -c constraints.txt
 python build.py         # or double-click build.bat
 ```
-
-### Web version (preview)
-
-`web/` holds a browser version that prints over Bluetooth from Chrome on Android, Windows, macOS and Linux. Double-click `run_web.bat` (or run `python web/serve.py`) to start it; it prints the address to open on your phone. To host it, GitHub Actions publishes a Docker image (`ghcr.io/mctobe/cube-labeler-web`) that serves it on port 80 for a reverse proxy that adds HTTPS. See [web/README.md](web/README.md).
 
 Pushing a tag such as `v1.4.0` builds the executable on GitHub Actions and publishes it as a release.
 
@@ -145,13 +161,14 @@ The tests run on Windows and Linux in CI. On machines without tkinter the GUI te
 |---|---|
 | `core/` | Printer protocol and status, serial driver and simulator, label and bin label rendering, fonts, icons, config, CLI |
 | `ui/` | The customtkinter app: main window, preview, editors, printer chip, templates, settings, dialogs |
+| `web/` | The web version: HTML and JavaScript UI, Web Serial printer transport, the Python bridge, build script and Docker setup |
 | `assets/` | App icon, icon library (`assets/icons/catalog.json` lists categories, titles and search words) and template previews |
 | `icons-src/` | SVG drawings of the library icons; `python tools/build_icons.py` renders them to `assets/icons/` (needs `pip install resvg-py`) |
 | `tests/` | Unit tests and headless GUI tests |
 
 ## Contributing
 
-Bug reports and ideas are welcome in [Issues](https://github.com/McTobe/printlabel-ui/issues). For a pull request, keep changes focused, add or update tests where it makes sense, and check that `python -m unittest discover tests` passes.
+Bug reports and ideas are welcome in [Issues](https://github.com/McTobe/cube-labeler/issues). For a pull request, keep changes focused, add or update tests where it makes sense, and check that `python -m unittest discover tests` passes.
 
 ## Credits
 
