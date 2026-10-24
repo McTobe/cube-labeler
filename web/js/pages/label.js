@@ -34,8 +34,8 @@ export function LabelPage() {
   return html`<div class="label-page">
     <div class="label-preview-col">
       <${Preview} />
-      <${ActionBar} />
       ${wide && html`<${TextCard} />`}
+      <${ActionBar} />
     </div>
     <div class="label-edit-col">
       ${!wide && html`<${TextCard} />`}

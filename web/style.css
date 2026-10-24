@@ -447,6 +447,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 
 .tape-strip img { display: block; max-width: 100%; height: auto; max-height: 120px; }
+.fitted .tape-strip img { max-width: none; max-height: none; }
 .zoom-2 .tape-strip, .zoom-4 .tape-strip { max-width: none; margin: 0 12px; }
 .zoom-2 .tape-strip img { max-width: none; max-height: none; zoom: 2; }
 .zoom-4 .tape-strip img { max-width: none; max-height: none; zoom: 4; }
@@ -606,8 +607,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .format-bar { flex-wrap: wrap; overflow: visible; margin-left: 0; margin-right: 0; padding: 0; }
   .action-bar .menu { bottom: auto; top: calc(100% + 6px); }
   .label-preview-col .text-card { margin: 0; flex: none; }
-  .label-preview-col .text-card textarea { min-height: 110px; }
-  .tape-strip img { max-height: min(36vh, 320px); }
+  .label-preview-col .text-card textarea { min-height: 180px; }
 }
 
 /* --- Sheets (dialogs) ---------------------------------------------------------------------- */

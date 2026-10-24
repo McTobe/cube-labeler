@@ -1,16 +1,41 @@
 // The label on a strip of tape, with its size and print time, or the dots the printer will print
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { useStore } from './state.js';
 import { app, boot } from './app.js';
+import { useWide } from './ui.js';
 
 const ZOOMS = [['fit', 'Fit'], ['2', '2×'], ['4', '4×']];
+// Room Fit leaves around the strip, in pixels, and the share of a tall stage the label may fill
+const FIT_SIDE = 80;
+const FIT_HEIGHT_SHARE = 0.6;
+const PHONE_FIT_HEIGHT = 120;
+
+// The width that shows the whole label as big as the stage allows (Fit)
+function useFitWidth(stageRef, natural, wide) {
+  const [box, setBox] = useState(null);
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const observer = new ResizeObserver(() => setBox([stage.clientWidth, stage.clientHeight]));
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [stageRef.current]);
+  if (!box || !natural) return null;
+  const maxHeight = wide ? (box[1] - 40) * FIT_HEIGHT_SHARE : PHONE_FIT_HEIGHT;
+  const scale = Math.min((box[0] - FIT_SIDE) / natural[0], maxHeight / natural[1]);
+  return Math.max(40, Math.floor(natural[0] * scale));
+}
 
 export function Preview() {
   const { render, renderError } = useStore(app);
   const { phase, text, error } = useStore(boot);
   const [view, setView] = useState('tape');
   const [zoom, setZoom] = useState('fit');
+  const stageRef = useRef(null);
+  const [natural, setNatural] = useState(null);
+  const wide = useWide();
+  const fitWidth = useFitWidth(stageRef, natural, wide);
 
   let stage;
   if (phase === 'failed') {
@@ -23,9 +48,12 @@ export function Preview() {
   } else {
     const dots = view === 'dots';
     const tape = dots ? '#ffffff' : render.label.tape_bg_color;
-    stage = html`<div class=${`tape-scroll zoom-${zoom}`}>
+    const fit = zoom === 'fit' && fitWidth;
+    stage = html`<div ref=${stageRef} class=${`tape-scroll zoom-${zoom}${fit ? ' fitted' : ''}`}>
       <div class="tape-strip" style=${{ background: tape }}>
         <img class=${dots ? 'dots' : ''} src=${dots ? render.dotsUrl : render.previewUrl}
+          style=${fit ? { width: `${fitWidth}px` } : null}
+          onLoad=${(e) => setNatural([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight])}
           alt=${dots ? 'The dots the printer will print' : 'Label preview'} />
       </div>
     </div>`;
