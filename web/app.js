@@ -23,6 +23,7 @@ const el = {
   autoFit: $('auto-fit'),
   fontSize: $('font-size'),
   align: $('align'),
+  frame: $('frame'),
   qrEnabled: $('qr-enabled'),
   qrData: $('qr-data'),
   preview: $('preview'),
@@ -88,6 +89,7 @@ function labelOptions() {
     auto_fit_font: el.autoFit.checked,
     fixed_font_size: Number(el.fontSize.value) || 40,
     alignment: el.align.value,
+    frame: el.frame.value,
     qr_enabled: el.qrEnabled.checked && el.qrData.value.trim() !== '',
     qr_data: el.qrData.value,
   };
@@ -233,7 +235,7 @@ async function main() {
   }
 
   for (const input of [el.text, el.qrData, el.fontSize]) input.addEventListener('input', scheduleRender);
-  for (const input of [el.tape, el.font, el.align, el.autoFit, el.qrEnabled]) {
+  for (const input of [el.tape, el.font, el.align, el.frame, el.autoFit, el.qrEnabled]) {
     input.addEventListener('change', () => { updateButtons(); render(); });
   }
   el.fontFile.addEventListener('change', addFont);

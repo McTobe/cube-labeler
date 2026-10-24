@@ -22,6 +22,24 @@ from core.printer import BrotherPrinter
 from test_audit_fixes import FakeSerial, _status_bytes
 
 
+class TestWebBuild(unittest.TestCase):
+    def test_shipped_core_modules_bring_their_imports(self):
+        import re
+        import build
+        core_dir = os.path.join(BASE_DIR, "core")
+        for name in build.CORE_MODULES:
+            with open(os.path.join(core_dir, name), encoding="utf-8") as f:
+                source = f.read()
+            imported = set(re.findall(r"^\s*from core\.(\w+) import", source, re.M))
+            for names in re.findall(r"^\s*from core import ([\w, ]+)", source, re.M):
+                imported.update(n.strip() for n in names.split(","))
+            # Desktop-only imports inside functions are fine as long as the web path never reaches them
+            imported -= {"config", "printer", "icon_manager", "secret_store"}
+            for module in imported:
+                with self.subTest(file=name, module=module):
+                    self.assertIn(f"{module}.py", build.CORE_MODULES)
+
+
 class TestWebRender(unittest.TestCase):
     def test_render_matches_desktop_renderer(self):
         result = cube_web.render_label({"text": "M3 x 12", "tape_width_mm": 9.0, "font_name": "Arial"})

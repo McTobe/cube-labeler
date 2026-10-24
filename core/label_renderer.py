@@ -11,6 +11,7 @@ from typing import List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import qrcode
 
+from core import rich_text
 from core.font_manager import font_manager
 from core.specs import (
     DOT_PITCH_MM,
@@ -48,7 +49,7 @@ class LabelConfig:
     fixed_font_size: int = 40
     font_scale: float = 100.0  # Percentage (10-200)
     line_spacing: float = 1.2
-    alignment: str = "center"  # "left", "center", "right"
+    alignment: str = "center"  # "left", "center", "right"; a line can override it (see core/rich_text.py)
     stroke_width: int = 0
     stroke_fill: Optional[str] = None
     h_padding: int = 8  # dots
@@ -62,6 +63,8 @@ class LabelConfig:
     def h_padding_dots(self, value: int):
         self.h_padding = value
     
+    frame: str = "none"  # "none", "box", "rounded"
+
     # Sizing & Stretching
     fixed_width_mm: Optional[float] = None
     end_margin: int = 0  # dots
@@ -99,6 +102,10 @@ class LabelConfig:
     inventory_config: Optional[object] = None  # FastenerLabelConfig or ComponentLabelConfig
 
 
+# A frame is drawn this thick, with this much space between it and the content
+FRAME_WIDTH_DOTS = 2
+FRAME_GAP_DOTS = 3
+
 # Tape between labels in a batch; each label gets half of it on both sides (14 dots ≈ 2 mm)
 BATCH_GAP_DOTS = 28
 # Blank tape on each side of a single bin label, which is otherwise drawn border to border
@@ -118,95 +125,6 @@ class LabelRenderer:
 
     def _get_tape_spec(self, tape_width_mm: float) -> dict:
         return get_tape_spec(tape_width_mm)
-
-    @staticmethod
-    def _line_ink_extent(font: ImageFont.FreeTypeFont, line: str, stroke_width: int = 0) -> Tuple[int, int]:
-        """
-        Left and right edge of the ink a line draws at x=0. Font boxes include each glyph's
-        side bearings (a "1" in Arial has much more space on its left), so centring on the box
-        puts the ink off-centre.
-        """
-        advance = int(font.getlength(line)) + 2 * stroke_width
-        pad = 8 + 2 * stroke_width
-        height = max(font.getbbox(line, anchor="lt")[3], 1) + 2 * pad
-        probe = Image.new("L", (advance + 2 * pad, height), 0)
-        ImageDraw.Draw(probe).text(
-            (pad, pad), line, font=font, fill=255, anchor="lt",
-            stroke_width=stroke_width, stroke_fill=255,
-        )
-        bbox = probe.getbbox()
-        if not bbox:
-            return 0, 0
-        # Leading spaces are typed indentation, so they count as part of the line
-        indent = int(round(font.getlength(line[: len(line) - len(line.lstrip(" "))])))
-        return bbox[0] - pad - indent, bbox[2] - pad
-
-    def calculate_multiline_dims(
-        self, lines: List[str], font: ImageFont.FreeTypeFont, line_spacing: float, stroke_width: int = 0
-    ) -> Tuple[int, int, List[int]]:
-        """Calculates total ink width, height and individual line heights for multiline text."""
-        if not lines:
-            return 0, 0, []
-        sample_bbox = font.getbbox("".join(lines) or "Ag", anchor="lt")
-        base_line_height = max(sample_bbox[3] - sample_bbox[1], 1)
-        line_spacing_px = base_line_height * line_spacing
-        max_width = 0
-        line_heights = []
-
-        for line in lines:
-            if line.strip():
-                left, right = self._line_ink_extent(font, line, stroke_width)
-                w = right - left
-            else:
-                w = 0
-            max_width = max(max_width, w)
-            line_heights.append(base_line_height)
-
-        n = len(lines)
-        total_height = base_line_height * n
-        if n > 1:
-            total_height += int(round((line_spacing_px - base_line_height) * (n - 1)))
-
-        return max_width, total_height, line_heights
-
-    def compute_auto_font_size(
-        self, lines: List[str], font_identifier: str, target_height: int, line_spacing: float
-    ) -> Tuple[int, ImageFont.FreeTypeFont, float]:
-        """Calculates the maximum font size that fits into target printable height."""
-        low = 6
-        high = target_height * 2
-        best_size = low
-        best_font = font_manager.load_font(font_identifier, low)
-        adjusted_spacing = line_spacing
-
-        # Binary search for optimal font size
-        while low <= high:
-            mid = (low + high) // 2
-            test_font = font_manager.load_font(font_identifier, mid)
-            _, h, _ = self.calculate_multiline_dims(lines, test_font, line_spacing)
-
-            if h <= target_height:
-                best_size = mid
-                best_font = test_font
-                low = mid + 1
-            else:
-                high = mid - 1
-
-        # Fine-tune line spacing if multiline
-        if len(lines) > 1:
-            test_h = self.calculate_multiline_dims(lines, best_font, adjusted_spacing)[1]
-            if test_h > target_height:
-                # Try slightly tighter line spacing down to 0.85x
-                min_spacing = line_spacing * 0.85
-                step = 0.02
-                cur_spacing = line_spacing
-                while cur_spacing >= min_spacing:
-                    cur_spacing -= step
-                    if self.calculate_multiline_dims(lines, best_font, cur_spacing)[1] <= target_height:
-                        adjusted_spacing = cur_spacing
-                        break
-
-        return best_size, best_font, adjusted_spacing
 
     def generate_qr_image(self, data: str, target_height: int, scale: float = 1.0) -> Optional[Image.Image]:
         """Generates a high-contrast QR code image sized to printable height."""
@@ -278,45 +196,45 @@ class LabelRenderer:
             img_canvas.paste(inv_img.convert("RGB"), (0, print_border))
             return img_canvas, spec, print_border, printable_h, canvas_h, 16
 
-        # 1. Parse text lines
-        raw_text = config.text.replace("\\n", "\n")
-        lines = raw_text.split("\n")
+        # 1. Parse the styled text and leave room for a frame
+        doc = rich_text.parse(config.text)
+        frame_inset = FRAME_WIDTH_DOTS + FRAME_GAP_DOTS if config.frame in ("box", "rounded") else 0
+        inner_h = printable_h - 2 * frame_inset
+        # Rounded corners cut into the sides, so keep the content further in
+        frame_inset_x = frame_inset + (printable_h // 8 if config.frame == "rounded" else 0)
+        layout = rich_text.TextLayout(
+            doc, config.font_name, config.stroke_width, config.line_spacing, config.alignment
+        )
 
-        # 2. Determine font and size
+        # 2. Determine font size
         if config.auto_fit_font:
-            base_size, font, spacing = self.compute_auto_font_size(
-                lines, config.font_name, printable_h, config.line_spacing
-            )
-            if abs(config.font_scale - 100.0) > 0.5:
-                effective_size = max(int(round(base_size * (config.font_scale / 100.0))), 6)
-                font = font_manager.load_font(config.font_name, effective_size)
-            else:
-                effective_size = base_size
+            effective_size = layout.fit_size(inner_h)
         else:
             effective_size = max(config.fixed_font_size, 6)
-            if abs(config.font_scale - 100.0) > 0.5:
-                effective_size = max(int(round(effective_size * (config.font_scale / 100.0))), 6)
-            font = font_manager.load_font(config.font_name, effective_size)
-            spacing = config.line_spacing
+        if abs(config.font_scale - 100.0) > 0.5:
+            effective_size = max(int(round(effective_size * (config.font_scale / 100.0))), 6)
 
-        text_w, text_h, _ = self.calculate_multiline_dims(lines, font, spacing, config.stroke_width)
-        self._last_text_overflow = text_h > printable_h
+        has_text = doc.has_text
+        text_img = layout.render(effective_size) if has_text else None
+        text_w = text_img.width if text_img else 0
+        text_h = text_img.height if text_img else 0
+        self._last_text_overflow = text_h > inner_h
 
         # 3. Handle QR Code
         qr_img = None
         if config.qr_enabled and config.qr_data.strip():
-            qr_img = self.generate_qr_image(config.qr_data, printable_h, config.qr_scale)
+            qr_img = self.generate_qr_image(config.qr_data, inner_h, config.qr_scale)
 
         # 4. Handle Merged Image
         merged_img = None
         if config.image_path:
             merged_img = self.process_user_image(
-                config.image_path, printable_h, config.image_scale, config.white_level
+                config.image_path, inner_h, config.image_scale, config.white_level
             )
 
         # 5. Compute content layout width
         gap = 12
-        total_content_w = config.h_padding * 2
+        total_content_w = config.h_padding * 2 + 2 * frame_inset_x
 
         elements_left = []
         elements_right = []
@@ -336,7 +254,6 @@ class LabelRenderer:
         for el in elements_left + elements_right:
             total_content_w += el.width + gap
 
-        has_text = any(line.strip() for line in lines)
         if has_text:
             total_content_w += text_w
         elif not elements_left and not elements_right:
@@ -353,49 +270,34 @@ class LabelRenderer:
         img_canvas = Image.new("RGB", (max(total_content_w, 10), canvas_h), "white")
         draw = ImageDraw.Draw(img_canvas)
 
-        cur_x = config.h_padding
+        cur_x = config.h_padding + frame_inset_x
 
         for el in elements_left:
             y_pos = print_border + (printable_h - el.height) // 2
             img_canvas.paste(el, (cur_x, y_pos))
             cur_x += el.width + gap
 
-        if has_text:
+        if text_img is not None:
             y_text = print_border + (printable_h - text_h) // 2 + config.v_shift
-            sample_bbox = font.getbbox("".join(lines) or "Ag", anchor="lt")
-            base_lh = max(sample_bbox[3] - sample_bbox[1], 1)
-            line_step = base_lh * spacing
-
-            current_line_y = y_text
-            for line in lines:
-                if line.strip():
-                    ink_left, ink_right = self._line_ink_extent(font, line, config.stroke_width)
-                    lw = ink_right - ink_left
-                    if config.alignment == "center":
-                        line_x = cur_x + (text_w - lw) // 2
-                    elif config.alignment == "right":
-                        line_x = cur_x + (text_w - lw)
-                    else:
-                        line_x = cur_x
-
-                    # Shift by the ink's own offset so the ink, not the font box, lands at line_x
-                    draw.text(
-                        (line_x - ink_left, current_line_y),
-                        line,
-                        font=font,
-                        fill="black",
-                        anchor="lt",
-                        stroke_width=config.stroke_width,
-                        stroke_fill=config.stroke_fill or "black",
-                    )
-                current_line_y += line_step
-
+            img_canvas.paste("black", (cur_x, y_text), text_img)
             cur_x += text_w + gap
 
         for el in elements_right:
             y_pos = print_border + (printable_h - el.height) // 2
             img_canvas.paste(el, (cur_x, y_pos))
             cur_x += el.width + gap
+
+        if frame_inset:
+            box = [
+                config.h_padding,
+                print_border,
+                img_canvas.width - config.h_padding - config.end_margin - 1,
+                print_border + printable_h - 1,
+            ]
+            if config.frame == "rounded":
+                draw.rounded_rectangle(box, radius=printable_h // 4, outline="black", width=FRAME_WIDTH_DOTS)
+            else:
+                draw.rectangle(box, outline="black", width=FRAME_WIDTH_DOTS)
 
         return img_canvas, spec, print_border, printable_h, canvas_h, effective_size
 

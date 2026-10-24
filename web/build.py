@@ -29,6 +29,7 @@ CORE_MODULES = [
     "protocol.py",
     "ptcbp.py",
     "ptstatus.py",
+    "rich_text.py",
     "specs.py",
 ]
 
