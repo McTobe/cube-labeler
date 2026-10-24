@@ -1,13 +1,17 @@
-# Cube Labeler web app (preview)
+# Cube Labeler web app (2.0, in progress)
 
 A browser version of Cube Labeler that prints to the PT-P300BT over Bluetooth with the
 [Web Serial API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API). It runs
 the same Python core as the desktop app inside the browser with [Pyodide](https://pyodide.org),
 so labels and printer bytes come out exactly the same.
 
-This first version does single text labels: font, tape width, alignment, auto-fit or fixed
-size, an optional QR code, cut after printing, printer status and saving the preview as a
-picture. Bin labels, icons, the queue and templates are not in it yet.
+It is becoming the main way to use Cube Labeler (version 2.0). Done so far: the app shell
+(tabs on a phone, a sidebar on a wide screen), text labels with the styling toolbar, fonts,
+frames, QR codes (with a Wi-Fi helper), a picture, tape width, length and the advanced
+settings, the tape and print-dot preview, the printer panel (connect, status, feed tape),
+saving the label as a picture, and settings. The label, settings and added fonts are kept in
+the browser, and after the first visit the app also starts offline. Bin labels, the queue,
+icons, templates, backups and AI icons follow.
 
 ## Browser support
 
@@ -106,7 +110,13 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 
 | File | What it does |
 |---|---|
-| `index.html`, `style.css`, `app.js` | The page and its controls. |
+| `index.html`, `style.css` | The page shell and its look (light and dark). |
+| `js/main.js` | Navigation and pages. The pages live in `js/pages/`, shared controls in `js/ui.js`. |
+| `js/app.js` | App state and actions: start Python, render, print, keep settings. |
+| `js/worker.js`, `js/python.js` | Pyodide runs in a Web Worker so the page stays smooth; `python.js` calls into it. |
+| `js/storage.js` | Keeps the label, settings and fonts in the browser's IndexedDB. |
+| `sw.js` | Offline cache: the app's files, Pyodide, Pillow and qrcode. |
+| `vendor/` | [Preact](https://preactjs.com) and [htm](https://github.com/developit/htm), copied in so there is no build step (see `vendor/README.md`). |
 | `printer.js` | Web Serial transport and the print flow (status check, job, wait for completion). |
 | `cube_web.py` | The Python functions the page calls: render a label, build and read printer bytes. |
 | `serve.py` | Builds the site and serves it on this computer and the local network (`run_web.bat` runs it). |

@@ -1,0 +1,25 @@
+// Line icons for the app's own buttons and navigation (24 x 24, drawn with currentColor)
+import { html } from './html.js';
+
+const PATHS = {
+  label: html`<path d="M3 11.6V4a1 1 0 0 1 1-1h7.6a1 1 0 0 1 .7.3l8.4 8.4a1 1 0 0 1 0 1.4l-7.6 7.6a1 1 0 0 1-1.4 0L3.3 12.3a1 1 0 0 1-.3-.7z"/><circle cx="7.5" cy="7.5" r="1.5"/>`,
+  queue: html`<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke-width="3"/>`,
+  icons: html`<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>`,
+  templates: html`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/>`,
+  settings: html`<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>`,
+  printer: html`<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 14h10v7H7z"/>`,
+  more: html`<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>`,
+  close: html`<path d="M6 6l12 12M18 6L6 18"/>`,
+  image: html`<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>`,
+  download: html`<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`,
+  feed: html`<path d="M4 12h12M12 7l5 5-5 5M20 5v14"/>`,
+  help: html`<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>`,
+  column: html`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>`,
+  refresh: html`<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>`,
+};
+
+export function Icon({ name, size = 22 }) {
+  return html`<svg class="icon" width=${size} height=${size} viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+    aria-hidden="true">${PATHS[name]}</svg>`;
+}
