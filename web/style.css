@@ -489,7 +489,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   background: var(--bar);
   border-top: 1px solid var(--border);
 }
-.page-label main { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 110px); }
+.page-label main, .page-queue main { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 110px); }
 .action-buttons { display: flex; gap: 8px; }
 .action-buttons > .primary { flex: 1; }
 .status-line { min-height: 1.3em; margin: 0 2px 6px; font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -499,9 +499,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .menu-anchor { position: relative; }
 .menu-backdrop { position: fixed; inset: 0; z-index: 40; }
 .menu {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 6px);
+  position: fixed;
+  top: 0;
+  left: 0;
+  visibility: hidden;  /* until it has been placed next to its button */
   min-width: 220px;
   background: var(--card);
   border: 1px solid var(--border);
@@ -574,7 +575,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* Desktop: a workspace that fills the window. The preview takes the free room with the text
    and Print under it; the settings are a panel along the right edge that scrolls on its own. */
 @media (min-width: 900px) {
-  .page-label main { max-width: none; padding: 0; height: calc(100vh - var(--top-h)); }
+  .page-label main, .page-queue main { max-width: none; padding: 0; height: calc(100vh - var(--top-h)); }
   .label-page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) clamp(360px, 28vw, 460px);
@@ -605,7 +606,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .action-bar .status-line { margin: 8px 2px 0; white-space: normal; }
   .action-bar { display: flex; flex-direction: column-reverse; }
   .format-bar { flex-wrap: wrap; overflow: visible; margin-left: 0; margin-right: 0; padding: 0; }
-  .action-bar .menu { bottom: auto; top: calc(100% + 6px); }
   .label-preview-col .text-card { margin: 0; flex: none; }
   .label-preview-col .text-card textarea { min-height: 180px; }
 }
@@ -683,6 +683,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* --- Other pages --------------------------------------------------------------------------- */
 
 .settings-page { max-width: 680px; }
+/* Wide screens: the cards in two columns instead of one narrow strip */
+@media (min-width: 1400px) {
+  .settings-page { max-width: 1400px; columns: 2; column-gap: 16px; }
+  .settings-page > * { break-inside: avoid; }
+}
 .settings-page .toggle { margin-top: 16px; }
 
 
@@ -830,9 +835,48 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .link-button.on { color: #e0a100; }
 .link-button.danger { color: var(--error); }
 .picker-body .icon-grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
-.icons-page { max-width: 1200px; margin: 0 auto; }
+.icon-tile.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+/* Wide screens: the library like on the desktop, with the categories down the left, the grid
+   in the middle and the chosen icon's details on the right. Each part scrolls on its own. */
+.library-layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 360px); padding: 0; overflow: hidden; min-height: 0; }
+.icon-browser.wide { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: 0; }
+.view-list { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; overflow-y: auto; border-right: 1px solid var(--border); }
+.view-list button {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: 0.9rem;
+}
+.view-list button:hover { background: var(--raised); }
+.view-list button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.view-list .count { color: var(--muted); font-size: 0.78rem; font-weight: 400; }
+.view-list-head { margin: 14px 10px 4px; color: var(--muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.browser-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.browser-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.browser-head .search-box { flex: 1; max-width: 420px; }
+.browser-grid { flex: 1; min-height: 0; overflow-y: auto; padding: 14px; }
+.browser-grid .icon-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+.details-panel { min-height: 0; overflow-y: auto; padding: 16px; border-left: 1px solid var(--border); background: var(--bar); }
+.details-panel h2 { font-size: 1.05rem; margin: 0 0 12px; }
+.details-panel .icon-previews { grid-template-columns: 1fr 1fr; }
+.details-panel .sheet-actions.minor { flex-direction: column; align-items: flex-start; }
+.library-layout.picker { height: min(760px, calc(94vh - 70px)); margin: 0 -18px -18px; border-top: 1px solid var(--border); }
+
 @media (min-width: 900px) {
-  .icon-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .page-icons main { max-width: none; height: calc(100vh - var(--top-h)); display: flex; flex-direction: column; padding: 16px 24px 24px; }
+  .icons-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .icons-page > .library-layout { flex: 1; margin: 0; }
+}
+@media (min-width: 1500px) {
+  .browser-grid .icon-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 }
 
 /* --- Icon editor ---------------------------------------------------------------------------- */
@@ -889,7 +933,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .template-open .hint { font-size: 0.8rem; }
 .template-card > .menu-anchor { position: absolute; top: 4px; right: 4px; }
 .template-card > .menu-anchor .icon-button { background: var(--card); border-radius: 999px; }
-.template-card .menu { right: 0; left: auto; top: calc(100% + 4px); bottom: auto; }
 .primary.danger { background: var(--error); border-color: var(--error); }
 .restore-parts { display: grid; gap: 4px; margin: 12px 0; }
 @media (max-width: 640px) {
@@ -900,3 +943,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .ai-box { margin-top: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--raised); display: grid; gap: 8px; }
 .ai-box h4 { font-size: 0.9rem; }
 .ai-box .primary { width: 100%; }
+.browser-grid .icon-title, .details-panel h2 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-align: center; }
+.details-panel h2 { text-align: left; }
+
+/* --- Automatic backups ---------------------------------------------------------------------- */
+.auto-backup { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.auto-backup h3 { font-size: 0.95rem; margin: 0 0 6px; }
+.auto-on { display: flex; align-items: baseline; gap: 8px; }
+.auto-on .dot { width: 9px; height: 9px; border-radius: 50%; background: #e0a100; flex: none; }
+.auto-on .dot.on { background: #2fb36d; }

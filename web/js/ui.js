@@ -1,5 +1,5 @@
 // Shared controls. They are plain inputs underneath, so the keyboard and screen readers work.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { Icon } from './icons.js';
 
@@ -98,11 +98,30 @@ export function Sheet({ open, title, onClose, children, wide = false }) {
   </dialog>`;
 }
 
-// A small menu of actions under a button
+// A small menu of actions next to its button. It is placed in the window, not in the page,
+// so it never sticks out of a scrolling panel: under the button when there is room, else above.
 export function Menu({ open, onClose, items }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const menu = ref.current;
+    if (!open || !menu) return;
+    const anchor = menu.parentElement.getBoundingClientRect();
+    const { width, height } = menu.getBoundingClientRect();
+    const gap = 6;
+    const below = anchor.bottom + gap + height <= window.innerHeight - 8 || anchor.top - gap - height < 8;
+    menu.style.top = `${below ? anchor.bottom + gap : anchor.top - gap - height}px`;
+    menu.style.left = `${Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8))}px`;
+    menu.style.visibility = 'visible';
+    menu.querySelector('button:not(:disabled)')?.focus({ preventScroll: true });
+  }, [open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    window.addEventListener('resize', onClose);
+    return () => window.removeEventListener('resize', onClose);
+  }, [open]);
   if (!open) return null;
-  return html`<div class="menu-backdrop" onClick=${onClose}></div>
-    <div class="menu" role="menu" onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); }}>
+  return html`<div class="menu-backdrop" onClick=${onClose} onWheel=${onClose}></div>
+    <div ref=${ref} class="menu" role="menu" onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); }}>
       ${items.map((item) => html`<button role="menuitem" disabled=${item.disabled}
         onClick=${() => { onClose(); item.action(); }}>
         ${item.icon && html`<${Icon} name=${item.icon} />`}<span>${item.label}</span>

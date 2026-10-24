@@ -615,15 +615,8 @@ def template_file_name(name: str) -> str:
     return desktop_name(name)
 
 
-def make_backup(data: Any) -> bytes:
-    """
-    A .cubebackup file the desktop app can restore, from what the page keeps:
-    {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch"}],
-     "settings": {...}, "templates": [{"name", "json"}]}. Icons, originals and touch-ups are
-    bytes; touch-ups may be the page's raw cells. Settings that belong to one device are left out.
-    """
-    import json
-    import zipfile
+def _backup_parts(data: Any):
+    """The manifest, zip members and data files of a backup made from what the page keeps."""
     data = _to_dict(data)
     icons, members = [], {}
     for item in data.get("icons") or []:
@@ -657,6 +650,19 @@ def make_backup(data: Any) -> bytes:
         "settings": settings,
         "files": sorted(files),
     }
+    return manifest, members, files
+
+
+def make_backup(data: Any) -> bytes:
+    """
+    A .cubebackup file the desktop app can restore, from what the page keeps:
+    {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch"}],
+     "settings": {...}, "templates": [{"name", "json"}]}. Icons, originals and touch-ups are
+    bytes; touch-ups may be the page's raw cells. Settings that belong to one device are left out.
+    """
+    import json
+    import zipfile
+    manifest, members, files = _backup_parts(data)
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False, default=str))
@@ -665,6 +671,23 @@ def make_backup(data: Any) -> bytes:
         for name, content in sorted(files.items()):
             zf.writestr(f"data/{name}", content)
     return out.getvalue()
+
+
+def backup_digest(data: Any) -> str:
+    """
+    Fingerprint of what a backup made from `data` would hold, leaving out when it was made
+    and the recently used icons, so automatic backups are skipped when nothing changed.
+    """
+    import hashlib
+    import json
+    manifest, members, files = _backup_parts(data)
+    manifest.pop("created", None)
+    manifest["settings"] = {k: v for k, v in manifest["settings"].items() if k != "icon_recent"}
+    h = hashlib.sha256(json.dumps(manifest, sort_keys=True, default=str).encode("utf-8"))
+    for name, content in sorted({**members, **{f"data/{k}": v for k, v in files.items()}}.items()):
+        h.update(name.encode("utf-8"))
+        h.update(hashlib.sha256(content).digest())
+    return h.hexdigest()
 
 
 def open_backup(data: Any) -> Dict[str, Any]:

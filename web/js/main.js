@@ -11,6 +11,7 @@ import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
 import { app, start, pageChanged } from './app.js';
 import { useStore } from './state.js';
+import { startAutoBackup } from './autobackup.js';
 
 const PAGES = [
   { id: 'label', title: 'Label', icon: 'label' },
@@ -61,6 +62,7 @@ function App() {
 
 render(html`<${App} />`, document.getElementById('root'));
 start();
+startAutoBackup().catch((err) => console.warn('Automatic backups', err));
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Offline cache unavailable:', err));
