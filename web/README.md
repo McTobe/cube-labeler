@@ -9,9 +9,15 @@ It is becoming the main way to use Cube Labeler (version 2.0). Done so far: the 
 (tabs on a phone, a sidebar on a wide screen), text labels with the styling toolbar, fonts,
 frames, QR codes (with a Wi-Fi helper), a picture, tape width, length and the advanced
 settings, the tape and print-dot preview, the printer panel (connect, status, feed tape),
-saving the label as a picture, and settings. The label, settings and added fonts are kept in
-the browser, and after the first visit the app also starts offline. Bin labels, the queue,
-icons, templates, backups and AI icons follow.
+saving the label as a picture, and settings. Bin labels (fasteners and parts, with their
+drive and part icons or your own picture) and the print queue (one strip with cut lines,
+reorder, edit, remove) are in too, and so is the icon library (search, categories, favourites,
+recently used, a print preview) and the icon editor (crop, drawing, silhouette or outline,
+darkness, thickness, clean-up, turn and mirror, pencil and eraser touch-ups, kept with the icon
+so it can be changed again), templates (your own and the starting points, as the desktop app's
+.json files) and backups (.cubebackup files that restore here or in the desktop app). The label, queue, icons,
+settings and added fonts are kept in the browser, and after the first visit the app also starts
+offline. AI icons follow.
 
 ## Browser support
 
@@ -114,6 +120,7 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 | `js/main.js` | Navigation and pages. The pages live in `js/pages/`, shared controls in `js/ui.js`. |
 | `js/app.js` | App state and actions: start Python, render, print, keep settings. |
 | `js/worker.js`, `js/python.js` | Pyodide runs in a Web Worker so the page stays smooth; `python.js` calls into it. |
+| `js/library.js` | The icon library: built-in icons from `icons/library.json` (made by `build.py`) and your own icons, with the desktop app's keys so backups move between the two. |
 | `js/storage.js` | Keeps the label, settings and fonts in the browser's IndexedDB. |
 | `sw.js` | Offline cache: the app's files, Pyodide, Pillow and qrcode. |
 | `vendor/` | [Preact](https://preactjs.com) and [htm](https://github.com/developit/htm), copied in so there is no build step (see `vendor/README.md`). |

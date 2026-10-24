@@ -27,8 +27,11 @@ class TestWebBuild(unittest.TestCase):
         import re
         import build
         core_dir = os.path.join(BASE_DIR, "core")
-        for name in build.CORE_MODULES:
-            with open(os.path.join(core_dir, name), encoding="utf-8") as f:
+        shipped = [os.path.join(core_dir, n) for n in build.CORE_MODULES]
+        shipped += [os.path.join(BASE_DIR, "ui", n) for n in build.UI_MODULES]
+        for path in shipped:
+            name = os.path.basename(path)
+            with open(path, encoding="utf-8") as f:
                 source = f.read()
             imported = set(re.findall(r"^\s*from core\.(\w+) import", source, re.M))
             for names in re.findall(r"^\s*from core import ([\w, ]+)", source, re.M):
@@ -114,6 +117,194 @@ class TestWebRender(unittest.TestCase):
             name = cube_web.add_font("Arimo-Bold.ttf", f.read())
         self.assertEqual(name, "[Custom] Arimo-Bold")
         self.assertIn(name, cube_web.font_names())
+
+
+class TestWebBinLabelsAndQueue(unittest.TestCase):
+    def test_bin_label_matches_desktop_renderer(self):
+        from core.inventory_renderer import FastenerLabelConfig
+        fastener = cube_web.bin_defaults("en")["fastener"]
+        result = cube_web.render_label({"bin": fastener, "tape_width_mm": 6.0})
+        fields = {k: v for k, v in fastener.items() if k != "kind"}
+        _, _, raster, _ = LabelRenderer().render(
+            LabelConfig(inventory_config=FastenerLabelConfig(**fields), tape_width_mm=12.0)
+        )
+        self.assertEqual(result["raster"], raster)
+
+    def test_part_label_with_own_icon(self):
+        part = dict(cube_web.bin_defaults("en")["component"], icon_type="custom")
+        picture = Image.new("RGB", (30, 30), "white")
+        picture.paste((0, 0, 0), (5, 5, 25, 25))
+        data = io.BytesIO()
+        picture.save(data, format="PNG")
+        with_icon = cube_web.render_label({"bin": dict(part, icon_data=data.getvalue())})
+        # Without the picture bytes, a custom icon falls back to no icon instead of failing
+        without = cube_web.render_label({"bin": part})
+        self.assertNotEqual(with_icon["raster"], without["raster"])
+
+    def test_bin_icon_paths_from_the_page_are_ignored(self):
+        part = dict(cube_web.bin_defaults("en")["component"], icon_type="custom", custom_icon_path="/etc/passwd")
+        self.assertGreater(cube_web.render_label({"bin": part})["metrics"]["raster_lines"], 0)
+
+    def test_queue_prints_as_one_strip(self):
+        labels = [{"text": "One"}, {"bin": cube_web.bin_defaults("en")["component"]}, {"text": "Three"}]
+        result = cube_web.render_queue(labels)
+        self.assertEqual(result["metrics"]["label_count"], 3)
+        self.assertEqual(result["metrics"]["tape_saved_mm"], 50.0)
+        configs = [cube_web._label_config(label) for label in labels]
+        self.assertEqual(result["raster"], LabelRenderer().render_batch(configs)[2])
+
+    def test_bin_defaults_and_suggestions_follow_the_language(self):
+        self.assertEqual(cube_web.bin_defaults("sv")["fastener"]["category"], "SKRUV")
+        self.assertIn("KULLAGER", cube_web.bin_name_suggestions("sv")["component"])
+        self.assertIn(["sv", "Svenska"], cube_web.label_languages())
+
+    def test_thumbnail_height(self):
+        png = cube_web.label_thumbnail({"text": "Hello"}, 40)
+        self.assertEqual(Image.open(io.BytesIO(png)).height, 40)
+
+
+class TestWebIcons(unittest.TestCase):
+    def _picture(self):
+        picture = Image.new("RGB", (200, 120), "white")
+        picture.paste((0, 0, 0), (40, 20, 160, 100))
+        data = io.BytesIO()
+        picture.save(data, format="JPEG")
+        return data.getvalue()
+
+    def test_library_lists_every_icon_with_its_file(self):
+        import json
+        import tempfile
+        from unittest import mock
+        import build
+        with tempfile.TemporaryDirectory() as dist, mock.patch.object(build, "DIST_DIR", dist):
+            build.build_icon_library()
+            with open(os.path.join(dist, "icons", "library.json"), encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertGreater(len(data["icons"]), 100)
+            for icon in data["icons"]:
+                self.assertIn(icon["category"], data["categories"])
+                self.assertTrue(os.path.isfile(os.path.join(dist, icon["file"])), icon["file"])
+                self.assertEqual(icon["file"], "icons/" + icon["key"])
+
+    def test_print_preview_is_the_bin_label_size(self):
+        preview = Image.open(io.BytesIO(cube_web.icon_print_preview(self._picture())))
+        self.assertEqual(max(preview.size), 56)
+
+    def test_editor_matches_the_desktop_editor(self):
+        from core import icon_editor as ie
+        original = cube_web.prepare_icon_original(self._picture())
+        edit = {"mode": "outline", "thickness": 1, "rotate": 1}
+        touch = bytearray(ie.TOUCH_GRID * ie.TOUCH_GRID)
+        touch[0] = ie.TOUCH_INK
+        result = cube_web.edit_icon(original, edit, bytes(touch))
+        source = Image.open(io.BytesIO(original)).convert("RGBA")
+        layer = Image.frombytes("L", (ie.TOUCH_GRID, ie.TOUCH_GRID), bytes(touch))
+        expected = ie.render_icon(source, ie.IconEdit.from_dict(edit), layer)
+        self.assertEqual(Image.open(io.BytesIO(result["icon_png"])).convert("RGBA").tobytes(), expected.tobytes())
+        self.assertTrue(result["has_ink"])
+        self.assertEqual(result["edit"]["mode"], "outline")
+        # Turned a quarter, the 200 x 120 picture stands up
+        view = Image.open(io.BytesIO(result["view_png"]))
+        self.assertGreater(view.height, view.width)
+        self.assertEqual(max(Image.open(io.BytesIO(result["print_png"])).size), ie.PRINT_DOTS)
+
+    def test_touch_ups_from_a_desktop_backup(self):
+        from core import icon_editor as ie
+        layer = ie.new_touch_layer()
+        layer.putpixel((3, 4), ie.TOUCH_ERASE)
+        cells = cube_web.touch_cells(cube_web._png(layer))
+        self.assertEqual(cells[4 * ie.TOUCH_GRID + 3], ie.TOUCH_ERASE)
+        self.assertEqual(cube_web.touch_cells(cube_web.touch_png(cells)), cells)
+
+    def test_blank_picture_has_no_ink(self):
+        data = io.BytesIO()
+        Image.new("RGB", (50, 50), "white").save(data, format="PNG")
+        result = cube_web.edit_icon(cube_web.prepare_icon_original(data.getvalue()))
+        self.assertFalse(result["has_ink"])
+        self.assertIsNone(result["print_png"])
+
+
+class TestWebTemplatesAndBackups(unittest.TestCase):
+    def _png(self, color="black"):
+        data = io.BytesIO()
+        Image.new("RGBA", (8, 8), color).save(data, format="PNG")
+        return data.getvalue()
+
+    def test_desktop_template_opens_in_the_web_version(self):
+        import json
+        from ui.templates import BUILTIN_PRESETS
+        item = cube_web.template_from_desktop(json.dumps(BUILTIN_PRESETS["Storage Box"]["config"]))
+        self.assertEqual(item["mode"], "text")
+        self.assertEqual(item["label"]["text"], "ELECTRONICS & CORDS\nShelf 2 - Row B")
+        self.assertIn(item["label"]["font_name"], cube_web.font_names())
+
+    def test_web_template_opens_on_the_desktop(self):
+        import json
+        from ui.templates import config_from_dict
+        text = {"mode": "text", "label": {"text": "Box 4", "qr_enabled": True, "qr_data": "x",
+                                         "image": {"name": "a.png", "data": self._png()}}}
+        saved = cube_web.template_to_desktop(text)
+        cfg = config_from_dict(json.loads(saved))
+        self.assertEqual(cfg.text, "Box 4")
+        self.assertIsNone(cfg.image_path)
+        again = cube_web.template_from_desktop(saved)
+        self.assertEqual(again["label"]["image"]["data"], self._png())
+        part = dict(cube_web.bin_defaults("en")["component"], icon_type="custom", icon={"name": "i.png", "data": self._png()})
+        cfg = config_from_dict(json.loads(cube_web.template_to_desktop({"mode": "bin", "bin": part})))
+        self.assertIsNone(cfg.inventory_config.custom_icon_path)
+        back = cube_web.template_from_desktop(cube_web.template_to_desktop({"mode": "bin", "bin": part}))
+        self.assertEqual(back["bin"]["icon_type"], "custom")
+        self.assertEqual(back["bin"]["kind"], "component")
+
+    def test_broken_template_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "not a template"):
+            cube_web.template_from_desktop("{nope")
+
+    def test_web_backup_restores_on_the_desktop(self):
+        from core import backup
+        cells = bytearray(64 * 64)
+        cells[5] = 1
+        data = cube_web.make_backup({
+            "created": "2026-10-24T20:00:00+02:00",
+            "icons": [{"file": "washer.png", "favourite": True, "icon": self._png(),
+                       "meta": {"title": "Washer", "category": "My Icons", "keywords": ["ring"], "edit": {"mode": "outline"}},
+                       "original": self._png("white"), "touch": bytes(cells)}],
+            "settings": {"label_language": "sv", "gemini_api_key": "secret", "icon_favourites": ["user/washer.png"]},
+            "templates": [{"name": "Shelf A", "json": cube_web.template_to_desktop({"mode": "text", "label": {"text": "A"}})}],
+        })
+        read = backup.read_backup(io.BytesIO(data))
+        self.assertEqual(read.icons[0].title, "Washer")
+        self.assertTrue(read.icons[0].favourite)
+        self.assertIsNotNone(read.icons[0].touch)
+        self.assertNotIn("gemini_api_key", read.settings)
+        self.assertEqual(list(read.templates), ["templates/Shelf A.json"])
+
+    def test_desktop_backup_opens_in_the_web_version(self):
+        from core import backup
+        layer = Image.new("L", (64, 64), 0)
+        layer.putpixel((1, 0), 2)
+        touch = io.BytesIO()
+        layer.save(touch, format="PNG")
+        made = backup.Backup(
+            created="2026-10-24T20:00:00+02:00",
+            icons=[backup.BackupIcon(file="nut.png", meta={"title": "Nut", "edit": {"mode": "drawing"}}, favourite=False,
+                                     icon=self._png(), original=self._png("white"), touch=touch.getvalue())],
+            settings={"label_language": "de"},
+            files={"templates/Bin.json": cube_web.template_to_desktop(
+                {"mode": "bin", "bin": cube_web.bin_defaults("en")["fastener"]}).encode(), "templates/Bad.json": b"{"},
+        )
+        out = io.BytesIO()
+        backup.write_backup(made, out)
+        opened = cube_web.open_backup(out.getvalue())
+        self.assertEqual(opened["icons"][0]["meta"]["title"], "Nut")
+        self.assertEqual(opened["icons"][0]["touch"][1], 2)
+        self.assertEqual(opened["settings"]["label_language"], "de")
+        self.assertEqual([t["name"] for t in opened["templates"]], ["Bin"])
+        self.assertEqual(opened["skipped_templates"], ["Bad"])
+
+    def test_not_a_backup(self):
+        with self.assertRaisesRegex(ValueError, "not a Cube Labeler backup"):
+            cube_web.open_backup(b"hello")
 
 
 class TestWebTextEditing(unittest.TestCase):

@@ -106,32 +106,120 @@ def _hide_cut_line(preview, config):
     return out
 
 
-def render_label(options: Any) -> Dict[str, Any]:
+def _known(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+    names = {f.name for f in dataclasses.fields(cls)}
+    return {k: v for k, v in data.items() if k in names}
+
+
+def _bin_config(data: Dict[str, Any]):
     """
-    Renders one text label. Options use LabelConfig field names (text, font_name,
-    tape_width_mm, auto_fit_font, fixed_font_size, alignment, qr_enabled, qr_data, ...);
-    unknown keys are ignored. A picture comes as bytes in image_data instead of image_path.
-    Returns the preview PNG, the print dots as a PNG that reads like the preview, the print
-    raster and the metrics.
+    A bin label from the page: {"kind": "fastener" or "component", ...FastenerLabelConfig or
+    ComponentLabelConfig fields}. Its own icon comes as bytes in icon_data; icon paths from
+    the page are ignored.
     """
-    from PIL import ImageOps
+    from core.inventory_renderer import ComponentLabelConfig, FastenerLabelConfig
+    data = dict(data)
+    icon = data.pop("icon_data", None)
+    if data.get("kind") == "component":
+        fields = _known(ComponentLabelConfig, data)
+        fields.pop("custom_icon_path", None)
+        cfg = ComponentLabelConfig(**fields)
+        if cfg.icon_type == "custom":
+            cfg.custom_icon_path = _image_path(icon) if icon is not None else None
+            if cfg.custom_icon_path is None:
+                cfg.icon_type = "none"
+    else:
+        fields = _known(FastenerLabelConfig, data)
+        fields.pop("custom_tool_icon_path", None)
+        cfg = FastenerLabelConfig(**fields)
+        if cfg.tool_type == "custom":
+            cfg.custom_tool_icon_path = _image_path(icon) if icon is not None else None
+            if cfg.custom_tool_icon_path is None:
+                cfg.tool_type = "none"
+    cfg.tape_width_mm = 12
+    return cfg
+
+
+def _label_config(options: Any):
+    """
+    LabelConfig from the page's options: LabelConfig field names (text, font_name,
+    tape_width_mm, auto_fit_font, ...), a picture as bytes in image_data, and a bin label in
+    "bin" (see _bin_config). Unknown keys are ignored.
+    """
     from core.label_renderer import LabelConfig
-    fields = {f.name for f in dataclasses.fields(LabelConfig)}
+    from core.specs import INVENTORY_TAPE_WIDTH_MM
     raw = _to_dict(options)
-    opts = {k: v for k, v in raw.items() if k in fields and k != "image_path"}
+    opts = _known(LabelConfig, raw)
+    opts.pop("image_path", None)
+    opts.pop("inventory_config", None)
     if raw.get("image_data") is not None:
         opts["image_path"] = _image_path(raw["image_data"])
-    config = LabelConfig(**opts)
-    preview, raster_image, raster, metrics = _get_renderer().render(config)
+    if raw.get("bin") is not None:
+        opts["inventory_config"] = _bin_config(raw["bin"])
+        opts["tape_width_mm"] = INVENTORY_TAPE_WIDTH_MM
+    return LabelConfig(**opts)
 
+
+def _render_result(rendered) -> Dict[str, Any]:
+    from PIL import ImageOps
+    preview, raster_image, raster, metrics = rendered
     # The raster runs down the tape the way the printer feeds it; turn it back to read like the label
     dots = ImageOps.mirror(raster_image.convert("L")).rotate(90, expand=True)
     return {
-        "preview_png": _png(_hide_cut_line(preview, config)),
+        "preview_png": _png(preview),
         "dots_png": _png(ImageOps.invert(dots)),
         "raster": raster,
         "metrics": dataclasses.asdict(metrics),
     }
+
+
+def render_label(options: Any) -> Dict[str, Any]:
+    """
+    Renders one label: a text label, or a bin label when options has "bin". Returns the
+    preview PNG, the print dots as a PNG that reads like the preview, the print raster and
+    the metrics.
+    """
+    config = _label_config(options)
+    preview, *rest = _get_renderer().render(config)
+    return _render_result((_hide_cut_line(preview, config), *rest))
+
+
+def render_queue(labels: Any) -> Dict[str, Any]:
+    """Renders queued labels as one strip with cut lines between them, like the desktop queue."""
+    if hasattr(labels, "to_py"):
+        labels = labels.to_py()
+    configs = [_label_config(label) for label in labels]
+    return _render_result(_get_renderer().render_batch(configs))
+
+
+def label_thumbnail(options: Any, height: int = 48) -> bytes:
+    """A small preview PNG of one label, for lists."""
+    from PIL import Image
+    preview = _get_renderer().render(_label_config(options))[0]
+    width = max(1, round(preview.width * height / preview.height))
+    return _png(preview.resize((width, int(height)), Image.Resampling.LANCZOS))
+
+
+def bin_defaults(lang: str = "en") -> Dict[str, Any]:
+    """The starting fastener and part labels (presets A2 and B1), in the label language."""
+    from core.label_language import build_presets
+    presets = build_presets(lang)
+    fastener = dataclasses.asdict(presets["A2"].config)
+    component = dataclasses.asdict(presets["B1"].config)
+    fastener["kind"], component["kind"] = "fastener", "component"
+    # The editor has one note line for a single bin (as on the desktop)
+    fastener["standard_line1"], fastener["standard_line2"] = "", ""
+    return {"fastener": fastener, "component": component}
+
+
+def bin_name_suggestions(lang: str = "en") -> Dict[str, List[str]]:
+    from core.label_language import component_categories, fastener_categories
+    return {"fastener": fastener_categories(lang), "component": component_categories(lang)}
+
+
+def label_languages() -> List[List[str]]:
+    from core.label_language import LANGUAGES
+    return [[code, name] for code, name in LANGUAGES.items()]
 
 
 # --- Text editor helpers: the same styling rules as the desktop editor (core/rich_text.py) ---
@@ -256,3 +344,403 @@ def job_state(raw: Any) -> str:
         return "invalid"
     protocol.raise_if_error(status)
     return "completed" if protocol.is_completed(status) else "pending"
+
+
+# --- Icons: the same steps as the desktop icon library and editor (core/icon_editor.py) ---
+
+def _open_picture(data: Any):
+    from PIL import Image, ImageOps
+    with Image.open(io.BytesIO(_to_bytes(data))) as src:
+        # Phone photos carry their rotation in EXIF
+        return ImageOps.exif_transpose(src).convert("RGBA")
+
+
+def icon_print_preview(data: Any, dots: int = 56) -> bytes:
+    """An icon as it comes out on a 12 mm bin label: cropped to its ink, shrunk, black and white."""
+    from core.icon_editor import print_dots
+    return _png(print_dots(_open_picture(data), int(dots)))
+
+
+# The icon editor calls edit_icon on every change, so the picture and the last masks are kept
+_EDIT_SOURCES: Dict[str, Any] = {}
+_EDIT_MASKS: Dict[Any, Any] = {}
+
+
+def _remember(cache: Dict[Any, Any], key: Any, value: Any, keep: int) -> Any:
+    cache.pop(key, None)
+    cache[key] = value
+    while len(cache) > keep:
+        cache.pop(next(iter(cache)))
+    return value
+
+
+def _touch_layer(touch: Any):
+    """Touch-ups as the editor's grid: raw cells from the page, or a PNG from a desktop backup."""
+    from PIL import Image
+    from core.icon_editor import TOUCH_GRID
+    if touch is None:
+        return None
+    data = _to_bytes(touch)
+    if len(data) == TOUCH_GRID * TOUCH_GRID:
+        return Image.frombytes("L", (TOUCH_GRID, TOUCH_GRID), data)
+    with Image.open(io.BytesIO(data)) as src:
+        layer = src.convert("L")
+    return layer if layer.size == (TOUCH_GRID, TOUCH_GRID) else None
+
+
+def touch_cells(touch: Any) -> Optional[bytes]:
+    """Touch-ups as raw grid cells (one byte each), from either form edit_icon takes."""
+    layer = _touch_layer(touch)
+    return layer.tobytes() if layer is not None else None
+
+
+def touch_png(cells: Any) -> Optional[bytes]:
+    """Raw touch-up cells as the PNG the desktop app keeps next to an icon."""
+    layer = _touch_layer(cells)
+    return _png(layer) if layer is not None else None
+
+
+def prepare_icon_original(data: Any) -> bytes:
+    """A picture as it is kept with an icon: upright, at most 1024 pixels across, PNG."""
+    from core.icon_editor import prepare_original
+    return _png(prepare_original(_open_picture(data)))
+
+
+def edit_icon(original: Any, edit: Any = None, touch: Any = None, view: int = 480) -> Dict[str, Any]:
+    """
+    Everything the icon editor shows for a picture and its settings:
+    base_png, the icon before touch-ups (the page draws touch-ups over it while you draw),
+    icon_png with touch-ups as it is saved, print_png as it prints on a
+    12 mm bin label, the darkness cutoff used, whether there is any ink, the settings as
+    read, and view_png, the picture turned and mirrored the way the crop box refers to it.
+    """
+    from core.icon_editor import (
+        IconEdit, apply_touch, has_ink, ink_mask, mask_to_icon, orient, print_dots, threshold_for,
+    )
+    data = _to_bytes(original)
+    digest = hashlib.sha1(data).hexdigest()
+    source = _EDIT_SOURCES.get(digest)
+    if source is None:
+        source = _open_picture(data)
+    _remember(_EDIT_SOURCES, digest, source, 2)
+
+    settings = IconEdit.from_dict(_to_dict(edit) if edit is not None else None)
+    key = (digest, repr(sorted(settings.to_dict().items())))
+    cached = _EDIT_MASKS.get(key)
+    if cached is None:
+        cached = (ink_mask(source, settings), threshold_for(source, settings))
+    _remember(_EDIT_MASKS, key, cached, 6)
+    mask, threshold = cached
+
+    full = apply_touch(mask, _touch_layer(touch))
+    icon = mask_to_icon(full)
+    oriented = orient(source, settings).copy()
+    oriented.thumbnail((int(view), int(view)))
+    return {
+        "base_png": _png(mask_to_icon(mask)),
+        "icon_png": _png(icon),
+        "print_png": _png(print_dots(icon)) if has_ink(full) else None,
+        "threshold": threshold,
+        "has_ink": has_ink(full),
+        "edit": settings.to_dict(),
+        "view_png": _png(oriented),
+    }
+
+
+# --- Templates: the desktop app's template files, read and written by the web version ---
+
+def _web_font(name: Any) -> str:
+    """A font this browser has for a template's font: the same one, else Arimo (bold if it was)."""
+    names = font_names()
+    if name in names:
+        return name
+    bold = "Arimo Bold" if "bold" in str(name or "").lower() and "Arimo Bold" in names else None
+    return bold or ("Arimo" if "Arimo" in names else names[0])
+
+
+def _b64(data: Optional[bytes]) -> Optional[str]:
+    import base64
+    return base64.b64encode(data).decode("ascii") if data else None
+
+
+def _unb64(text: Any) -> Optional[bytes]:
+    import base64
+    import binascii
+    if not isinstance(text, str):
+        return None
+    try:
+        return base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+
+
+def _picture(saved: Any) -> Optional[Dict[str, Any]]:
+    """A picture kept in a template file by the web version: {"name", "data" as base64}."""
+    if not isinstance(saved, dict):
+        return None
+    data = _unb64(saved.get("data"))
+    return {"name": str(saved.get("name") or "picture.png"), "data": data} if data else None
+
+
+def template_from_desktop(data: Any) -> Dict[str, Any]:
+    """
+    A desktop template (the JSON text or the parsed object) as the page keeps a label:
+    {"mode": "text", "label": {...}} or {"mode": "bin", "bin": {"kind", ...}}. Pictures only
+    come along from templates the web version saved, since desktop ones point at files on a PC.
+    Raises ValueError with a readable message for anything that is not a template.
+    """
+    import json
+    from ui.templates import config_from_dict
+    if isinstance(data, (str, bytes, bytearray)) or hasattr(data, "to_bytes"):
+        text = _to_bytes(data).decode("utf-8-sig") if not isinstance(data, str) else data
+        try:
+            data = json.loads(text)
+        except ValueError as e:
+            raise ValueError(f"This is not a template file: {e}") from e
+    else:
+        data = _to_dict(data)
+    if not isinstance(data, dict):
+        raise ValueError("This is not a template file.")
+    try:
+        cfg = config_from_dict(data)
+    except TypeError as e:
+        raise ValueError(f"The template has values Cube Labeler cannot read: {e}") from e
+    inv = cfg.inventory_config
+    if inv is not None:
+        from core.inventory_renderer import ComponentLabelConfig
+        fields = dataclasses.asdict(inv)
+        kind = "component" if isinstance(inv, ComponentLabelConfig) else "fastener"
+        fields.pop("custom_icon_path", None)
+        fields.pop("custom_tool_icon_path", None)
+        fields["kind"] = kind
+        fields["icon"] = _picture(data.get("web_bin_icon"))
+        icon_field = "icon_type" if kind == "component" else "tool_type"
+        if fields[icon_field] == "custom" and fields["icon"] is None:
+            fields[icon_field] = "none"
+        return {"mode": "bin", "bin": fields}
+    label = dataclasses.asdict(cfg)
+    for key in ("inventory_config", "image_path", "cut_line", "cut_line_style", "cut_line_position", "auto_cut_hardware"):
+        label.pop(key, None)
+    label["text"] = label["text"].replace("\\n", "\n")
+    label["font_name"] = _web_font(label["font_name"])
+    label["image"] = _picture(data.get("web_picture"))
+    return {"mode": "text", "label": label}
+
+
+def template_to_desktop(item: Any) -> str:
+    """
+    A label from the page ({"mode", "label" or "bin"}, as template_from_desktop gives) as the
+    JSON of a desktop template file. Pictures go along as base64 for the web version; the
+    desktop app ignores them.
+    """
+    import json
+    from ui.templates import config_to_dict
+    item = _to_dict(item)
+    if item.get("mode") == "bin":
+        bin_data = _to_dict(item.get("bin"))
+        icon = bin_data.pop("icon", None)
+        icon = _to_dict(icon) if icon else None
+        options = {"bin": dict(bin_data, icon_data=icon["data"] if icon else None)}
+    else:
+        label = _to_dict(item.get("label"))
+        image = label.pop("image", None)
+        image = _to_dict(image) if image else None
+        options = dict(label, image_data=image["data"] if image else None)
+        icon = None
+    data = config_to_dict(_label_config(options))
+    data["image_path"] = None
+    inv = data.get("inventory_config")
+    if isinstance(inv, dict):
+        for key in ("custom_icon_path", "custom_tool_icon_path"):
+            if key in inv:
+                inv[key] = None
+    if item.get("mode") == "bin":
+        if icon:
+            data["web_bin_icon"] = {"name": icon.get("name"), "data": _b64(_to_bytes(icon["data"]))}
+    elif image:
+        data["web_picture"] = {"name": image.get("name"), "data": _b64(_to_bytes(image["data"]))}
+    return json.dumps(data, indent=2)
+
+
+def template_presets() -> List[Dict[str, Any]]:
+    """The desktop app's starting points: [{"key", "name", "description", "mode", "label"}]."""
+    from ui.templates import BUILTIN_PRESETS
+    out = []
+    for key, preset in BUILTIN_PRESETS.items():
+        item = template_from_desktop(preset["config"])
+        out.append({"key": key, "name": preset["name"], "description": preset["description"], **item})
+    return out
+
+
+# --- Backups: the desktop app's .cubebackup files (see core/backup.py for the format) ---
+
+BACKUP_FORMAT = "cube-labeler-backup"
+BACKUP_VERSION = 2
+OLD_ICON_FORMAT = "cube-labeler-icons"
+BACKUP_MAX_ICONS = 5000
+BACKUP_MAX_FILES = 2000
+BACKUP_MAX_FILE_BYTES = 25 * 1024 * 1024
+TOUCH_SUFFIX = ".touch.png"
+TEMPLATES_FOLDER = "templates"
+# Settings that belong to one device or are secrets never go in a backup (as on the desktop)
+_LOCAL_SUFFIXES = ("_api_key", "_api_key_protected")
+_LOCAL_KEYS = ("last_serial_port",)
+_LOCAL_PREFIXES = ("icon_backup_",)
+
+
+def _is_local_setting(key: str) -> bool:
+    return key in _LOCAL_KEYS or key.startswith(_LOCAL_PREFIXES) or key.endswith(_LOCAL_SUFFIXES)
+
+
+def _safe_icon_file(name: Any) -> bool:
+    return (isinstance(name, str) and name == os.path.basename(name) and "/" not in name and "\\" not in name
+            and not name.startswith(".") and name.lower().endswith(".png") and len(name) <= 120)
+
+
+def _is_png(data: bytes) -> bool:
+    from PIL import Image
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            if img.format != "PNG":
+                return False
+            img.verify()
+        return True
+    except Exception:
+        return False
+
+
+def template_file_name(name: str) -> str:
+    """The file a template called `name` is kept in on the desktop (as ui/templates.py names it)."""
+    from ui.templates import template_file_name as desktop_name
+    return desktop_name(name)
+
+
+def make_backup(data: Any) -> bytes:
+    """
+    A .cubebackup file the desktop app can restore, from what the page keeps:
+    {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch"}],
+     "settings": {...}, "templates": [{"name", "json"}]}. Icons, originals and touch-ups are
+    bytes; touch-ups may be the page's raw cells. Settings that belong to one device are left out.
+    """
+    import json
+    import zipfile
+    data = _to_dict(data)
+    icons, members = [], {}
+    for item in data.get("icons") or []:
+        item = _to_dict(item)
+        file = item.get("file")
+        if not _safe_icon_file(file):
+            continue
+        stem = os.path.splitext(file)[0]
+        meta = _to_dict(item.get("meta"))
+        members[f"icons/{file}"] = _to_bytes(item["icon"])
+        original = item.get("original")
+        if original is not None and meta.get("edit"):
+            members[f"originals/{stem}.png"] = _to_bytes(original)
+            touch = touch_png(item.get("touch")) if item.get("touch") is not None else None
+            if touch:
+                members[f"originals/{stem}{TOUCH_SUFFIX}"] = touch
+        else:
+            meta.pop("edit", None)
+        icons.append({"file": file, "favourite": bool(item.get("favourite")), "meta": meta})
+    files = {}
+    for template in data.get("templates") or []:
+        template = _to_dict(template)
+        files[f"{TEMPLATES_FOLDER}/{template_file_name(str(template.get('name') or 'My template'))}"] = (
+            str(template["json"]).encode("utf-8"))
+    settings = {k: v for k, v in _to_dict(data.get("settings")).items() if not _is_local_setting(k)}
+    manifest = {
+        "format": BACKUP_FORMAT,
+        "version": BACKUP_VERSION,
+        "created": str(data.get("created") or ""),
+        "icons": icons,
+        "settings": settings,
+        "files": sorted(files),
+    }
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False, default=str))
+        for name, content in members.items():
+            zf.writestr(name, content)
+        for name, content in sorted(files.items()):
+            zf.writestr(f"data/{name}", content)
+    return out.getvalue()
+
+
+def open_backup(data: Any) -> Dict[str, Any]:
+    """
+    Reads a .cubebackup (or an older .cubeicons) file from the desktop app or the web version:
+    {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch" as cells}],
+     "settings": {...} or None, "templates": [{"name", "item"}], "skipped_templates": [names]}.
+    Raises ValueError with a readable message when it is not a backup this version can read.
+    """
+    import json
+    import zipfile
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(_to_bytes(data)))
+    except (zipfile.BadZipFile, OSError):
+        raise ValueError("This is not a Cube Labeler backup.")
+
+    def member(name: str, required: bool = False) -> Optional[bytes]:
+        try:
+            info = zf.getinfo(name)
+        except KeyError:
+            if required:
+                raise ValueError(f"The backup is missing {name}.")
+            return None
+        if info.file_size > BACKUP_MAX_FILE_BYTES:
+            raise ValueError(f"{name} in the backup is too large.")
+        return zf.read(info)
+
+    with zf:
+        try:
+            manifest = json.loads(member("manifest.json", required=True).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            raise ValueError("The backup's list of contents is damaged.")
+        if not isinstance(manifest, dict) or manifest.get("format") not in (BACKUP_FORMAT, OLD_ICON_FORMAT):
+            raise ValueError("This is not a Cube Labeler backup.")
+        if not isinstance(manifest.get("version"), int) or manifest["version"] > BACKUP_VERSION:
+            raise ValueError("This backup was made by a newer version of Cube Labeler.")
+        listed = manifest.get("icons")
+        if not isinstance(listed, list) or len(listed) > BACKUP_MAX_ICONS:
+            raise ValueError("The backup's list of contents is damaged.")
+
+        icons, seen = [], set()
+        for item in listed:
+            if not isinstance(item, dict) or not _safe_icon_file(item.get("file")) or item["file"].lower() in seen:
+                continue
+            file = item["file"]
+            seen.add(file.lower())
+            stem = os.path.splitext(file)[0]
+            icon = member(f"icons/{file}", required=True)
+            if not _is_png(icon):
+                raise ValueError(f"{file} in the backup is not a readable picture.")
+            meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+            original = member(f"originals/{stem}.png")
+            if original is not None and not _is_png(original):
+                original = None
+            touch = member(f"originals/{stem}{TOUCH_SUFFIX}") if original is not None else None
+            if original is None:
+                meta.pop("edit", None)
+            icons.append({
+                "file": file, "meta": meta, "favourite": bool(item.get("favourite")), "icon": icon,
+                "original": original, "touch": touch_cells(touch) if touch and _is_png(touch) else None,
+            })
+
+        settings, templates, skipped = None, [], []
+        if manifest["format"] == BACKUP_FORMAT:
+            settings = manifest.get("settings") if isinstance(manifest.get("settings"), dict) else {}
+            listed_files = manifest.get("files") if isinstance(manifest.get("files"), list) else []
+            for path in listed_files[:BACKUP_MAX_FILES]:
+                if not isinstance(path, str) or not path.startswith(TEMPLATES_FOLDER + "/") or ".." in path:
+                    continue
+                name = os.path.splitext(path.split("/")[-1])[0]
+                content = member(f"data/{path}")
+                if content is None:
+                    continue
+                try:
+                    templates.append({"name": name, "item": template_from_desktop(content)})
+                except ValueError:
+                    skipped.append(name)
+    return {"created": str(manifest.get("created") or ""), "icons": icons, "settings": settings,
+            "templates": templates, "skipped_templates": skipped}

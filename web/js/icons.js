@@ -15,11 +15,20 @@ const PATHS = {
   feed: html`<path d="M4 12h12M12 7l5 5-5 5M20 5v14"/>`,
   help: html`<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>`,
   column: html`<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/>`,
+  edit: html`<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>`,
+  up: html`<path d="M12 19V5M6 11l6-6 6 6"/>`,
+  down: html`<path d="M12 5v14M6 13l6 6 6-6"/>`,
+  star: html`<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>`,
+  search: html`<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>`,
+  trash: html`<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>`,
+  plus: html`<path d="M12 5v14M5 12h14"/>`,
+  'rotate-left': html`<path d="M4 4v6h6"/><path d="M4.5 10A8 8 0 1 1 6 16.5"/>`,
+  'rotate-right': html`<path d="M20 4v6h-6"/><path d="M19.5 10A8 8 0 1 0 18 16.5"/>`,
   refresh: html`<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>`,
 };
 
-export function Icon({ name, size = 22 }) {
-  return html`<svg class="icon" width=${size} height=${size} viewBox="0 0 24 24" fill="none"
+export function Icon({ name, size = 22, filled = false }) {
+  return html`<svg class=${filled ? 'icon filled' : 'icon'} width=${size} height=${size} viewBox="0 0 24 24" fill="none"
     stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
     aria-hidden="true">${PATHS[name]}</svg>`;
 }

@@ -8,7 +8,6 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, List, Union
 
-from core.config import config_manager
 from core.inventory_renderer import ComponentLabelConfig, FastenerLabelConfig
 
 DEFAULT_LANGUAGE = "en"
@@ -51,10 +50,12 @@ def normalize_language(lang: str) -> str:
 
 
 def get_label_language() -> str:
+    from core.config import config_manager  # desktop settings; the web app passes the language in
     return normalize_language(str(config_manager.get("label_language", DEFAULT_LANGUAGE)))
 
 
 def set_label_language(lang: str) -> None:
+    from core.config import config_manager
     config_manager.set("label_language", normalize_language(lang))
 
 

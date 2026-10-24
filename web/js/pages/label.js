@@ -2,13 +2,15 @@
 // The preview and the print button stay in view while editing.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
+import { IconPickerSheet } from './icons.js';
 import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
+import { BinEditor } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
-  addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM,
+  addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -29,21 +31,28 @@ const STYLE_KEYS = { b: 'bold', i: 'italic', u: 'underline' };
 const pct = (v) => `${Math.round(v * 100)}%`;
 
 export function LabelPage() {
+  const { mode } = useStore(app);
   // On a wide screen the text sits under the preview, so both stay in view while typing
   const wide = useWide();
+  const textHere = mode === 'text' && wide;
   return html`<div class="label-page">
     <div class="label-preview-col">
       <${Preview} />
-      ${wide && html`<${TextCard} />`}
+      ${textHere && html`<${TextCard} />`}
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
-      ${!wide && html`<${TextCard} />`}
-      <${FontSection} />
-      <${QrSection} />
-      <${PictureSection} />
-      <${TapeSection} />
-      <${AdvancedSection} />
+      <div class="mode-switch" role="tablist" aria-label="Kind of label">
+        <button role="tab" aria-selected=${mode === 'text'} class=${mode === 'text' ? 'on' : ''} onClick=${() => setMode('text')}>Text label</button>
+        <button role="tab" aria-selected=${mode === 'bin'} class=${mode === 'bin' ? 'on' : ''} onClick=${() => setMode('bin')}>Bin label</button>
+      </div>
+      ${mode === 'bin' ? html`<${BinEditor} />` : html`
+        ${!wide && html`<${TextCard} />`}
+        <${FontSection} />
+        <${QrSection} />
+        <${PictureSection} />
+        <${TapeSection} />
+        <${AdvancedSection} />`}
     </div>
   </div>`;
 }
@@ -241,6 +250,7 @@ function PictureSection() {
   const { phase } = useStore(boot);
   const fileRef = useRef(null);
   const [thumb, setThumb] = useState(null);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     if (!label.image) { setThumb(null); return undefined; }
@@ -261,8 +271,12 @@ function PictureSection() {
       <span class="picture-name">${label.image ? label.image.name : 'No picture'}</span>
       ${label.image && html`<button class="link-button" onClick=${() => setImage(null)}>Remove</button>`}
     </div>
-    <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Choose a picture</button>
+    <div class="button-row">
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => setPicking(true)}>Icon library</button>
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Your own picture</button>
+    </div>
     <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
+    <${IconPickerSheet} open=${picking} target="text" onClose=${() => setPicking(false)} />
     <${Segmented} label="Position" options=${SIDES} value=${label.image_position}
       onChange=${(image_position) => updateLabel({ image_position })} />
     <${Slider} label="Size" min=${0.3} max=${1.5} step=${0.05} value=${label.image_scale} format=${pct}
@@ -318,7 +332,7 @@ function AdvancedSection() {
 // --- Print ---------------------------------------------------------------------------------
 
 function ActionBar() {
-  const { render, status } = useStore(app);
+  const { render, status, queue } = useStore(app);
   const p = useStore(printer);
   const { phase } = useStore(boot);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -329,6 +343,9 @@ function ActionBar() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         if (ready && p.transport && !p.busy) printLabel();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (ready) addToQueue();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -341,10 +358,14 @@ function ActionBar() {
     <div class="action-buttons">
       ${needsPrinter
         ? html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
-            <${Icon} name="printer" size=${20} /> Connect printer</button>`
+            <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`
         : html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
             title="Print (Ctrl+P)" onClick=${printLabel}>
             <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`}
+      <button class="secondary big" disabled=${!ready} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
+        <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Queue</span>
+        ${queue.length > 0 && html`<span class="count">${queue.length}</span>`}
+      </button>
       <span class="menu-anchor">
         <button class="secondary big icon-only" aria-label="More actions" onClick=${() => setMenuOpen(true)}>
           <${Icon} name="more" /></button>
