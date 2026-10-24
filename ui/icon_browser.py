@@ -39,11 +39,9 @@ class IconBrowserDialog(ctk.CTkToplevel):
         on_select: Callable[[str], None],
         initial_category: str = ALL,
         title_suffix: str = "",
-        on_open_ai_generator: Optional[Callable[[], None]] = None,
     ):
         super().__init__(parent)
         self.on_select_callback = on_select
-        self.on_open_ai_generator = on_open_ai_generator
         self.selected_icon: Optional[IconItem] = None
         self._ctk_image_cache: Dict[str, ctk.CTkImage] = {}
         self._tiles: Dict[str, ctk.CTkButton] = {}
@@ -85,7 +83,7 @@ class IconBrowserDialog(ctk.CTkToplevel):
 
         ctk.CTkButton(
             top_row, text="Make an icon…", width=130, fg_color="#8B5CF6", hover_color="#7C3AED",
-            font=ctk.CTkFont(size=12, weight="bold"), command=self._launch_ai_generator,
+            font=ctk.CTkFont(size=12, weight="bold"), command=self._make_icon,
         ).pack(side="right", padx=(8, 0))
         ctk.CTkButton(
             top_row, text="Import image…", width=120, font=ctk.CTkFont(size=12),
@@ -159,6 +157,9 @@ class IconBrowserDialog(ctk.CTkToplevel):
         self.btn_fav = ctk.CTkButton(d, text="☆ Add to favourites", height=28, fg_color="gray30", hover_color="gray40",
                                      command=self._toggle_favourite)
         self.btn_fav.pack(fill="x", padx=12, pady=(0, 6))
+        # "Edit icon…" for the user's own icons, "Edit a copy…" for built-in ones
+        self.btn_edit = ctk.CTkButton(d, text="Edit icon…", height=28, command=self._edit_selected)
+        self.btn_edit.pack(fill="x", padx=12, pady=(0, 6))
 
         # Only for the user's own icons
         self.user_box = ctk.CTkFrame(d, fg_color="transparent")
@@ -335,6 +336,7 @@ class IconBrowserDialog(ctk.CTkToplevel):
             self.lbl_name.configure(text="")
             self.lbl_meta.configure(text="")
             self.btn_fav.pack_forget()
+            self.btn_edit.pack_forget()
             self.user_box.pack_forget()
             return
 
@@ -356,6 +358,8 @@ class IconBrowserDialog(ctk.CTkToplevel):
 
         self.btn_fav.pack(fill="x", padx=12, pady=(0, 6))
         self._update_fav_button(icon)
+        self.btn_edit.configure(text="Edit icon…" if icon.user else "Edit a copy…")
+        self.btn_edit.pack(fill="x", padx=12, pady=(0, 6))
 
         if icon.user:
             self.entry_title.delete(0, "end")
@@ -423,21 +427,41 @@ class IconBrowserDialog(ctk.CTkToplevel):
             parent=self, title="Import an image as an icon",
             filetypes=[("Images", "*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.gif"), ("All files", "*.*")],
         )
-        if not path:
-            return
-        try:
-            from core.ai_generator import post_process_thermal
-            with Image.open(path) as picked:
-                cleaned = post_process_thermal(picked, target_size=(256, 256))
-        except Exception as e:
-            messagebox.showerror("Import image", f"Could not read that picture:\n{e}", parent=self)
-            return
-        name = os.path.splitext(os.path.basename(path))[0]
+        if path:
+            self._open_editor(picture_path=path)
+
+    def _make_icon(self):
+        self._open_editor()
+
+    def _edit_selected(self):
+        if self.selected_icon:
+            self._open_editor(icon=self.selected_icon)
+
+    def _open_editor(self, picture_path: Optional[str] = None, icon: Optional[IconItem] = None):
+        """Opens the icon editor; new icons go in the category shown, when it is a real one."""
+        from ui.icon_editor_dialog import IconEditorDialog
+
         category = self.category_var.get()
         if category not in icon_manager.built_in_categories:
             category = USER_CATEGORY
-        item = icon_manager.save_user_icon(cleaned, name, category=category)
-        self._after_library_change(item.file_path)
+        editor = IconEditorDialog(self, on_saved=self._on_icon_saved, picture_path=picture_path,
+                                  category=category, icon=icon)
+        # The editor takes the input grab while it is open; take it back afterwards
+        editor.bind("<Destroy>", lambda e: e.widget is editor and self.after(10, self._take_grab), add="+")
+        return editor
+
+    def _take_grab(self):
+        try:
+            if self.winfo_exists():
+                self.grab_set()
+                self.focus_force()
+        except tk.TclError:
+            pass
+
+    def _on_icon_saved(self, path: str, insert: bool):
+        self._after_library_change(path)
+        if insert and self.selected_icon:
+            self._confirm_selection()
 
     def _open_custom_folder(self):
         user_dir = os.path.normpath(config_manager.user_icons_dir)
@@ -455,18 +479,6 @@ class IconBrowserDialog(ctk.CTkToplevel):
                     subprocess.Popen(["explorer", user_dir])
                 except Exception:
                     pass
-
-    def _launch_ai_generator(self):
-        if self.on_open_ai_generator:
-            self.on_open_ai_generator()
-        else:
-            from ui.ai_generator_dialog import AIGeneratorDialog
-
-            def on_ai_saved(icon_path: str):
-                icon_manager.reload()
-                self._after_library_change(icon_path)
-
-            AIGeneratorDialog(self, on_save_callback=on_ai_saved)
 
     def _confirm_selection(self):
         if self.selected_icon:
