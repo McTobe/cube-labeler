@@ -449,8 +449,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .tape-strip img { display: block; max-width: 100%; height: auto; max-height: 120px; }
 .fitted .tape-strip img { max-width: none; max-height: none; }
 .zoom-2 .tape-strip, .zoom-4 .tape-strip { max-width: none; margin: 0 12px; }
-.zoom-2 .tape-strip img { max-width: none; max-height: none; zoom: 2; }
-.zoom-4 .tape-strip img { max-width: none; max-height: none; zoom: 4; }
+.zoom-2:not(.fitted) .tape-strip img { max-width: none; max-height: none; zoom: 2; }
+.zoom-4:not(.fitted) .tape-strip img { max-width: none; max-height: none; zoom: 4; }
 .tape-strip img.dots, .zoom-2 img, .zoom-4 img { image-rendering: pixelated; }
 
 .preview-bar {

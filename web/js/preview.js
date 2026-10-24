@@ -42,6 +42,9 @@ export function Preview({ strip, empty }) {
   const [natural, setNatural] = useState(null);
   const wide = useWide();
   const fitWidth = useFitWidth(stageRef, natural, wide);
+  // Zooming makes the stage taller, which must not change the size it zooms from
+  const fitBase = useRef(null);
+  if (zoom === 'fit' || !fitBase.current) fitBase.current = fitWidth;
 
   let stage;
   if (phase === 'failed') {
@@ -56,11 +59,12 @@ export function Preview({ strip, empty }) {
   } else {
     const dots = view === 'dots';
     const tape = dots ? '#ffffff' : render.tape_bg_color;
-    const fit = zoom === 'fit' && fitWidth;
+    // 2× and 4× zoom in from the Fit size, so they are always bigger
+    const fit = fitBase.current ? fitBase.current * (zoom === 'fit' ? 1 : Number(zoom)) : null;
     stage = html`<div ref=${stageRef} class=${`tape-scroll zoom-${zoom}${fit ? ' fitted' : ''}`}>
       <div class="tape-strip" style=${{ background: tape }}>
         <img class=${dots ? 'dots' : ''} src=${dots ? render.dotsUrl : render.previewUrl}
-          style=${fit ? { width: `${fitWidth}px` } : null}
+          style=${fit ? { width: `${fit}px` } : null}
           onLoad=${(e) => setNatural([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight])}
           alt=${dots ? 'The dots the printer will print' : 'Label preview'} />
       </div>
