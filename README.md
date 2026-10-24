@@ -17,7 +17,7 @@ Cube Labeler runs on Windows as a single portable `.exe`, with no Python install
 - **Live preview.** See the label on a simulated tape cartridge in its real colors, or switch to *Print dots* to see exactly what the print head will print. Label length, tape used and print time are shown as you type.
 - **Less tape waste.** Queue several labels and print them as one continuous strip with cut guides between them. Every label, queued or not, starts with a dotted cut line in place of the printer's own ":" cut mark. Each extra label saves about 25 mm of tape.
 - **Bin labels.** A dedicated editor for fastener and parts bins: size block, name, one, two or four length boxes and a drive icon (Allen, Hex, PH, PZ, Torx, Slot), in English or Swedish.
-- **Text, QR codes and images.** Any installed or imported font, auto-fit to the tape height, alignment and outline. Add QR codes (including Wi-Fi guest login codes), icons or your own pictures.
+- **Text, QR codes and images.** Any installed or imported font, auto-fit to the tape height, alignment and outline. Mix sizes per line, use bold, italic, underlined or inverted (white on black) text, align single lines, split the label into columns with a divider, and add a box or rounded frame. Add QR codes (including Wi-Fi guest login codes), icons or your own pictures.
 - **Icon library.** Monochrome icons for fasteners, screw drives, mechanical parts, electronics, wiring, tools, home & kitchen and safety marks, plus your own icons in `~/.printlabel/icons/`. Browse and manage them on the **Icons** page.
 - **Icon editor.** Import or paste any picture and tune how it turns into black and white (drawing, filled silhouette or photo outline, cutoff, line thickness, crop, clean-up) with a live dot-for-dot print preview, then touch it up with a pencil and eraser. Your icons keep their original picture, so you can edit them again later.
 - **Backups.** Export your icons, saved templates and settings to one `.cubebackup` file and restore all or part of it on another PC, or turn on automatic backups to a folder that Google Drive, OneDrive or Dropbox syncs (the newest 10 are kept). API keys are left out. Open **Backups…** on the Icons page or in Settings; older `.cubeicons` backups still restore.
@@ -66,6 +66,20 @@ The window has a **left rail** for switching views, the **tape preview** in the 
 | **Icons** | The icon library: browse, search, import, make, edit and back up icons. |
 | **Settings** | Bin label language, AI service (Gemini, OpenAI or OpenRouter) with its API key and model, backups and simulation mode. |
 
+### Styling label text
+
+Select text and use the buttons above the editor (**B**, *I*, U, *Inverted*, *Line size*, *Line align*, *Add column*), or type the markers yourself. They are plain text, so templates, the queue and the web version keep them.
+
+| Type | Result |
+|---|---|
+| `**bold**`, `*italic*`, `__underline__`, `==inverted==` | Styles inside a line (`Ctrl+B`, `Ctrl+I`, `Ctrl+U`) |
+| `# `, `## `, `-# ` at the start of a line | Large, medium or small line |
+| `<< `, `>< `, `>> ` at the start of a line | Left, centred or right line, whatever the label's alignment |
+| `---` on its own line | Starts a new column with a divider line |
+| `\*` | A plain `*` (works for any marker) |
+
+Fonts without their own bold or italic file get a drawn one. The **Frame** option in the *Text* section puts a box or rounded frame around the label.
+
 The preview can show the whole label (**Fit**) or zoom to 100–300%, where long labels scroll sideways. The **•••** menu next to **Print** has *Export PNG* and *Feed tape*.
 
 ### Keyboard shortcuts
@@ -75,6 +89,7 @@ The preview can show the whole label (**Fit**) or zoom to 100–300%, where long
 | `Ctrl+P` | Print |
 | `Ctrl+Enter` | Add to queue |
 | `Ctrl+S` | Export PNG |
+| `Ctrl+B`, `Ctrl+I`, `Ctrl+U` | Bold, italic, underline in the label text |
 | `Esc` | Close the printer panel |
 
 ### Command line

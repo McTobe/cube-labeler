@@ -38,6 +38,7 @@
     <section class="card">
       <label for="text">Text</label>
       <textarea id="text" rows="2" placeholder="Type your label">Cube Labeler</textarea>
+      <p class="hint">**bold** *italic* __underline__ ==inverted== · line start: # large, -# small, &lt;&lt; left, &gt;&gt; right · a line with --- starts a new column</p>
 
       <div class="row">
         <div>
@@ -50,6 +51,14 @@
             <option value="left">Left</option>
             <option value="center" selected>Center</option>
             <option value="right">Right</option>
+          </select>
+        </div>
+        <div>
+          <label for="frame">Frame</label>
+          <select id="frame">
+            <option value="none" selected>None</option>
+            <option value="box">Box</option>
+            <option value="rounded">Rounded</option>
           </select>
         </div>
       </div>

@@ -16,6 +16,7 @@ from typing import Callable, List, Optional
 import customtkinter as ctk
 from PIL import Image
 
+from core import rich_text
 from core.font_manager import font_manager
 from core.label_renderer import LabelRenderer, LabelConfig, LabelMetrics
 from core.printer import (
@@ -58,6 +59,11 @@ VIEW_QUEUE = "queue"
 VIEW_TEMPLATES = "templates"
 VIEW_ICONS = "icons"
 VIEW_SETTINGS = "settings"
+
+LINE_SIZES = {"Large": "large", "Medium": "medium", "Normal": "normal", "Small": "small"}
+LINE_ALIGN_DEFAULT = "Like the label"
+LINE_ALIGNS = {LINE_ALIGN_DEFAULT: None, "Left": "left", "Centre": "center", "Right": "right"}
+FRAMES = {"None": "none", "Box": "box", "Rounded": "rounded"}
 
 POS_LEFT = "Left of text"
 POS_RIGHT = "Right of text"
@@ -379,12 +385,141 @@ class PrintLabelApp(ctk.CTk):
         )
         self.btn_clear_text.pack(side="right")
 
+        self._build_format_bar(parent)
+
         self.text_editor = ctk.CTkTextbox(parent, height=150, font=("Segoe UI", 14), undo=True)
         self.text_editor.pack(fill="x")
         self.text_editor.insert("1.0", "HELLO WORLD\nBrother PT-P300BT")
         self.text_editor.bind("<KeyRelease>", lambda e: self._on_text_changed())
+        self.text_editor.bind("<ButtonRelease-1>", lambda e: self._sync_line_style_menus())
+        for key, style in (("b", "bold"), ("i", "italic"), ("u", "underline")):
+            for k in (key, key.upper()):
+                self.text_editor.bind(f"<Control-{k}>", lambda e, st=style: (self._on_toggle_style(st), "break")[1])
         self.text_editor.bind("<Control-Return>", lambda e: (self._on_add_to_queue(), "break")[1])
         self.text_editor.bind("<Control-KP_Enter>", lambda e: (self._on_add_to_queue(), "break")[1])
+
+    def _build_format_bar(self, parent):
+        """Buttons that write the label's markdown styling, so nobody has to remember it."""
+        bar = ctk.CTkFrame(parent, fg_color="transparent")
+        bar.pack(fill="x", pady=(0, 4))
+        plain = dict(height=28, fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
+        self.format_buttons = {}
+        for style, label, font, tip in (
+            ("bold", "B", ctk.CTkFont(size=13, weight="bold"), "Bold (Ctrl+B)"),
+            ("italic", "I", ctk.CTkFont(size=13, slant="italic"), "Italic (Ctrl+I)"),
+            ("underline", "U", ctk.CTkFont(size=13, underline=True), "Underline (Ctrl+U)"),
+            ("invert", "Inverted", None, "White text on black"),
+        ):
+            btn = ctk.CTkButton(
+                bar, text=label, width=34 if len(label) == 1 else 76, font=font,
+                command=lambda st=style: self._on_toggle_style(st), **plain,
+            )
+            btn.pack(side="left", padx=(0, 4))
+            self.format_buttons[style] = btn
+
+        ctk.CTkLabel(bar, text="Line size", text_color=MUTED_TEXT).pack(side="left", padx=(10, 4))
+        self.line_size_menu = ctk.CTkOptionMenu(
+            bar, values=list(LINE_SIZES), width=92, height=28, command=self._on_line_size_changed
+        )
+        self.line_size_menu.set("Normal")
+        self.line_size_menu.pack(side="left")
+        ctk.CTkLabel(bar, text="Line align", text_color=MUTED_TEXT).pack(side="left", padx=(10, 4))
+        self.line_align_menu = ctk.CTkOptionMenu(
+            bar, values=list(LINE_ALIGNS), width=112, height=28, command=self._on_line_align_changed
+        )
+        self.line_align_menu.set(LINE_ALIGN_DEFAULT)
+        self.line_align_menu.pack(side="left")
+        self.btn_add_column = ctk.CTkButton(
+            bar, text="Add column", width=96, command=self._on_add_column, **plain
+        )
+        self.btn_add_column.pack(side="left", padx=(10, 0))
+        self.btn_format_help = ctk.CTkButton(
+            bar, text="?", width=28, command=self._show_format_help, **plain
+        )
+        self.btn_format_help.pack(side="right")
+
+    def _selection_offsets(self):
+        """Selection (or cursor) in the editor as character offsets into its text."""
+        tb = self.text_editor
+        try:
+            first, last = tb.index("sel.first"), tb.index("sel.last")
+        except tk.TclError:
+            first = last = tb.index("insert")
+        return len(tb.get("1.0", first)), len(tb.get("1.0", last))
+
+    def _set_editor_text(self, text: str, start: int, end: int):
+        tb = self.text_editor
+        tb.delete("1.0", "end")
+        tb.insert("1.0", text)
+        tb.tag_remove("sel", "1.0", "end")
+        if start != end:
+            tb.tag_add("sel", f"1.0+{start}c", f"1.0+{end}c")
+        tb.mark_set("insert", f"1.0+{end}c")
+        tb.focus_set()
+        self._on_text_changed()
+
+    def _on_toggle_style(self, style: str):
+        text = self.text_editor.get("1.0", "end-1c")
+        start, end = self._selection_offsets()
+        new_text, new_start, new_end = rich_text.toggle_style(text, start, end, style)
+        self._set_editor_text(new_text, new_start, new_end)
+
+    def _selected_line_numbers(self) -> range:
+        tb = self.text_editor
+        try:
+            first, last = tb.index("sel.first"), tb.index("sel.last")
+        except tk.TclError:
+            first = last = tb.index("insert")
+        return range(int(first.split(".")[0]), int(last.split(".")[0]) + 1)
+
+    def _restyle_lines(self, **changes):
+        """Rewrites the size or alignment prefix of every line in the selection."""
+        tb = self.text_editor
+        cursor = tb.index("insert")
+        for n in self._selected_line_numbers():
+            old = tb.get(f"{n}.0", f"{n}.end")
+            new = rich_text.set_line_style(old, **changes)
+            if new != old:
+                tb.delete(f"{n}.0", f"{n}.end")
+                tb.insert(f"{n}.0", new)
+        tb.mark_set("insert", cursor)
+        tb.focus_set()
+        self._on_text_changed()
+
+    def _on_line_size_changed(self, value: str):
+        self._restyle_lines(size=LINE_SIZES[value])
+
+    def _on_line_align_changed(self, value: str):
+        self._restyle_lines(align=LINE_ALIGNS[value])
+
+    def _sync_line_style_menus(self):
+        """Shows the size and alignment of the line the cursor is on."""
+        if not hasattr(self, "line_size_menu"):
+            return
+        n = self.text_editor.index("insert").split(".")[0]
+        size, align = rich_text.line_style(self.text_editor.get(f"{n}.0", f"{n}.end"))
+        self.line_size_menu.set(next(k for k, v in LINE_SIZES.items() if v == size))
+        self.line_align_menu.set(next(k for k, v in LINE_ALIGNS.items() if v == align))
+
+    def _on_add_column(self):
+        tb = self.text_editor
+        n = tb.index("insert").split(".")[0]
+        tb.insert(f"{n}.end", f"\n{rich_text.COLUMN_BREAK}\n")
+        tb.mark_set("insert", f"{int(n) + 2}.end")
+        tb.focus_set()
+        self._on_text_changed()
+
+    def _show_format_help(self):
+        messagebox.showinfo(
+            "Styling label text",
+            "Select text and use the buttons, or type the markers yourself:\n\n"
+            "**bold**    *italic*    __underline__    ==inverted==\n\n"
+            "At the start of a line:\n"
+            "# large    ## medium    -# small\n"
+            "<< left    >< centre    >> right\n\n"
+            "A line with only --- starts a new column with a divider line.\n\n"
+            "Put a backslash before a marker to print it as it is, as in M3 \\* 8.",
+        )
 
     def _build_designer_panel(self, panel):
         # --- Text
@@ -419,6 +554,13 @@ class PrintLabelApp(ctk.CTk):
         )
         self.align_seg.set("Center")
         self.align_seg.pack(fill="x")
+
+        field_label(body, "Frame")
+        self.frame_seg = ctk.CTkSegmentedButton(
+            body, values=list(FRAMES), command=self._on_frame_changed
+        )
+        self.frame_seg.set("None")
+        self.frame_seg.pack(fill="x")
 
         # --- QR code
         self.section_qr = Section(panel, "QR code", expanded=False)
@@ -605,7 +747,8 @@ class PrintLabelApp(ctk.CTk):
             if isinstance(inv, FastenerLabelConfig):
                 return f"{inv.thread_size} {inv.category}", f"Bin label · {inv.label_width_mm:g} mm"
             return f"{inv.category_banner} {inv.spec_primary}", f"Bin label · {inv.label_width_mm:g} mm"
-        first_line = cfg.text.strip().splitlines()[0] if cfg.text.strip() else "Image or QR code only"
+        plain = rich_text.plain_text(cfg.text).strip()
+        first_line = plain.splitlines()[0] if plain else "Image or QR code only"
         if len(first_line) > 40:
             first_line = first_line[:39] + "…"
         details = [format_tape_width(cfg.tape_width_mm), cfg.font_name]
@@ -729,7 +872,8 @@ class PrintLabelApp(ctk.CTk):
                 self.action_status_label.configure(text="Add some text, a QR code or an image first.")
                 return
             cfg_copy.text = raw_text
-            first_line = raw_text.strip().splitlines()[0] if raw_text.strip() else "Label"
+            plain = rich_text.plain_text(raw_text).strip()
+            first_line = plain.splitlines()[0] if plain else "Label"
 
         # A batch prints as one continuous strip, so every label must share one tape width
         if self.label_queue:
@@ -813,6 +957,7 @@ class PrintLabelApp(ctk.CTk):
             self.outline_slider.set(cfg.stroke_width)
             self.outline_val_label.configure(text=f"{cfg.stroke_width} px")
             self.align_seg.set(cfg.alignment.capitalize())
+            self.frame_seg.set(next((k for k, v in FRAMES.items() if v == cfg.frame), "None"))
             self.spacing_slider.set(cfg.line_spacing)
             self.spacing_val_label.configure(text=f"{cfg.line_spacing:.2f}x")
             pad = getattr(cfg, "h_padding", getattr(cfg, "h_padding_dots", 8))
@@ -1004,10 +1149,15 @@ class PrintLabelApp(ctk.CTk):
             return get_tape_spec(12)
 
     def _on_text_changed(self):
+        self._sync_line_style_menus()
         self._trigger_render()
 
     def _on_align_changed(self, value: str):
         self.config.alignment = value.lower()
+        self._trigger_render()
+
+    def _on_frame_changed(self, value: str):
+        self.config.frame = FRAMES[value]
         self._trigger_render()
 
     def _on_clear_text(self):

@@ -5,7 +5,7 @@ Font discovery, management and caching for Brother PT-P300BT label designer.
 
 import os
 import sys
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from PIL import ImageFont
 
 DEFAULT_FALLBACK_FONTS = [
@@ -198,6 +198,53 @@ class FontManager:
 
         # 5. Let load_font fall back to Pillow's built-in font
         return "arial.ttf"
+
+    def _cached_name(self, name: str) -> Optional[str]:
+        """The font cache key matching name, ignoring case, or None."""
+        if name in self._font_cache:
+            return name
+        norm = name.strip().lower()
+        for cached in self._font_cache:
+            if cached.lower() == norm:
+                return cached
+        return None
+
+    def _family_name(self, font_identifier: str) -> Optional[str]:
+        """The installed family a font name resolves to, including the substitute used when it is missing."""
+        if os.path.isfile(font_identifier):
+            return None
+        name = self._cached_name(font_identifier)
+        if name is not None:
+            return name
+        for substitute in SUBSTITUTE_FONTS:
+            if substitute in self._font_cache:
+                return substitute
+        return None
+
+    def load_styled_font(
+        self, font_identifier: str, size: int, bold: bool = False, italic: bool = False
+    ) -> Tuple[ImageFont.FreeTypeFont, bool, bool]:
+        """
+        Loads the font's own bold and/or italic file when one is installed.
+        Returns (font, fake_bold, fake_italic): the styles the caller still has to fake.
+        """
+        if not bold and not italic:
+            return self.load_font(font_identifier, size), False, False
+        family = self._family_name(font_identifier)
+        if family is not None:
+            wanted = []
+            if bold and italic:
+                wanted.append((("Bold Italic", "BoldItalic", "Bold Oblique"), False, False))
+            if bold:
+                wanted.append((("Bold",), False, italic))
+            if italic:
+                wanted.append((("Italic", "Oblique"), bold, False))
+            for styles, fake_bold, fake_italic in wanted:
+                for style in styles:
+                    name = self._cached_name(f"{family} {style}")
+                    if name is not None:
+                        return self.load_font(name, size), fake_bold, fake_italic
+        return self.load_font(font_identifier, size), bold, italic
 
     def load_font(self, font_identifier: str, size: int) -> ImageFont.FreeTypeFont:
         """Loads and caches an ImageFont instance of the specified size."""
