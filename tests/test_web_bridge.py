@@ -4,6 +4,7 @@ Tests for web/cube_web.py, the Python side of the web app. It runs in Pyodide in
 but it is plain Python, so CPython checks it here against the desktop printer driver.
 """
 
+import base64
 import io
 import os
 import sys
@@ -305,6 +306,82 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
     def test_not_a_backup(self):
         with self.assertRaisesRegex(ValueError, "not a Cube Labeler backup"):
             cube_web.open_backup(b"hello")
+
+
+class TestWebAiIcons(unittest.TestCase):
+    def _picture(self):
+        data = io.BytesIO()
+        Image.new("RGB", (40, 30), "white").save(data, format="PNG")
+        return data.getvalue()
+
+    def _desktop_request(self, service, model):
+        import json
+        import urllib.request
+        from unittest import mock
+        from core import ai_generator as ag
+        sent = {}
+
+        class Answer:
+            def __init__(self, body):
+                self.body = body
+
+            def read(self):
+                return self.body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        png = base64.b64encode(self._picture()).decode()
+        answer = ({"candidates": [{"content": {"parts": [{"inlineData": {"data": png}}]}}]}
+                  if service == "gemini" else {"data": [{"b64_json": png}]})
+
+        def urlopen(req, timeout=None):
+            sent.update(url=req.full_url, body=req.data, headers={k.lower(): v for k, v in req.header_items()})
+            return Answer(json.dumps(answer).encode())
+
+        provider = ag.PROVIDERS[service].__class__(api_key="K")
+        with mock.patch.object(urllib.request, "urlopen", urlopen), mock.patch.object(ag.uuid, "uuid4") as uid:
+            uid.return_value.hex = "fixed"
+            provider.redraw(Image.open(io.BytesIO(self._picture())), model=model)
+        return sent, answer
+
+    def test_requests_match_the_desktop_app(self):
+        from unittest import mock
+        from core import ai_generator as ag
+        from core.ai_generator import DEFAULT_PRESET
+        for service in ("gemini", "openai", "openrouter"):
+            with self.subTest(service=service):
+                sent, answer = self._desktop_request(service, "m1")
+                with mock.patch.object(ag.uuid, "uuid4") as uid:
+                    uid.return_value.hex = "fixed"
+                    req = cube_web.ai_request(service, self._picture(), DEFAULT_PRESET, "", "m1")
+                self.assertEqual(req["url"], sent["url"])
+                self.assertEqual(req["body"], sent["body"])
+                self.assertEqual(sent["headers"][req["key_header"].lower()], req["key_prefix"] + "K")
+                import json
+                result = cube_web.ai_answer(service, "m1", 200, json.dumps(answer))
+                self.assertEqual(Image.open(io.BytesIO(result["png"])).size, (40, 30))
+
+    def test_answers_with_errors(self):
+        missing = cube_web.ai_answer("openai", "m", 404, '{"error": {"message": "nope"}}')
+        self.assertTrue(missing["try_next_model"])
+        quota = cube_web.ai_answer("gemini", "m", 429, '{"error": {"message": "quota"}}')
+        self.assertIn("gemini.google.com", quota["error"])
+        self.assertFalse(quota["try_next_model"])
+        self.assertIn("text instead of a picture",
+                      cube_web.ai_answer("gemini", "m", 200, '{"candidates": [{"content": {"parts": [{"text": "hi"}]}}]}')["error"])
+        self.assertIn("cannot read", cube_web.ai_answer("openai", "m", 200, "<html>")["error"])
+
+    def test_models_and_custom_instructions(self):
+        self.assertEqual(cube_web.ai_models("openai")[0], "gpt-image-2")
+        self.assertEqual(cube_web.ai_models("openai", "mine")[:2], ["mine", "gpt-image-1.5"])
+        services = cube_web.ai_services()
+        self.assertEqual([s["id"] for s in services["services"]], ["gemini", "openai", "openrouter"])
+        with self.assertRaisesRegex(ValueError, "Custom"):
+            cube_web.ai_request("openai", self._picture(), services["custom"], "  ", "m")
 
 
 class TestWebTextEditing(unittest.TestCase):

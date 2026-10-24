@@ -25,6 +25,8 @@ PAGE_DIRS = ["js", "vendor"]
 # The parts of core/ the web app runs; the rest needs the desktop (tkinter, pyserial, registry)
 CORE_MODULES = [
     "__init__.py",
+    "ai_generator.py",
+    "config.py",
     "font_manager.py",
     "icon_editor.py",
     "inventory_renderer.py",
@@ -34,6 +36,7 @@ CORE_MODULES = [
     "ptcbp.py",
     "ptstatus.py",
     "rich_text.py",
+    "secret_store.py",
     "specs.py",
 ]
 

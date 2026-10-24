@@ -5,9 +5,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Icon } from '../icons.js';
-import { Field, Segmented, Sheet, Slider, Toggle } from '../ui.js';
+import { Field, Segmented, Select, Sheet, Slider, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
+import { app } from '../app.js';
 import { prepareIconOriginal, editIcon } from '../app.js';
+import { ai, loadAi, currentService, redraw } from '../ai.js';
 import { errorMessage } from '../../printer.js';
 import {
   library, iconBytes, parseKeywords, saveUserIcon, updateUserIcon, USER_CATEGORY,
@@ -172,6 +174,50 @@ function TouchCanvas({ basePng, touch, tool, onStroke, onTouch }) {
     onContextMenu=${(e) => e.preventDefault()} aria-label="The icon. Draw on it with the pencil or eraser." />`;
 }
 
+// Redraws the picture with the AI service chosen under Settings
+function AiBox({ picture, onPicture, onRestore, canRestore }) {
+  const state = useStore(ai);
+  const { settings } = useStore(app);
+  const [preset, setPreset] = useState(null);
+  const [custom, setCustom] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState({ text: '', error: false });
+  useEffect(() => { loadAi(); }, []);
+  if (!state.ready) return null;
+  const service = currentService();
+  const hasKey = !!state.keys[service.id];
+  const chosen = preset || state.presets[0].label;
+  const isCustom = chosen === state.custom;
+  const run = async () => {
+    if (isCustom && !custom.trim()) { setMessage({ text: 'Type how the picture should be redrawn first.', error: true }); return; }
+    setBusy(true);
+    setMessage({ text: `Asking ${service.name} for an icon. This can take up to a minute…`, error: false });
+    try {
+      const png = await redraw(picture, chosen, custom);
+      const mode = (state.presets.find((p) => p.label === chosen) || { mode: 'drawing' }).mode;
+      await onPicture(png, mode);
+      setMessage({ text: `${service.name}'s icon is ready. Tune it or touch it up, then save.`, error: false });
+    } catch (err) {
+      setMessage({ text: errorMessage(err), error: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return html`<div class="ai-box">
+    <h4>Redraw it with ${service.name}</h4>
+    <${Select} label="Style" value=${chosen} onChange=${setPreset}
+      options=${[...state.presets.map((p) => [p.label, p.label]), [state.custom, 'Custom: your own words']]} />
+    ${isCustom && html`<input type="text" value=${custom} placeholder="e.g. front view, keep the two screw holes"
+      onInput=${(e) => setCustom(e.currentTarget.value)} onKeyDown=${(e) => { if (e.key === 'Enter') run(); }} />`}
+    ${hasKey
+      ? html`<button class="primary" disabled=${busy || !picture} onClick=${run}>${busy ? 'Redrawing…' : 'Redraw my picture'}</button>`
+      : html`<p class="hint">Needs your own ${service.name} API key: add it under <a href="#/settings" onClick=${() => onRestore(null)}>Settings</a>.
+        ${service.id === 'gemini' ? ' Or make the picture at gemini.google.com and open or paste it here.' : ''}</p>`}
+    ${canRestore && !busy && html`<button class="link-button" onClick=${() => onRestore(true)}>Use my own picture again</button>`}
+    ${message.text && html`<p class=${`status-line${message.error ? ' error' : ''}`} role="status">${message.text}</p>`}
+  </div>`;
+}
+
 // What the editor opens with: a picture from a file, one of the user's icons, or a copy
 // of an icon. Returns the original, its settings, touch-ups and details.
 async function startingPoint(start) {
@@ -205,6 +251,7 @@ function EditorBody({ start, onDone, dirtyRef }) {
   const [undo, setUndo] = useState([]);
   const [error, setError] = useState('');
   const [drawing, setDrawing] = useState(false);
+  const [beforeAi, setBeforeAi] = useState(null);
   const busy = useRef({ running: false, again: false });
   const latest = useRef(null);
   latest.current = state;
@@ -336,6 +383,18 @@ function EditorBody({ start, onDone, dirtyRef }) {
       </div>
       <${CropView} png=${result && result.view_png} crop=${shown.crop} onCrop=${(crop) => changeEdit({ crop })} />
       <p class="hint">Drag on the picture to crop it. You can also paste a picture.</p>
+      <${AiBox} picture=${beforeAi || state.original} canRestore=${!!beforeAi}
+        onPicture=${async (png, mode) => {
+          if (!beforeAi) setBeforeAi(state.original);
+          update({ original: await prepareIconOriginal(png), edit: { mode }, touch: new Uint8Array(TOUCH_GRID * TOUCH_GRID) });
+          setUndo([]);
+        }}
+        onRestore=${(restore) => {
+          if (!restore) return;
+          update({ original: beforeAi, edit: null, touch: new Uint8Array(TOUCH_GRID * TOUCH_GRID) });
+          setBeforeAi(null);
+          setUndo([]);
+        }} />
     </section>
 
     <section class="editor-settings">

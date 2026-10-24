@@ -17,7 +17,8 @@ darkness, thickness, clean-up, turn and mirror, pencil and eraser touch-ups, kep
 so it can be changed again), templates (your own and the starting points, as the desktop app's
 .json files) and backups (.cubebackup files that restore here or in the desktop app). The label, queue, icons,
 settings and added fonts are kept in the browser, and after the first visit the app also starts
-offline. AI icons follow.
+offline. The icon editor can also redraw a photo as an icon with Gemini, OpenAI or OpenRouter,
+using your own API key, which stays in the browser and is sent only to that service.
 
 ## Browser support
 

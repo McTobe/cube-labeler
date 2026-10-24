@@ -744,3 +744,71 @@ def open_backup(data: Any) -> Dict[str, Any]:
                     skipped.append(name)
     return {"created": str(manifest.get("created") or ""), "icons": icons, "settings": settings,
             "templates": templates, "skipped_templates": skipped}
+
+
+# --- AI icons: the page sends the request itself, straight from the browser with the key
+# kept on the device; Python builds it and reads the answer the desktop app's way ---
+
+def ai_services() -> Dict[str, Any]:
+    """The AI services and ready-made instructions: {"services": [...], "presets": [...], "custom"}."""
+    from core.ai_generator import CUSTOM, PRESETS, PROVIDERS
+    return {
+        "services": [{"id": p.id, "name": p.name, "key_url": p.key_url, "key_note": p.key_note,
+                      "default_model": p.default_model} for p in PROVIDERS.values()],
+        "presets": [{"label": p.label, "mode": p.mode} for p in PRESETS],
+        "custom": CUSTOM,
+    }
+
+
+def _ai_service(service: str):
+    from core.ai_generator import PROVIDERS
+    provider = PROVIDERS.get(service)
+    if provider is None:
+        raise ValueError(f"Unknown AI service {service!r}.")
+    return provider
+
+
+def ai_models(service: str, model: str = "") -> List[str]:
+    """The models to try in order: the chosen one, then the service's fallbacks."""
+    provider = _ai_service(service)
+    preferred = (model or "").strip() or provider.default_model
+    return list(dict.fromkeys(m for m in [preferred] + list(provider.fallback_models) if m))
+
+
+def ai_request(service: str, picture: Any, preset: str, custom: str, model: str) -> Dict[str, Any]:
+    """
+    One request to redraw the picture: {"url", "headers", "body", "key_header", "key_prefix"}.
+    The page adds the key as key_header: key_prefix + key, so it never passes through Python.
+    """
+    from core.ai_generator import build_prompt
+    provider = _ai_service(service)
+    req = provider.request(_open_picture(picture), build_prompt(preset, custom or ""), model)
+    [(header, value)] = provider.auth_headers("KEY").items()
+    return {"url": req["url"], "headers": req["headers"], "body": req["body"],
+            "key_header": header, "key_prefix": value[: -len("KEY")]}
+
+
+def ai_answer(service: str, model: str, status: int, body: Any) -> Dict[str, Any]:
+    """
+    Reads the service's answer: {"png"} with the picture, or {"error", "try_next_model"}
+    with the service's own message, as the desktop app shows it.
+    """
+    import json
+    from core.ai_generator import ModelNotFoundError
+    provider = _ai_service(service)
+    text = _to_bytes(body).decode("utf-8", errors="replace") if not isinstance(body, str) else body
+    if not 200 <= int(status) < 300:
+        try:
+            err = json.loads(text).get("error", {})
+            msg = err.get("message", text) if isinstance(err, dict) else str(err)
+        except Exception:
+            msg = text
+        error = provider.http_error(int(status), text, f"{provider.name} API error ({status}): {msg}", model)
+        return {"error": str(error), "try_next_model": isinstance(error, ModelNotFoundError)}
+    try:
+        picture = provider.read_answer(json.loads(text), model)
+    except RuntimeError as e:
+        return {"error": str(e), "try_next_model": False}
+    except Exception:
+        return {"error": f"{provider.name} sent an answer Cube Labeler cannot read.", "try_next_model": False}
+    return {"png": _png(picture.convert("RGBA"))}
