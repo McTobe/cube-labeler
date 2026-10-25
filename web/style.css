@@ -411,8 +411,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   position: sticky;
   top: var(--top-h);
   z-index: 10;
-  margin: -12px -12px 12px;
-  padding: 12px 12px 0;
+  margin: -12px -12px 2px;
+  /* The pinned preview keeps a strip of page colour under it, so cards scrolling past
+     disappear under a straight edge instead of showing round the preview's corners */
+  padding: 12px 12px 10px;
   background: var(--bg);
   box-shadow: 0 -8px 0 var(--bg);  /* covers sub-pixel gaps under the top bar */
 }
@@ -439,7 +441,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
    (interactive-widget in index.html), so the preview stays pinned at the top, and the
    buttons and page tabs step aside to leave room for the text */
 @media (max-width: 899px) {
-  body.typing .nav, body.typing .action-bar, body.typing .preview-bar { display: none; }
+  body.typing .nav, body.typing .action-bar { display: none; }
+  /* Only typing the label text needs the room of the size line and Rulers */
+  body.typing:has(#label-text:focus) .preview-bar { display: none; }
   body.typing .toast-slot { bottom: 72px; }
   .wide-text { display: none; }
   .format-bar { gap: 4px; }
