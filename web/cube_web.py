@@ -582,6 +582,8 @@ BACKUP_MAX_FILES = 2000
 BACKUP_MAX_FILE_BYTES = 25 * 1024 * 1024
 TOUCH_SUFFIX = ".touch.png"
 TEMPLATES_FOLDER = "templates"
+FONTS_FOLDER = "fonts"
+FONT_SUFFIXES = (".ttf", ".otf", ".ttc")
 # Settings that belong to one device or are secrets never go in a backup (as on the desktop)
 _LOCAL_SUFFIXES = ("_api_key", "_api_key_protected")
 _LOCAL_KEYS = ("last_serial_port",)
@@ -595,6 +597,11 @@ def _is_local_setting(key: str) -> bool:
 def _safe_icon_file(name: Any) -> bool:
     return (isinstance(name, str) and name == os.path.basename(name) and "/" not in name and "\\" not in name
             and not name.startswith(".") and name.lower().endswith(".png") and len(name) <= 120)
+
+
+def _safe_font_file(name: Any) -> bool:
+    return (isinstance(name, str) and name == os.path.basename(name) and "/" not in name and "\\" not in name
+            and not name.startswith(".") and name.lower().endswith(FONT_SUFFIXES) and len(name) <= 120)
 
 
 def _is_png(data: bytes) -> bool:
@@ -641,6 +648,10 @@ def _backup_parts(data: Any):
         template = _to_dict(template)
         files[f"{TEMPLATES_FOLDER}/{template_file_name(str(template.get('name') or 'My template'))}"] = (
             str(template["json"]).encode("utf-8"))
+    for font in data.get("fonts") or []:
+        font = _to_dict(font)
+        if _safe_font_file(font.get("filename")):
+            files[f"{FONTS_FOLDER}/{font['filename']}"] = _to_bytes(font["data"])
     settings = {k: v for k, v in _to_dict(data.get("settings")).items() if not _is_local_setting(k)}
     manifest = {
         "format": BACKUP_FORMAT,
@@ -657,8 +668,9 @@ def make_backup(data: Any) -> bytes:
     """
     A .cubebackup file the desktop app can restore, from what the page keeps:
     {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch"}],
-     "settings": {...}, "templates": [{"name", "json"}]}. Icons, originals and touch-ups are
-    bytes; touch-ups may be the page's raw cells. Settings that belong to one device are left out.
+     "settings": {...}, "templates": [{"name", "json"}], "fonts": [{"filename", "data"}]}. Icons,
+    originals, touch-ups and fonts are bytes; touch-ups may be the page's raw cells. Settings that
+    belong to one device are left out.
     """
     import json
     import zipfile
@@ -694,6 +706,8 @@ def backup_digest(data: Any) -> str:
         return value
 
     for name, content in list(files.items()):
+        if name.startswith(FONTS_FOLDER + "/"):
+            continue
         try:
             files[name] = json.dumps(same_numbers(json.loads(content)), sort_keys=True).encode("utf-8")
         except ValueError:
@@ -710,7 +724,8 @@ def open_backup(data: Any) -> Dict[str, Any]:
     """
     Reads a .cubebackup (or an older .cubeicons) file from the desktop app or the web version:
     {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch" as cells}],
-     "settings": {...} or None, "templates": [{"name", "item"}], "skipped_templates": [names]}.
+     "settings": {...} or None, "templates": [{"name", "item"}], "skipped_templates": [names],
+     "fonts": [{"filename", "data"}]}.
     Raises ValueError with a readable message when it is not a backup this version can read.
     """
     import json
@@ -766,12 +781,19 @@ def open_backup(data: Any) -> Dict[str, Any]:
                 "original": original, "touch": touch_cells(touch) if touch and _is_png(touch) else None,
             })
 
-        settings, templates, skipped = None, [], []
+        settings, templates, skipped, fonts = None, [], [], []
         if manifest["format"] == BACKUP_FORMAT:
             settings = manifest.get("settings") if isinstance(manifest.get("settings"), dict) else {}
             listed_files = manifest.get("files") if isinstance(manifest.get("files"), list) else []
             for path in listed_files[:BACKUP_MAX_FILES]:
-                if not isinstance(path, str) or not path.startswith(TEMPLATES_FOLDER + "/") or ".." in path:
+                if not isinstance(path, str) or ".." in path:
+                    continue
+                if path.startswith(FONTS_FOLDER + "/") and _safe_font_file(path[len(FONTS_FOLDER) + 1:]):
+                    content = member(f"data/{path}")
+                    if content is not None:
+                        fonts.append({"filename": path[len(FONTS_FOLDER) + 1:], "data": content})
+                    continue
+                if not path.startswith(TEMPLATES_FOLDER + "/"):
                     continue
                 name = os.path.splitext(path.split("/")[-1])[0]
                 content = member(f"data/{path}")
@@ -782,7 +804,7 @@ def open_backup(data: Any) -> Dict[str, Any]:
                 except ValueError:
                     skipped.append(name)
     return {"created": str(manifest.get("created") or ""), "icons": icons, "settings": settings,
-            "templates": templates, "skipped_templates": skipped}
+            "templates": templates, "skipped_templates": skipped, "fonts": fonts}
 
 
 # --- AI icons: the page sends the request itself, straight from the browser with the key

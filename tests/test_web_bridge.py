@@ -280,6 +280,24 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         self.assertNotIn("gemini_api_key", read.settings)
         self.assertEqual(list(read.templates), ["templates/Shelf A.json"])
 
+    def test_added_fonts_travel_between_web_and_desktop(self):
+        from core import backup
+        with open(os.path.join(BASE_DIR, "tests", "fonts", "Roboto-Regular.ttf"), "rb") as f:
+            font = f.read()
+        contents = {"created": "", "icons": [], "settings": {}, "templates": [],
+                    "fonts": [{"filename": "Roboto-Regular.ttf", "data": font}, {"filename": "../evil.ttf", "data": b"x"}]}
+        data = cube_web.make_backup(contents)
+        read = backup.read_backup(io.BytesIO(data))
+        self.assertEqual(read.fonts, {"fonts/Roboto-Regular.ttf": font})
+        self.assertIn(backup.FONTS, read.parts)
+        opened = cube_web.open_backup(data)
+        self.assertEqual(opened["fonts"], [{"filename": "Roboto-Regular.ttf", "data": font}])
+        # A desktop backup with an added font opens in the web version too
+        buf = io.BytesIO()
+        backup.write_backup(backup.Backup(created="", icons=[], settings={}, files={"fonts/Roboto-Regular.ttf": font}), buf)
+        self.assertEqual(cube_web.open_backup(buf.getvalue())["fonts"][0]["filename"], "Roboto-Regular.ttf")
+        self.assertNotEqual(cube_web.backup_digest(contents), cube_web.backup_digest(dict(contents, fonts=[])))
+
     def test_backup_digest_ignores_time_and_recent_icons(self):
         contents = {
             "created": "2026-10-24T20:00:00+02:00",

@@ -2,7 +2,7 @@
 // as the desktop app's, so a backup made in either one restores in the other.
 
 import * as storage from './storage.js';
-import { app, updateSettings, makeBackup, openBackup, templateToDesktop } from './app.js';
+import { app, updateSettings, makeBackup, openBackup, templateToDesktop, restoreFonts } from './app.js';
 import { library, iconsForBackup, planIcons, restoreIcons, restoreIconLists } from './library.js';
 import { templates, loadTemplates, findTemplate, putTemplate, freeTemplateName } from './templates.js';
 import { downloadBlob } from './ui.js';
@@ -42,6 +42,7 @@ export async function collectBackup(created = localTime()) {
     icons: iconsForBackup(),
     settings: await backupSettings(),
     templates: await Promise.all(templates.get().mine.map(async (t) => ({ name: t.name, json: await templateToDesktop(t.item) }))),
+    fonts: await storage.load('fonts', []),
   };
 }
 
@@ -68,9 +69,11 @@ export async function readBackup(file) {
   return { ...opened, iconPlan, templatePlan };
 }
 
-// Restores the chosen parts ({icons, settings, templates}) of a read backup
+// Restores the chosen parts ({icons, settings, templates, fonts}) of a read backup
 export async function restoreBackup(opened, parts, onConflict) {
-  const result = { icons: null, templates: null, settings: false };
+  const result = { icons: null, templates: null, settings: false, fonts: null };
+  // Fonts first, so restored labels and templates find them
+  if (parts.fonts && opened.fonts && opened.fonts.length) result.fonts = await restoreFonts(opened.fonts);
   if (parts.icons && opened.icons.length) result.icons = restoreIcons(opened.icons, onConflict);
   if (parts.templates && opened.templates.length) {
     const counts = { added: 0, replaced: 0, skipped: 0 };

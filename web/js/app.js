@@ -323,6 +323,27 @@ export async function addFont(file) {
   return name;
 }
 
+// Fonts from a backup: added, or replaced by the backup's file of the same name. Returns how many changed.
+export async function restoreFonts(list) {
+  const fonts = await storage.load('fonts', []);
+  const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+  let changed = 0;
+  for (const { filename, data } of list) {
+    const bytes = new Uint8Array(data);
+    const had = fonts.find((f) => f.filename === filename);
+    if (had && same(new Uint8Array(had.data), bytes)) continue;
+    if (!(await py.add_font(filename, bytes))) continue;
+    if (had) had.data = bytes;
+    else fonts.push({ filename, data: bytes });
+    changed++;
+  }
+  if (changed) {
+    await storage.save('fonts', fonts);
+    app.set({ fonts: await py.font_names() });
+  }
+  return changed;
+}
+
 export async function setBinIcon(file) {
   setBinIconBytes(file.name, new Uint8Array(await file.arrayBuffer()));
 }

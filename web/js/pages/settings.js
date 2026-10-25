@@ -31,7 +31,7 @@ function formatDate(iso) {
 }
 
 function RestoreSheet({ opened, onClose, onDone }) {
-  const [parts, setParts] = useState({ icons: true, settings: true, templates: true });
+  const [parts, setParts] = useState({ icons: true, settings: true, templates: true, fonts: true });
   const [onConflict, setOnConflict] = useState('skip');
   const [busy, setBusy] = useState(false);
   if (!opened) return html`<${Sheet} open=${false} title="" onClose=${onClose} />`;
@@ -39,12 +39,13 @@ function RestoreSheet({ opened, onClose, onDone }) {
     icons: opened.icons.length > 0,
     settings: opened.settings !== null,
     templates: opened.templates.length > 0,
+    fonts: (opened.fonts || []).length > 0,
   };
   const conflicts = (parts.icons ? opened.iconPlan.conflicts : 0) + (parts.templates ? opened.templatePlan.conflicts : 0);
   const restore = async () => {
     setBusy(true);
     try {
-      onDone(await restoreBackup(opened, { icons: parts.icons && has.icons, settings: parts.settings && has.settings, templates: parts.templates && has.templates }, onConflict));
+      onDone(await restoreBackup(opened, { icons: parts.icons && has.icons, settings: parts.settings && has.settings, templates: parts.templates && has.templates, fonts: parts.fonts && has.fonts }, onConflict));
     } catch (err) {
       onDone(null, errorMessage(err));
     } finally {
@@ -60,7 +61,8 @@ function RestoreSheet({ opened, onClose, onDone }) {
     <p class="hint">${opened.created ? `Made ${formatDate(opened.created)}.` : 'An older backup.'} Nothing here is deleted; restoring only adds or replaces.</p>
     ${Object.values(has).filter(Boolean).length <= 1
       ? html`<p>${has.icons ? `${plural(opened.icons.length, 'icon')} (${iconNote})` : has.templates ? plural(opened.templates.length, 'template')
-        : has.settings ? 'Your settings, favourites and recently used icons' : 'This backup is empty.'}</p>`
+        : has.settings ? 'Your settings, favourites and recently used icons' : has.fonts ? plural(opened.fonts.length, 'added font')
+        : 'This backup is empty.'}</p>`
       : html`<div class="restore-parts">
       ${has.icons && html`<${Toggle} label=${`${plural(opened.icons.length, 'icon')} (${iconNote})`} checked=${parts.icons}
         onChange=${(icons) => setParts({ ...parts, icons })} />`}
@@ -68,6 +70,8 @@ function RestoreSheet({ opened, onClose, onDone }) {
         onChange=${(templates) => setParts({ ...parts, templates })} />`}
       ${has.settings && html`<${Toggle} label="Settings, favourites and recently used icons" checked=${parts.settings}
         onChange=${(settings) => setParts({ ...parts, settings })} />`}
+      ${has.fonts && html`<${Toggle} label=${plural(opened.fonts.length, 'added font')} checked=${parts.fonts}
+        onChange=${(fonts) => setParts({ ...parts, fonts })} />`}
     </div>`}
     ${opened.skipped_templates.length > 0 && html`<p class="hint">Left out, could not be read: ${opened.skipped_templates.join(', ')}.</p>`}
     ${conflicts > 0 && html`<${Segmented} label=${`${plural(conflicts, 'icon or template', 'icons or templates')} with the same name as one of yours`}
@@ -130,6 +134,7 @@ function BackupCard() {
     if (result.icons) said.push(`${plural(result.icons.added + result.icons.replaced, 'icon')} restored`);
     if (result.templates) said.push(`${plural(result.templates.added + result.templates.replaced, 'template')} restored`);
     if (result.settings) said.push('settings restored');
+    if (result.fonts) said.push(`${plural(result.fonts, 'font')} added`);
     const skipped = (result.icons ? result.icons.skipped : 0) + (result.templates ? result.templates.skipped : 0);
     if (skipped) said.push(`${skipped} kept as yours`);
     setMessage({ text: said.length ? `Done: ${said.join(', ')}.` : 'Everything in the backup was already here.', error: false });

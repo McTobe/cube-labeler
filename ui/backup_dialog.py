@@ -13,7 +13,7 @@ import customtkinter as ctk
 
 from core import backup as bk
 from core.backup import (
-    BACKUP_EXTENSION, ICONS, KEEP_BOTH, OLD_ICON_EXTENSION, REPLACE, SETTINGS, SKIP, TEMPLATES,
+    BACKUP_EXTENSION, FONTS, ICONS, KEEP_BOTH, OLD_ICON_EXTENSION, REPLACE, SETTINGS, SKIP, TEMPLATES,
     BackupError, auto_backup,
 )
 from core.icon_manager import icon_manager
@@ -62,7 +62,7 @@ def backup_status() -> Tuple[str, object, bool]:
 class RestoreDialog(ctk.CTkToplevel):
     """Asks which parts of a backup to restore, and what to do with names already taken."""
 
-    PART_LABELS = {ICONS: "Icons", SETTINGS: "Settings", TEMPLATES: "Templates"}
+    PART_LABELS = {ICONS: "Icons", SETTINGS: "Settings", TEMPLATES: "Templates", FONTS: "Fonts"}
 
     def __init__(self, parent, backup: bk.Backup, plan: bk.ImportPlan):
         super().__init__(parent)
@@ -81,6 +81,7 @@ class RestoreDialog(ctk.CTkToplevel):
             SETTINGS: "replaces your settings; your API keys and this PC's printer and backup folder stay",
             TEMPLATES: f"{len(backup.templates)} templates"
                        + (f", {len(plan.unchanged_templates)} already here" if plan.unchanged_templates else ""),
+            FONTS: f"{len(backup.fonts)} added fonts",
         }
         self.part_vars: Dict[str, ctk.BooleanVar] = {}
         for part in backup.parts:
@@ -317,6 +318,11 @@ class BackupDialog(ctk.CTkToplevel):
                 line += f", replaced {result.templates_replaced}"
             if result.templates_skipped:
                 line += f", skipped {result.templates_skipped}"
+            done.append(line + ".")
+        if FONTS in parts:
+            line = f"Fonts: added {result.fonts_added}"
+            if result.fonts_unchanged:
+                line += f", {result.fonts_unchanged} were already here"
             done.append(line + ".")
         if result.settings_restored:
             done.append("Settings restored. Restart Cube Labeler to use all of them.")

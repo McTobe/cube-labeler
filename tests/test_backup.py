@@ -111,7 +111,9 @@ class TestWhatGoesIn(BackupTestCase):
         backup = bk.read_backup(self.backup_file())
         self.assertEqual(sorted(backup.files), ["fonts/mine.ttf", "templates/Shelf.json"])
         self.assertEqual(list(backup.templates), ["templates/Shelf.json"])
-        self.assertEqual(backup.parts, [bk.ICONS, bk.SETTINGS, bk.TEMPLATES])
+        self.assertEqual(list(backup.fonts), ["fonts/mine.ttf"])
+        self.assertEqual(backup.other_files, {})
+        self.assertEqual(backup.parts, [bk.ICONS, bk.SETTINGS, bk.TEMPLATES, bk.FONTS])
 
 
 class TestRestore(BackupTestCase):
@@ -142,6 +144,24 @@ class TestRestore(BackupTestCase):
         self.assertEqual(self.config.data["label_language"], "sv")
         with open(os.path.join(other_dir, "templates", "Shelf.json"), encoding="utf-8") as f:
             self.assertEqual(json.load(f), {"text": "Shelf"})
+
+    def test_added_fonts_go_to_the_other_pc(self):
+        from core.font_manager import font_manager
+        roboto = os.path.join(BASE_DIR, "tests", "fonts", "Roboto-Regular.ttf")
+        name = font_manager.add_user_font(roboto, os.path.join(self.data_dir, "fonts"))
+        self.assertEqual(name, "[Custom] Roboto-Regular")
+        self.assertTrue(os.path.isfile(os.path.join(self.data_dir, "fonts", "Roboto-Regular.ttf")))
+        backup = bk.read_backup(self.backup_file())
+        self.assertEqual(list(backup.fonts), ["fonts/Roboto-Regular.ttf"])
+
+        other, other_dir = self.other_pc()
+        result = bk.restore_backup(other, backup, parts=[bk.FONTS], config=self.config, data_dir=other_dir)
+        self.assertEqual((result.fonts_added, result.settings_restored), (1, False))
+        restored = os.path.join(other_dir, "fonts", "Roboto-Regular.ttf")
+        self.assertEqual(font_manager.resolve_font_path("[Custom] Roboto-Regular"), restored)
+        again = bk.restore_backup(other, backup, parts=[bk.FONTS], config=self.config, data_dir=other_dir)
+        self.assertEqual((again.fonts_added, again.fonts_unchanged), (0, 1))
+        self.assertEqual(font_manager.load_user_fonts(os.path.join(other_dir, "fonts")), ["[Custom] Roboto-Regular"])
 
     def test_restore_only_chosen_parts(self):
         self.mgr.save_user_icon(square(), "Nut")

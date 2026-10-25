@@ -5,7 +5,8 @@ Backups of Cube Labeler: the user's icons, settings and saved templates in one f
 A backup is one .cubebackup file (a zip). It holds every user icon with its title, category,
 search words, original picture and editor settings, so restored icons can still be edited;
 all settings except this PC's own ones and the API keys; and every other file in the app's
-data folder, such as saved templates, so data added in later versions is backed up too.
+data folder, such as saved templates and added fonts, so data added in later versions is
+backed up too.
 Older icon-only .cubeicons backups can still be restored.
 
 Automatic backups go to a folder the user picks, for example a Google Drive, OneDrive or
@@ -53,6 +54,8 @@ MAX_FILE_BYTES = 25 * 1024 * 1024
 CONFIG_NAME = "config.json"
 SKIP_SUFFIXES = (".tmp", ".part")
 TEMPLATES_FOLDER = "templates"
+FONTS_FOLDER = "fonts"
+FONT_SUFFIXES = (".ttf", ".otf", ".ttc")
 # Settings that change all the time without the user meaning to; they go in a backup, but
 # never make a new automatic one on their own
 VOLATILE_SETTINGS = ("icon_recent",)
@@ -61,7 +64,8 @@ VOLATILE_SETTINGS = ("icon_recent",)
 ICONS = "icons"
 SETTINGS = "settings"
 TEMPLATES = "templates"
-ALL_PARTS = (ICONS, SETTINGS, TEMPLATES)
+FONTS = "fonts"
+ALL_PARTS = (ICONS, SETTINGS, TEMPLATES, FONTS)
 
 # What to do with a backed-up icon or template whose name is already used by a different one
 SKIP = "skip"
@@ -101,8 +105,14 @@ class Backup:
         return {p: d for p, d in self.files.items() if p.startswith(TEMPLATES_FOLDER + "/")}
 
     @property
+    def fonts(self) -> Dict[str, bytes]:
+        """Added fonts, by path: only font files straight in the fonts folder."""
+        return {p: d for p, d in self.files.items() if _is_font_path(p)}
+
+    @property
     def other_files(self) -> Dict[str, bytes]:
-        return {p: d for p, d in self.files.items() if not p.startswith(TEMPLATES_FOLDER + "/")}
+        return {p: d for p, d in self.files.items()
+                if not p.startswith(TEMPLATES_FOLDER + "/") and not p.startswith(FONTS_FOLDER + "/")}
 
     @property
     def parts(self) -> List[str]:
@@ -112,6 +122,8 @@ class Backup:
             parts.append(SETTINGS)
         if self.templates:
             parts.append(TEMPLATES)
+        if self.fonts:
+            parts.append(FONTS)
         return parts
 
 
@@ -137,6 +149,13 @@ class ImportResult:
     templates_replaced: int = 0
     templates_skipped: int = 0
     settings_restored: bool = False
+    fonts_added: int = 0
+    fonts_unchanged: int = 0
+
+
+def _is_font_path(path: str) -> bool:
+    parts = path.split("/")
+    return len(parts) == 2 and parts[0] == FONTS_FOLDER and parts[1].lower().endswith(FONT_SUFFIXES)
 
 
 def template_title(path: str) -> str:
@@ -490,6 +509,18 @@ def restore_backup(
                 result.templates_added += 1
             else:
                 result.templates_skipped += 1
+
+    if FONTS in parts:
+        # Fonts are added, or replaced by the backup's file of the same name
+        from core.font_manager import font_manager
+        for path, data in backup.fonts.items():
+            target = os.path.join(data_dir, *path.split("/"))
+            if _read_file(target) == data:
+                result.fonts_unchanged += 1
+                continue
+            _write(target, data)
+            font_manager.register_custom_font(target)
+            result.fonts_added += 1
 
     if ICONS in parts:
         result.unchanged = len(plan.unchanged)

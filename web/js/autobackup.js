@@ -96,7 +96,7 @@ async function syncDrive({ force }) {
     const [newest] = await listDriveBackups();
     if (newest && newest.id !== (await storage.load('driveSyncedId', null))) {
       const opened = await readBackup(await downloadDriveBackup(newest));
-      await restoreBackup(opened, { icons: true, settings: true, templates: true }, 'replace');
+      await restoreBackup(opened, { icons: true, settings: true, templates: true, fonts: true }, 'replace');
       // What was here at the last sync but is gone from the newer backup was deleted on the
       // other device; anything else only here is new on this one and stays
       const before = await storage.load('driveSyncedItems', null);
