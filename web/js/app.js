@@ -495,13 +495,13 @@ export function addToQueue() {
   const item = { id: nextQueueId++, ...structuredClone(currentItem()) };
   if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !item.label.image) {
     say('Add some text, a QR code or a picture first.', true);
-    return;
+    return false;
   }
   const { queue } = app.get();
   // A queue prints as one strip, so every label in it needs the same tape
   if (queue.length && itemTapeWidth(queue[0]) !== itemTapeWidth(item)) {
     say(`The queue is for ${itemTapeWidth(queue[0])} mm tape, but this label is ${itemTapeWidth(item)} mm. Print or clear the queue first.`, true);
-    return;
+    return false;
   }
   saveQueue([...queue, item]);
   makeThumb(item);
@@ -511,6 +511,7 @@ export function addToQueue() {
   say(count > 1
     ? `Added "${short}" to the queue (${count} labels, saves ${25 * (count - 1)} mm of tape).`
     : `Added "${short}" to the queue.`);
+  return true;
 }
 
 export function moveQueueItem(index, step) {

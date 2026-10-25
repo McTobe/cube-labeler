@@ -7,7 +7,7 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
-import { BinEditor } from './bin.js';
+import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
   addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue,
@@ -39,6 +39,7 @@ export function LabelPage() {
     <div class="label-preview-col">
       <${Preview} />
       ${textHere && html`<${TextCard} />`}
+      ${mode === 'bin' && wide && html`<${BinCard} />`}
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
@@ -46,7 +47,7 @@ export function LabelPage() {
         <button role="tab" aria-selected=${mode === 'text'} class=${mode === 'text' ? 'on' : ''} onClick=${() => setMode('text')}>Text label</button>
         <button role="tab" aria-selected=${mode === 'bin'} class=${mode === 'bin' ? 'on' : ''} onClick=${() => setMode('bin')}>Bin label</button>
       </div>
-      ${mode === 'bin' ? html`<${BinEditor} />` : html`
+      ${mode === 'bin' ? html`${!wide && html`<${BinCard} />`}<${BinOptions} />` : html`
         ${!wide && html`<${TextCard} />`}
         <${FontSection} />
         <${QrSection} />
