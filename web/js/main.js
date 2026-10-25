@@ -89,6 +89,7 @@ function App() {
             title="What's new in each version">v${APP_VERSION}</a>
           <a class="printer-chip link-chip wide-only" href=${REPO_URL} target="_blank" rel="noopener" title="Cube Labeler on GitHub">
             <${Icon} name="github" size=${17} /><span class="chip-label">GitHub</span></a>
+          <span class="chip-divider wide-only" aria-hidden="true"></span>
           <${SyncChip} /><${PrinterChip} />
         </span>
       </header>
