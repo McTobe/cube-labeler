@@ -16,6 +16,11 @@ import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
 import { APP_VERSION } from './version.js';
 
+// Marks the page while a text field has the focus, so a phone can make room for its keyboard
+const TYPING_FIELDS = 'textarea, input:not([type]), input[type="text"], input[type="search"], input[type="number"]';
+document.addEventListener('focusin', (e) => document.body.classList.toggle('typing', e.target.matches(TYPING_FIELDS)));
+document.addEventListener('focusout', () => document.body.classList.remove('typing'));
+
 const REPO_URL = 'https://github.com/McTobe/cube-labeler';
 const KOFI_URL = 'https://ko-fi.com/thetobek';
 

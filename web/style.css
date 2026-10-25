@@ -435,6 +435,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .toast .icon-button { flex: none; min-width: 28px; min-height: 28px; padding: 4px; justify-content: center; color: var(--muted); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+/* While typing on a phone the keyboard takes half the screen: the page shrinks above it
+   (interactive-widget in index.html), so the preview stays pinned at the top, and the
+   buttons and page tabs step aside to leave room for the text */
+@media (max-width: 899px) {
+  body.typing .nav, body.typing .action-bar, body.typing .preview-bar { display: none; }
+  body.typing .toast-slot { bottom: 12px; }
+}
 /* On a phone the stage is small, so messages float just above the buttons instead */
 @media (max-width: 899px) {
   .toast-slot { position: fixed; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 80px); }
