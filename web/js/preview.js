@@ -78,10 +78,13 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
   // Rulers are drawn on text labels
   const aids = strip === undefined;
   const { phase, text, error } = useStore(boot);
-  const [zoom, setZoom] = useState('fit');
+  const [zoomChoice, setZoom] = useState('fit');
   const stageRef = useRef(null);
   const [natural, setNatural] = useState(null);
   const wide = useWide();
+  // Phones always use Fit: browsers there don't size CSS millimetres to the screen, so Real
+  // size comes out far too small
+  const zoom = wide ? zoomChoice : 'fit';
   // Bin labels and queue strips are on 12 mm tape
   const tapeMm = strip === undefined && state.mode === 'text' ? Number(label.tape_width_mm) || 12 : 12;
   const box = useStageBox(stageRef);
@@ -163,9 +166,9 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}
             onClick=${() => updateLabel({ show_rulers: !label.show_rulers })}>Rulers</button>
         </span>`}
-        <span class="chip-group" role="group" aria-label="Zoom">
+        ${wide && html`<span class="chip-group" role="group" aria-label="Zoom">
           ${ZOOMS.map(([value, name]) => html`<button class=${zoom === value ? 'on' : ''} onClick=${() => setZoom(value)}>${name}</button>`)}
-        </span>
+        </span>`}
       </span>
     </div>
     ${m && m.warning && html`<p class="warning">${m.warning}</p>`}
