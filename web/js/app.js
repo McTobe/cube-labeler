@@ -270,7 +270,11 @@ export async function renderNow() {
       renderAgain = false;
       const item = currentItem();
       try {
-        const result = await py.render_label(itemOptions(item));
+        // The rulers are only for this preview, so a bin label takes the text label's choice
+        // here and not in its queue item
+        const options = itemOptions(item);
+        if (item.mode === 'bin') options.show_rulers = app.get().label.show_rulers;
+        const result = await py.render_label(options);
         const old = app.get().render;
         if (old) { URL.revokeObjectURL(old.previewUrl); URL.revokeObjectURL(old.dotsUrl); }
         app.set({

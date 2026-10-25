@@ -37,7 +37,7 @@ export function Preview({ strip, empty }) {
   const renderError = strip === undefined ? state.renderError : null;
   const { label } = state;
   // Rulers are drawn on text labels
-  const aids = strip === undefined && state.mode === 'text';
+  const aids = strip === undefined;
   const { phase, text, error } = useStore(boot);
   const [view, setView] = useState('tape');
   const [zoom, setZoom] = useState('fit');
