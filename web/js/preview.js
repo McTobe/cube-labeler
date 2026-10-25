@@ -1,5 +1,5 @@
 // The label on a strip of tape, with its size and print time, or the dots the printer will print
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { useStore } from './state.js';
 import { app, boot, updateLabel } from './app.js';
@@ -50,6 +50,14 @@ export function Preview({ strip, empty }) {
   // Zooming makes the stage taller, which must not change the size it zooms from
   const fitBase = useRef(null);
   if (zoom === 'fit' || !fitBase.current) fitBase.current = fitWidth;
+
+  // Zooming keeps the middle of the label in the middle of the stage
+  useLayoutEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
+  }, [zoom]);
 
   let stage;
   if (phase === 'failed') {
