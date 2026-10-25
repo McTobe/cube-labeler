@@ -5,7 +5,8 @@ import { Segmented, Select, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateSettings } from '../app.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
-import { autoBackup, chooseFolder, allowFolder, stopAutoBackup } from '../autobackup.js';
+import { autoBackup, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
+import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
 import { ai, loadAi, setKey, setModel } from '../ai.js';
 import { errorMessage } from '../../printer.js';
 import { PrinterPanel } from '../printer-ui.js';
@@ -97,6 +98,17 @@ function BackupCard() {
       setBusy(false);
     }
   };
+  const [picking, setPicking] = useState(false);
+  const d = useStore(drive);
+  const fromDrive = async (file) => {
+    setPicking(false);
+    try {
+      setOpened(await readBackup(await downloadDriveBackup(file)));
+      setMessage({ text: '', error: false });
+    } catch (err) {
+      setMessage({ text: `${file.name}: ${errorMessage(err)}`, error: true });
+    }
+  };
   const onFile = async (e) => {
     const file = e.currentTarget.files[0];
     e.currentTarget.value = '';
@@ -128,12 +140,78 @@ function BackupCard() {
     <div class="button-row">
       <button class="primary" disabled=${!ready || busy} onClick=${save}>${busy ? 'Saving…' : 'Save a backup'}</button>
       <button class="secondary" disabled=${!ready} onClick=${() => fileRef.current.click()}>Restore from a backup</button>
+      ${d.on && html`<button class="secondary" disabled=${!ready} onClick=${() => setPicking(true)}>Restore from Google Drive</button>`}
       <input ref=${fileRef} type="file" accept=".cubebackup,.cubeicons,application/zip" hidden onChange=${onFile} />
     </div>
     ${message.text && html`<p class=${`status-line${message.error ? ' error' : ''}`} role="status">${message.text}</p>`}
+    <${DriveBackup} ready=${ready} />
     <${AutoBackup} ready=${ready} />
     <${RestoreSheet} opened=${opened} onClose=${() => setOpened(null)} onDone=${done} />
+    <${DrivePicker} open=${picking} onClose=${() => setPicking(false)} onPick=${fromDrive} />
   </section>`;
+}
+
+// The backups in Google Drive, to pick one to restore
+function DrivePicker({ open, onClose, onPick }) {
+  const d = useStore(drive);
+  const [files, setFiles] = useState(null);
+  const [error, setError] = useState('');
+  const load = async () => {
+    setError('');
+    try { setFiles(await listDriveBackups()); } catch (err) { setError(errorMessage(err)); }
+  };
+  useEffect(() => { setFiles(null); if (open && driveReady()) load(); }, [open, !!d.token]);
+  const signIn = async () => {
+    setError('');
+    try { await continueDriveBackup(); } catch (err) { setError(errorMessage(err)); }
+  };
+  return html`<${Sheet} open=${open} title="Restore from Google Drive" onClose=${onClose}>
+    ${!driveReady()
+      ? html`<p>Sign in to Google again to see your backups.</p>
+        <div class="sheet-actions"><button class="primary" onClick=${signIn}>Continue with Google</button></div>`
+      : files === null ? html`<p class="hint">${error || 'Looking for backups…'}</p>`
+        : files.length === 0 ? html`<p class="hint">No backups in the ${'"Cube Labeler backups"'} folder yet.</p>`
+          : html`<ul class="drive-files">${files.map((f) => html`<li key=${f.id}>
+              <button class="drive-file" onClick=${() => onPick(f)}>
+                <span>${formatDate(f.createdTime)}</span><span class="hint">${f.name}</span>
+              </button></li>`)}</ul>`}
+    ${error && files !== null && html`<p class="status-line error">${error}</p>`}
+  <//>`;
+}
+
+// Backups to Google Drive, from any device
+function DriveBackup({ ready }) {
+  const d = useStore(drive);
+  const auto = useStore(autoBackup);
+  const [error, setError] = useState('');
+  const run = async (action) => {
+    setError('');
+    try { await action(); } catch (err) { setError(errorMessage(err)); }
+  };
+  const live = driveReady();
+  let state;
+  if (!d.on) {
+    state = html`<p class="hint">Sign in with Google and a backup goes to a ${'"Cube Labeler backups"'} folder in your Drive a few seconds after a change.
+      The newest 10 are kept. The app can only see the files it made there.</p>
+      <div class="button-row"><button class="secondary" disabled=${!ready} onClick=${() => run(async () => { await signInToDrive(); await startDriveBackup(); })}>Sign in with Google</button></div>`;
+  } else {
+    const who = d.email ? html`<strong>${d.email}</strong>` : 'your Google Drive';
+    const last = auto.driveLast ? ` Last: ${formatDate(auto.driveLast)}.` : '';
+    state = html`
+      ${live || !auto.drivePending
+        ? html`<p class="auto-on"><span class="dot on"></span><span>On, saving to ${who}.${last}</span></p>`
+        : html`<p class="auto-on"><span class="dot"></span><span>A backup is waiting: Google asks you to continue once an hour.${last}</span></p>`}
+      ${auto.driveError && html`<p class="status-line error">${auto.driveError}</p>`}
+      <div class="button-row">
+        ${!live && html`<button class=${auto.drivePending ? 'primary' : 'secondary'} disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue with Google</button>`}
+        <button class="secondary" disabled=${auto.busy} onClick=${() => run(signOutOfDrive)}>Sign out</button>
+      </div>`;
+  }
+  return html`<div class="auto-backup">
+    <h3>Google Drive</h3>
+    ${state}
+    ${error && html`<p class="status-line error">${error}</p>`}
+  </div>`;
 }
 
 // Automatic backups to a folder, which can be one that Google Drive, OneDrive or Dropbox syncs
@@ -144,12 +222,11 @@ function AutoBackup({ ready }) {
     setError('');
     try { await action(); } catch (err) { setError(errorMessage(err)); }
   };
+  if (!auto.supported) return null;
   let state;
-  if (!auto.supported) {
-    state = html`<p class="hint">Automatic backups need Chrome or Edge on a computer. On this device, save a backup by hand now and then.</p>`;
-  } else if (!auto.folder) {
+  if (!auto.folder) {
     state = html`<p class="hint">Pick a folder and a backup is saved there a few seconds after your icons, templates or settings change. The newest 10 are kept.
-      Pick a folder that Google Drive, OneDrive or Dropbox syncs to keep them in the cloud.</p>
+      A folder that OneDrive or Dropbox syncs keeps them in the cloud too.</p>
       <div class="button-row"><button class="secondary" disabled=${!ready || auto.busy} onClick=${() => run(chooseFolder)}>Choose a folder</button></div>`;
   } else {
     const where = html`<strong>${auto.folder.name}</strong>`;
@@ -165,7 +242,7 @@ function AutoBackup({ ready }) {
       </div>`;
   }
   return html`<div class="auto-backup">
-    <h3>Automatic backups</h3>
+    <h3>Folder on this computer</h3>
     ${state}
     ${error && html`<p class="status-line error">${error}</p>`}
   </div>`;
