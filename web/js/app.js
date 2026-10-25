@@ -232,6 +232,9 @@ export function renderOptions(label) {
   const { image, ...options } = label;
   options.qr_enabled = label.qr_enabled && label.qr_data.trim() !== '';
   options.image_data = image ? image.data : null;
+  // The web app always fits text to the tape (line sizes and Text scale adjust it), so a
+  // label saved by the desktop app with a fixed size fits too
+  options.auto_fit_font = true;
   if (!options.text.trim() && !options.qr_enabled && !image) options.text = ' ';
   return options;
 }

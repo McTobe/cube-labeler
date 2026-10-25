@@ -167,11 +167,10 @@ function StylingHelp() {
 // --- Options -------------------------------------------------------------------------------
 
 function FontSection() {
-  const { label, fonts, render } = useStore(app);
+  const { label, fonts } = useStore(app);
   const { phase } = useStore(boot);
   const fileRef = useRef(null);
   const names = fonts.length ? fonts : [label.font_name];
-  const autoSize = render && render.metrics.effective_font_size;
 
   const onFile = async (e) => {
     const file = e.currentTarget.files[0];
@@ -179,18 +178,14 @@ function FontSection() {
     if (file) await addFont(file);
   };
 
-  return html`<${Section} id="font" title="Font and size" summary=${`${label.font_name}, ${label.auto_fit_font ? 'fit to tape' : `${label.fixed_font_size} pt`}`}>
+  return html`<${Section} id="font" title="Font and layout" summary=${label.font_name}>
     <div class="row">
       <${Select} label="Font" value=${label.font_name} options=${names.map((n) => [n, n])}
         onChange=${(font_name) => updateLabel({ font_name })} />
       <button class="secondary add-font" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Add font</button>
       <input ref=${fileRef} type="file" accept=".ttf,.otf,.ttc" hidden onChange=${onFile} />
     </div>
-    <${Toggle} label="Fit to tape height" checked=${label.auto_fit_font}
-      onChange=${(auto_fit_font) => updateLabel({ auto_fit_font })} />
-    <${Slider} label="Size" min=${8} max=${80} value=${label.fixed_font_size} disabled=${label.auto_fit_font}
-      display=${label.auto_fit_font ? (autoSize ? `Auto (${autoSize} pt)` : 'Auto') : `${label.fixed_font_size} pt`}
-      onChange=${(fixed_font_size) => updateLabel({ fixed_font_size })} />
+    <p class="hint">Text always fills the tape height. Make a line bigger or smaller with the size menu above the text, or all text with Text scale under Advanced.</p>
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
     <${Segmented} label="Frame" options=${FRAMES} value=${label.frame}
