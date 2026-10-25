@@ -1,5 +1,5 @@
-// Google Drive for backups: sign in with Google, then backups go to a "Cube Labeler backups"
-// folder in the user's Drive. The page asks only for the drive.file scope, so it sees the
+// Google Drive sync: sign in with Google, and the icons, templates and settings travel between
+// devices as backups in a "Cube Labeler backups" folder in the user's Drive. The page asks only for the drive.file scope, so it sees the
 // files it made itself and nothing else in the Drive. There is no server: Google hands the
 // page a token that works for an hour, and after that one click on Continue gets a new one.
 
@@ -102,7 +102,7 @@ async function folderId() {
 export async function listDriveBackups() {
   const parent = await folderId();
   const q = `${quoted(parent)} in parents and trashed = false`;
-  const found = await json(`${API}/files?q=${encodeURIComponent(q)}&orderBy=createdTime desc&pageSize=100&fields=files(id,name,createdTime)`);
+  const found = await json(`${API}/files?q=${encodeURIComponent(q)}&orderBy=createdTime desc&pageSize=100&fields=files(id,name,createdTime,appProperties)`);
   return found.files.filter((f) => f.name.endsWith('.cubebackup'));
 }
 
@@ -111,24 +111,34 @@ export async function downloadDriveBackup(file) {
   return new File([data], file.name, { type: 'application/zip' });
 }
 
-// Uploads a backup and keeps the newest `keep` of the ones the app put there
-export async function uploadDriveBackup(name, data, keep) {
+// Uploads a backup and keeps the newest `keep` of the ones the app put there; returns its id.
+// The fingerprint of what it holds goes along, so other devices can tell what they have.
+export async function uploadDriveBackup(name, data, keep, digest) {
   const parent = await folderId();
   const boundary = `cube-${Math.random().toString(36).slice(2)}`;
   const body = new Blob([
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
-    JSON.stringify({ name, parents: [parent], mimeType: 'application/zip' }),
+    JSON.stringify({ name, parents: [parent], mimeType: 'application/zip', appProperties: { digest } }),
     `\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`,
     data,
     `\r\n--${boundary}--`,
   ]);
-  await call(UPLOAD, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body });
+  const { id } = await (await call(UPLOAD, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body })).json();
   const all = await listDriveBackups();
   for (const old of all.slice(keep)) await call(`${API}/files/${old.id}`, { method: 'DELETE' }).catch(() => {});
+  return id;
+}
+
+// Forgets the token when it runs out, so the page shows that syncing waits for a click
+let expiry = null;
+function watchToken(token) {
+  clearTimeout(expiry);
+  if (token) expiry = setTimeout(() => drive.set({ token: null }), Math.max(0, token.expires - Date.now() - 60000));
 }
 
 async function keepToken(token) {
   drive.set({ token });
+  watchToken(token);
   await storage.save('driveToken', token);
 }
 
@@ -161,5 +171,6 @@ export async function loadDrive() {
   const [on, email, token, folderId] = await Promise.all([
     storage.load('driveOn', false), storage.load('driveEmail', ''), storage.load('driveToken', null), storage.load('driveFolderId', null),
   ]);
-  drive.set({ on, email, folderId, token: token && token.expires > Date.now() ? token : null });
+  drive.set({ on, email, folderId, token: token && token.expires > Date.now() + 60000 ? token : null });
+  watchToken(drive.get().token);
 }

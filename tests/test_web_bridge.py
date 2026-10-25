@@ -294,6 +294,12 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         self.assertNotEqual(cube_web.backup_digest(changed), first)
         self.assertNotEqual(cube_web.backup_digest(dict(contents, settings={"label_language": "en"})), first)
 
+    def test_backup_digest_reads_desktop_numbers_like_the_page(self):
+        import json
+        contents = {"created": "", "icons": [], "settings": {}, "templates": [{"name": "A", "json": json.dumps({"font_scale": 100.0})}]}
+        same = dict(contents, templates=[{"name": "A", "json": json.dumps({"font_scale": 100}, indent=2)}])
+        self.assertEqual(cube_web.backup_digest(contents), cube_web.backup_digest(same))
+
     def test_desktop_backup_opens_in_the_web_version(self):
         from core import backup
         layer = Image.new("L", (64, 64), 0)

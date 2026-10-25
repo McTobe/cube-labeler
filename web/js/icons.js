@@ -25,6 +25,7 @@ const PATHS = {
   'rotate-left': html`<path d="M4 4v6h6"/><path d="M4.5 10A8 8 0 1 1 6 16.5"/>`,
   'rotate-right': html`<path d="M20 4v6h-6"/><path d="M19.5 10A8 8 0 1 0 18 16.5"/>`,
   refresh: html`<path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/>`,
+  cloud: html`<path d="M7 18h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.4 1.5A3.3 3.3 0 0 0 7 18z"/>`,
 };
 
 export function Icon({ name, size = 22, filled = false }) {

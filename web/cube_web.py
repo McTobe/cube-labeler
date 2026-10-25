@@ -682,6 +682,22 @@ def backup_digest(data: Any) -> str:
     import json
     manifest, members, files = _backup_parts(data)
     manifest.pop("created", None)
+
+    def same_numbers(value):
+        # 100.0 from a desktop file and 100 from the page are the same setting
+        if isinstance(value, float) and value.is_integer():
+            return int(value)
+        if isinstance(value, dict):
+            return {k: same_numbers(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [same_numbers(v) for v in value]
+        return value
+
+    for name, content in list(files.items()):
+        try:
+            files[name] = json.dumps(same_numbers(json.loads(content)), sort_keys=True).encode("utf-8")
+        except ValueError:
+            pass
     manifest["settings"] = {k: v for k, v in manifest["settings"].items() if k != "icon_recent"}
     h = hashlib.sha256(json.dumps(manifest, sort_keys=True, default=str).encode("utf-8"))
     for name, content in sorted({**members, **{f"data/{k}": v for k, v in files.items()}}.items()):
