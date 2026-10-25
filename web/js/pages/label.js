@@ -15,6 +15,10 @@ import {
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
 const LINE_ALIGNS = [['', 'Like the label'], ['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
+const ALIGN_ICONS = { '': 'align-auto', left: 'align-left', center: 'align-center', right: 'align-right' };
+const SIZE_MARKS = { large: 'L', medium: 'M', normal: 'N', small: 'S' };
+// Toolbar buttons don't take the focus, so the phone keyboard and the selection stay put
+const keepFocus = (e) => e.preventDefault();
 const ALIGNS = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
 const FRAMES = [['none', 'None'], ['box', 'Box'], ['rounded', 'Rounded']];
 const SIDES = [['left', 'Left of text'], ['right', 'Right of text']];
@@ -66,7 +70,11 @@ function TextCard() {
   const ref = useRef(null);
   const [lineStyle, setLineStyle] = useState(['normal', null]);
   const [helpOpen, setHelpOpen] = useState(false);
+  // The size or alignment picker open above the toolbar
+  const [picker, setPicker] = useState(null);
   const ready = phase === 'ready';
+  const wide = useWide();
+  useTypingRoom(ref, wide);
 
   const syncLineStyle = async () => {
     const area = ref.current;
@@ -121,22 +129,30 @@ function TextCard() {
       <label class="card-title" for="label-text">Label text</label>
       <button class="link-button" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
     </div>
-    <div class="format-bar" role="toolbar" aria-label="Text style">
-      <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onClick=${() => toggle('bold')}><b>B</b></button>
-      <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onClick=${() => toggle('italic')}><i>I</i></button>
-      <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onClick=${() => toggle('underline')}><u>U</u></button>
-      <button class="fmt inverted" title="White text on black" disabled=${!ready} onClick=${() => toggle('invert')}>Inverted</button>
-      <span class="format-sep" aria-hidden="true"></span>
-      <select class="fmt-select" aria-label="Line size" title="Size of this line" disabled=${!ready}
-        value=${lineStyle[0]} onChange=${(e) => restyle({ size: e.currentTarget.value })}>
-        ${LINE_SIZES.map(([v, t]) => html`<option value=${v}>${t}</option>`)}
-      </select>
-      <select class="fmt-select" aria-label="Line alignment" title="Alignment of this line" disabled=${!ready}
-        value=${lineStyle[1] || ''} onChange=${(e) => restyle({ align: e.currentTarget.value || null })}>
-        ${LINE_ALIGNS.map(([v, t]) => html`<option value=${v}>${t}</option>`)}
-      </select>
-      <button class="fmt" title="Add a column" disabled=${!ready} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text">Column</span></button>
-      <button class="fmt" title="How styling works" aria-label="How styling works" onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+    <div class="format-tools">
+      ${picker && html`<div class="fmt-picker" role="group" aria-label=${picker === 'size' ? 'Line size' : 'Line alignment'}>
+        ${(picker === 'size' ? LINE_SIZES : LINE_ALIGNS).map(([v, t]) => {
+          const on = picker === 'size' ? lineStyle[0] === v : (lineStyle[1] || '') === v;
+          return html`<button class=${`fmt${on ? ' on' : ''}`} aria-pressed=${on} onPointerDown=${keepFocus}
+            onClick=${() => { setPicker(null); restyle(picker === 'size' ? { size: v } : { align: v || null }); }}>
+            ${picker === 'align' && html`<${Icon} name=${ALIGN_ICONS[v]} size=${18} />`}<span class="fmt-text">${t}</span></button>`;
+        })}
+      </div>`}
+      <div class="format-bar" role="toolbar" aria-label="Text style">
+        <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('bold')}><b>B</b></button>
+        <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('italic')}><i>I</i></button>
+        <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('underline')}><u>U</u></button>
+        <button class="fmt" title="White text on black" aria-label="Inverted" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('invert')}><span class="inv-mark">A</span><span class="fmt-text wide-text">Inverted</span></button>
+        <span class="format-sep" aria-hidden="true"></span>
+        <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title="Size of this line" aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
+          <span class="size-mark">A<small>a</small></span><span class="fmt-text">${wide ? LINE_SIZES.find(([v]) => v === lineStyle[0])[1] : SIZE_MARKS[lineStyle[0]]}</span></button>
+        <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
+          <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${18} /></button>
+        <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text wide-text">Column</span></button>
+        <button class="fmt" title="How styling works" aria-label="How styling works" onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+      </div>
     </div>
     <textarea id="label-text" ref=${ref} rows="3" value=${label.text} spellcheck="false"
       placeholder="Type your label"
@@ -146,6 +162,45 @@ function TextCard() {
       <${StylingHelp} />
     <//>
   </section>`;
+}
+
+// On a phone, while the label text has the focus, the text box grows to fill the room between
+// the pinned preview and the toolbar docked on the keyboard, and the page scrolls it into place
+function useTypingRoom(ref, wide) {
+  useEffect(() => {
+    const area = ref.current;
+    if (!area || wide) return undefined;
+    let timer = null;
+    const fit = () => {
+      if (document.activeElement !== area) return;
+      const pinned = document.querySelector('.label-preview-col');
+      const tools = area.closest('.text-card').querySelector('.format-tools');
+      const top = pinned ? pinned.getBoundingClientRect().bottom : 0;
+      const room = window.innerHeight - top - (tools ? tools.offsetHeight : 0) - 16;
+      area.style.height = `${Math.max(96, room)}px`;
+      // The browser keeps the caret in view after each edit; it must look below the pinned
+      // preview and above the toolbar for that
+      const root = document.documentElement.style;
+      root.scrollPaddingTop = `${top + 8}px`;
+      root.scrollPaddingBottom = `${(tools ? tools.offsetHeight : 0) + 8}px`;
+      window.scrollBy({ top: area.getBoundingClientRect().top - top - 8 });
+    };
+    const later = () => { clearTimeout(timer); timer = setTimeout(fit, 120); };
+    const reset = () => {
+      area.style.height = '';
+      document.documentElement.style.scrollPaddingTop = '';
+      document.documentElement.style.scrollPaddingBottom = '';
+    };
+    area.addEventListener('focus', later);
+    area.addEventListener('blur', reset);
+    window.addEventListener('resize', later);
+    return () => {
+      clearTimeout(timer);
+      area.removeEventListener('focus', later);
+      area.removeEventListener('blur', reset);
+      window.removeEventListener('resize', later);
+    };
+  }, [wide]);
 }
 
 function StylingHelp() {
