@@ -181,7 +181,7 @@ function FastenerForm({ cfg, names }) {
           onPick=${(thread_size) => updateBin({ thread_size })} />
         <${Segmented} label="Bins" options=${BINS} value=${mode === 'assortment' ? '' : mode}
           onChange=${(compartment_mode) => { lastLength = null; updateBin({ compartment_mode }); }} />
-        <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'} hint="Numbers print as x30. Click a length to fill the next bin.">${lengths}<//>
+        <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'} >${lengths}<//>
         ${mode !== 'assortment' && html`<${Chips} label="Common lengths" values=${QUICK_LENGTHS} onPick=${(v) => pickLength(cfg, v)} />`}
       </div>
       <div class="bin-col">
@@ -237,7 +237,7 @@ export function BinCard() {
   const cfg = bin[bin.kind];
   return html`<section class="card bin-card">
     <div class="card-head">
-      <${Segmented} label="Label for" options=${[['fastener', 'Fasteners'], ['component', 'Parts']]} value=${bin.kind}
+      <${Segmented} ariaLabel="Label for" options=${[['fastener', 'Fasteners'], ['component', 'Parts']]} value=${bin.kind}
         onChange=${(kind) => { lastLength = null; updateBin({ kind }); }} />
       <button class="secondary" disabled=${phase !== 'ready'} title="Add to the queue and clear the lengths for the next bin"
         onClick=${addAndNext}>Add to queue and start the next</button>

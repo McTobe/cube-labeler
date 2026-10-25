@@ -619,8 +619,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .action-bar .status-line { margin: 8px 2px 0; white-space: normal; }
   .action-bar { display: flex; flex-direction: column-reverse; }
   .format-bar { flex-wrap: wrap; overflow: visible; margin-left: 0; margin-right: 0; padding: 0; }
-  .label-preview-col .text-card, .label-preview-col .bin-card { margin: 0; flex: none; }
-  .label-preview-col .text-card textarea { min-height: 180px; }
+  /* The text and bin cards share one fixed height, so the preview keeps its size when
+     switching kinds of label; on a short or narrow window the card scrolls, never the column */
+  .label-preview-col .text-card, .label-preview-col .bin-card {
+    margin: 0; flex: none; height: clamp(280px, 100vh - 500px, 420px); overflow-y: auto;
+  }
+  .label-preview-col .text-card { display: flex; flex-direction: column; }
+  .label-preview-col .text-card textarea { flex: 1; min-height: 120px; resize: none; }
+  .label-preview-col .length-grid.quad { grid-template-columns: repeat(4, 1fr); }
 }
 
 /* --- Sheets (dialogs) ---------------------------------------------------------------------- */
@@ -736,11 +742,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* The bin label card: the fields on the left, the icon on the right when there is room */
 .bin-card .card-head { align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
-.bin-card .card-head .field { margin: 0; flex: 1 1 260px; max-width: 360px; }
+.bin-card .card-head .field { margin: 0; flex: 1 1 220px; max-width: 360px; }
 .bin-card .card-head > .secondary { flex: none; }
 .bin-grid { display: grid; gap: 0 24px; }
-@media (min-width: 1200px) { .bin-grid { grid-template-columns: 1fr 1fr; } }
-.quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 12px; }
+@media (min-width: 900px) { .bin-grid { grid-template-columns: 1fr 1fr; } }
+.quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
 .quick-chips button {
   min-height: 30px; padding: 2px 10px; border-radius: 999px; font-size: 0.85rem;
   background: var(--raised); border: 1px solid var(--border); color: var(--text);
