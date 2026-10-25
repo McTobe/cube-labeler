@@ -45,7 +45,7 @@ export const DEFAULT_SETTINGS = {
   theme: 'system',  // 'system', 'light', 'dark'
   match_printer_tape: true,
   label_language: 'en',  // kept for the desktop app's backups; the web version is in English
-  bin_label_mm: null,  // the user's own bin label length for Reset, instead of 38 mm
+  bin_label_mm: null,  // the user's own bin label length for Reset, instead of 32 mm
 };
 
 export const MAX_TAPE_MM = 499;

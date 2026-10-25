@@ -471,7 +471,7 @@ class HardwareInventoryTab(ctk.CTkFrame):
         try:
             return max(float(self.entry_width.get().strip().replace(",", ".")), 10.0)
         except ValueError:
-            return 38.0
+            return 32.0
 
     def _collect_form_values(self):
         """Reads the form into the label being edited."""

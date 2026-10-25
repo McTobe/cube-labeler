@@ -136,9 +136,9 @@ class TestInventoryRenderer(unittest.TestCase):
 
         self.assertEqual(rast.size[0], 128)  # 128-dot Brother printhead width
         self.assertGreater(len(r_bytes), 1000)
-        # 38 mm label plus the same half-gap of tape on each side as in a queue
+        # 32 mm label plus the same half-gap of tape on each side as in a queue
         padding_mm = BATCH_GAP_DOTS * DOT_PITCH_MM
-        self.assertAlmostEqual(metrics.print_length_mm, 38.0 + padding_mm, delta=1.5)
+        self.assertAlmostEqual(metrics.print_length_mm, 32.0 + padding_mm, delta=1.5)
 
         # Batch rendering
         cfg_comp = LabelConfig(inventory_config=INVENTORY_PRESETS["B1"])

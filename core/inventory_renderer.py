@@ -128,7 +128,7 @@ class FastenerLabelConfig:
     simple_drive_icon: bool = False       # True: bold drawn drive icon instead of the library picture
     
     # Dimensions
-    label_width_mm: float = 38.0          # Typical width for organizer bin (38mm ~ 255 dots)
+    label_width_mm: float = 32.0          # Fits a typical organizer bin (32 mm ~ 227 dots)
     tape_width_mm: int = 12
 
 
@@ -142,7 +142,7 @@ class ComponentLabelConfig:
     custom_icon_path: Optional[str] = None
     
     # Dimensions
-    label_width_mm: float = 38.0          # Typical width for organizer bin (38mm ~ 255 dots)
+    label_width_mm: float = 32.0          # Fits a typical organizer bin (32 mm ~ 227 dots)
     tape_width_mm: int = 12
 
 
