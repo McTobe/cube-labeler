@@ -2,7 +2,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { useStore } from './state.js';
-import { app, boot, updateLabel } from './app.js';
+import { app, boot, updateLabel, hush } from './app.js';
+import { Icon } from './icons.js';
 import { useWide } from './ui.js';
 
 const ZOOMS = [['fit', 'Fit'], ['2', '2×'], ['4', '4×']];
@@ -141,8 +142,17 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
   }
 
   const m = render && render.metrics;
+  const { status } = state;
   return html`<section class="card preview" aria-label="Preview">
-    ${stage}
+    <div class="stage-wrap">
+      ${stage}
+      <div class="toast-slot" role="status" aria-live="polite">
+        ${status.text && html`<div class=${`toast${status.error ? ' error' : ''}`} key=${status.id}>
+          <span>${status.text}</span>
+          <button class="icon-button" aria-label="Close message" onClick=${hush}><${Icon} name="close" size=${16} /></button>
+        </div>`}
+      </div>
+    </div>
     <div class="preview-bar">
       <span class="metrics">${m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · about ${Math.max(1, Math.round(m.print_duration_sec))} s` : ''}</span>
       <span class="preview-controls">

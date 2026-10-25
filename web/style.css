@@ -418,6 +418,27 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 
 .preview { padding: 0; overflow: hidden; margin-bottom: 0; }
+/* Messages float over the bottom of the stage, so they never move the page */
+.stage-wrap { position: relative; display: flex; flex-direction: column; }
+.toast-slot {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 3;
+  display: flex; justify-content: center; pointer-events: none;
+}
+.toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 6px; max-width: min(640px, 100%);
+  padding: 6px 6px 6px 14px; border-radius: 999px; font-size: 0.9rem;
+  background: var(--card); color: var(--text); border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); animation: toast-in 0.18s ease-out;
+}
+.toast span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast.error { border-color: var(--error); color: var(--error); }
+.toast .icon-button { flex: none; min-width: 28px; min-height: 28px; padding: 4px; justify-content: center; color: var(--muted); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+/* On a phone the stage is small, so messages float just above the buttons instead */
+@media (max-width: 899px) {
+  .toast-slot { position: fixed; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 80px); }
+}
 
 .preview .stage-message, .tape-scroll {
   background: var(--stage);
@@ -618,6 +639,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   /* The preview takes the room the text and buttons leave and never grows the column: a
      zoomed label scrolls inside the stage, so the column itself does not scroll */
   .label-preview-col .preview { flex: 1 1 0; display: flex; flex-direction: column; min-height: 220px; }
+  .label-preview-col .stage-wrap { flex: 1 1 0; min-height: 0; }
   .label-preview-col .tape-scroll, .label-preview-col .stage-message { flex: 1 1 0; min-height: 0; }
   .label-preview-col .tape-scroll { overflow: auto; }
   .label-edit-col {
@@ -827,7 +849,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   color: var(--muted); cursor: grab; touch-action: none;
 }
 .queue-list.dragging .drag-handle { cursor: grabbing; }
-.queue-thumb { flex: none; width: 76px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--stage); border-radius: 6px; overflow: hidden; }
+.queue-thumb { flex: none; align-self: center; width: 76px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--stage); border-radius: 6px; overflow: hidden; }
 .queue-thumb img { max-width: 100%; max-height: 100%; }
 .queue-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .queue-title {

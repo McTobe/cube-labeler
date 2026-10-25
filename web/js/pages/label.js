@@ -333,7 +333,7 @@ function AdvancedSection() {
 // --- Print ---------------------------------------------------------------------------------
 
 function ActionBar() {
-  const { render, status, queue } = useStore(app);
+  const { render, queue } = useStore(app);
   const p = useStore(printer);
   const { phase } = useStore(boot);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -357,7 +357,6 @@ function ActionBar() {
   // With labels waiting in the queue, the next step is printing them together
   const queued = queueLabelCount(queue);
   return html`<div class="action-bar">
-    <p class=${`status-line${status.error ? ' error' : ''}`} role="status">${status.text}</p>
     <div class="action-buttons">
       ${queued > 0
         ? html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
@@ -369,7 +368,7 @@ function ActionBar() {
             title="Print (Ctrl+P)" onClick=${printLabel}>
             <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`}
       <button class="secondary big" disabled=${!ready} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
-        <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Queue</span>
+        <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Add</span>
       </button>
       <span class="menu-anchor">
         <button class="secondary big icon-only" aria-label="More actions" onClick=${() => setMenuOpen(true)}>

@@ -85,10 +85,20 @@ export const printer = createStore({
 let py = null;
 
 let saidAt = 0;
+let sayTimer = null;
+// How long a message stays up; errors stay until they are closed or replaced
+const SAY_SECONDS = 6;
 
 export function say(text, error = false) {
   saidAt = Date.now();
-  app.set({ status: { text, error } });
+  clearTimeout(sayTimer);
+  app.set({ status: { text, error, id: saidAt } });
+  if (!error) sayTimer = setTimeout(hush, SAY_SECONDS * 1000);
+}
+
+export function hush() {
+  clearTimeout(sayTimer);
+  if (app.get().status.text) app.set({ status: { text: '', error: false } });
 }
 
 // A message belongs to the page it was said on; one said just before moving to another page
@@ -245,15 +255,19 @@ function itemTapeWidth(item) {
   return item.mode === 'bin' ? BIN_TAPE_MM : item.label.tape_width_mm;
 }
 
+// A text label's lines without their styling marks
+export function textLines(label) {
+  return label.text.split('\n')
+    .map((l) => l.replace(/^(#{1,2}|-#|<<|><|>>)\s+/g, '').replace(/(\*\*|__|==|\*)/g, '').trim())
+    .filter((l) => l && l !== '---');
+}
+
 export function itemTitle(item) {
   if (item.mode === 'bin') {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
   }
-  const line = item.label.text.split('\n')
-    .map((l) => l.replace(/^(#{1,2}|-#|<<|><|>>)\s+/g, '').replace(/(\*\*|__|==|\*)/g, '').trim())
-    .find((l) => l && l !== '---');
-  return line || (item.label.qr_enabled ? 'QR code' : item.label.image ? 'Picture' : 'Label');
+  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : item.label.image ? 'Picture' : 'Label');
 }
 
 // Renders the current label. Calls made while one runs fold into a single follow-up render.
