@@ -457,7 +457,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .tape-strip img { display: block; max-width: 100%; height: auto; max-height: 120px; }
 .fitted .tape-strip img { max-width: none; max-height: none; }
 /* Auto margins centre the label and still let a zoomed one scroll to every edge */
-.zoom-2 .tape-strip, .zoom-4 .tape-strip { max-width: none; margin: auto 12px; }
+.zoom-2 .tape-strip, .zoom-4 .tape-strip { max-width: none; margin: auto; }
+.tape-scroll.zoom-2, .tape-scroll.zoom-4 { padding: 14px 12px; }
 .zoom-2:not(.fitted) .tape-strip img { max-width: none; max-height: none; zoom: 2; }
 .zoom-4:not(.fitted) .tape-strip img { max-width: none; max-height: none; zoom: 4; }
 .tape-strip img.dots, .zoom-2 img, .zoom-4 img { image-rendering: pixelated; }
