@@ -108,7 +108,8 @@ export async function start() {
   ]);
   app.set({
     settings: { ...DEFAULT_SETTINGS, ...settings },
-    label: { ...DEFAULT_LABEL, ...label },
+    // The printable-area guides no longer have a switch, so a label saved with them on drops them
+    label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     mode,
     bin,
     queue,

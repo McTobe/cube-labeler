@@ -36,7 +36,7 @@ export function Preview({ strip, empty }) {
   const render = strip === undefined ? state.render : strip;
   const renderError = strip === undefined ? state.renderError : null;
   const { label } = state;
-  // Rulers and the printable area are drawn on text labels
+  // Rulers are drawn on text labels
   const aids = strip === undefined && state.mode === 'text';
   const { phase, text, error } = useStore(boot);
   const [view, setView] = useState('tape');
@@ -86,12 +86,9 @@ export function Preview({ strip, empty }) {
           <button class=${view === 'tape' ? 'on' : ''} onClick=${() => setView('tape')}>Tape</button>
           <button class=${view === 'dots' ? 'on' : ''} onClick=${() => setView('dots')}>Print dots</button>
         </span>
-        ${aids && html`<span class="chip-group" role="group" aria-label="Measuring aids">
+        ${aids && html`<span class="chip-group" role="group" aria-label="Measuring aid">
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}
             onClick=${() => updateLabel({ show_rulers: !label.show_rulers })}>Rulers</button>
-          <button class=${label.show_guides ? 'on' : ''} aria-pressed=${label.show_guides}
-            title="Shows the part of the tape the printer can print on"
-            onClick=${() => updateLabel({ show_guides: !label.show_guides })}>Printable area</button>
         </span>`}
         <span class="chip-group" role="group" aria-label="Zoom">
           ${ZOOMS.map(([value, name]) => html`<button class=${zoom === value ? 'on' : ''} onClick=${() => setZoom(value)}>${name}</button>`)}
