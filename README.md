@@ -166,6 +166,10 @@ The tests run on Windows and Linux in CI. On machines without tkinter the GUI te
 | `icons-src/` | SVG drawings of the library icons; `python tools/build_icons.py` renders them to `assets/icons/` (needs `pip install resvg-py`) |
 | `tests/` | Unit tests and headless GUI tests |
 
+## Support
+
+Cube Labeler is free and open source. If it saves you time, you can [buy me a coffee on Ko-fi](https://ko-fi.com/thetobek) ♥
+
 ## Contributing
 
 Bug reports and ideas are welcome in [Issues](https://github.com/McTobe/cube-labeler/issues). For a pull request, keep changes focused, add or update tests where it makes sense, and check that `python -m unittest discover tests` passes.

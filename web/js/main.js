@@ -17,6 +17,7 @@ import { drive } from './gdrive.js';
 import { APP_VERSION } from './version.js';
 
 const REPO_URL = 'https://github.com/McTobe/cube-labeler';
+const KOFI_URL = 'https://ko-fi.com/thetobek';
 
 const PAGES = [
   { id: 'label', title: 'Label', icon: 'label' },
@@ -89,6 +90,8 @@ function App() {
             title="What's new in each version">v${APP_VERSION}</a>
           <a class="printer-chip link-chip wide-only" href=${REPO_URL} target="_blank" rel="noopener" title="Cube Labeler on GitHub">
             <${Icon} name="github" size=${17} /><span class="chip-label">GitHub</span></a>
+          <a class="printer-chip link-chip support-chip wide-only" href=${KOFI_URL} target="_blank" rel="noopener"
+            title="Support Cube Labeler on Ko-fi"><${Icon} name="heart" size=${16} /><span class="chip-label">Support</span></a>
           <span class="chip-divider wide-only" aria-hidden="true"></span>
           <${SyncChip} /><${PrinterChip} />
         </span>

@@ -1067,6 +1067,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .link-chip { color: var(--muted); text-decoration: none; padding-left: 12px; }
 .chip-divider { width: 1px; height: 22px; margin: 0 6px; background: var(--border); flex: none; }
 .link-chip:hover { color: var(--text); border-color: var(--accent); }
+.support-chip .icon { color: #e5536b; }
 /* On phones the version and GitHub link are in Settings → About instead */
 @media (max-width: 899px) { .wide-only { display: none; } }
 .sync-chip.state-ready .dot, .sync-chip.state-busy .dot { background: var(--ok); }
