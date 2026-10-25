@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir pillow -c constraints.txt
 COPY assets/icon.ico assets/icon.ico
 COPY assets/icons/ assets/icons/
 COPY core/ core/
+COPY ui/__init__.py ui/templates.py ui/
 COPY web/ web/
 RUN python web/build.py
 
