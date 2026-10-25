@@ -601,8 +601,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
     background: none;
     box-shadow: none;
   }
-  .label-preview-col .preview { flex: 1 0 auto; display: flex; flex-direction: column; min-height: 260px; }
-  .label-preview-col .tape-scroll, .label-preview-col .stage-message { flex: 1; }
+  /* The preview takes the room the text and buttons leave and never grows the column: a
+     zoomed label scrolls inside the stage, so the column itself does not scroll */
+  .label-preview-col .preview { flex: 1 1 0; display: flex; flex-direction: column; min-height: 220px; }
+  .label-preview-col .tape-scroll, .label-preview-col .stage-message { flex: 1 1 0; min-height: 0; }
+  .label-preview-col .tape-scroll { overflow: auto; }
   .label-edit-col {
     min-height: 0;
     overflow-y: auto;
