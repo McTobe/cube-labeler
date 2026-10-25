@@ -334,13 +334,13 @@ export function SettingsPage() {
 
     <section class="card">
       <h2 class="card-title">Your data</h2>
-      <p>Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the server.</p>
+      <p>Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the Cube Labeler server; with Google Drive sync on, a backup of them also goes to your own Drive.</p>
       <${StorageUse} />
     </section>
 
     <section class="card about">
       <h2 class="card-title">About</h2>
-      <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT.</p>
+      <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT. <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">On GitHub</a></p>
       <p class="hint">Labels are drawn by the same Python code as the desktop app, running in this browser with Pyodide.
         Arimo font under the SIL Open Font License.</p>
     </section>

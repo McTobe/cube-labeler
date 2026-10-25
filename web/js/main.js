@@ -14,6 +14,9 @@ import { app, start, pageChanged } from './app.js';
 import { useStore } from './state.js';
 import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
+import { APP_VERSION } from './version.js';
+
+const REPO_URL = 'https://github.com/McTobe/cube-labeler';
 
 const PAGES = [
   { id: 'label', title: 'Label', icon: 'label' },
@@ -81,7 +84,13 @@ function App() {
     <div class="main-col">
       <header class="topbar">
         <h1>${page.id === 'label' ? html`<span class="brand-inline">Cube Labeler</span><span class="page-name">Label</span>` : page.title}</h1>
-        <span class="top-chips"><${SyncChip} /><${PrinterChip} /></span>
+        <span class="top-chips">
+          <a class="printer-chip link-chip wide-only" href=${`${REPO_URL}/releases`} target="_blank" rel="noopener"
+            title="What's new in each version">v${APP_VERSION}</a>
+          <a class="printer-chip link-chip wide-only" href=${REPO_URL} target="_blank" rel="noopener" title="Cube Labeler on GitHub">
+            <${Icon} name="github" size=${17} /><span class="chip-label">GitHub</span></a>
+          <${SyncChip} /><${PrinterChip} />
+        </span>
       </header>
       <main>${body}</main>
     </div>

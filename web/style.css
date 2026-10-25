@@ -1003,6 +1003,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .drive-file:hover { border-color: var(--accent); }
 .drive-file .hint { font-size: 0.8rem; }
 .top-chips { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.link-chip { color: var(--muted); text-decoration: none; padding-left: 12px; }
+.link-chip:hover { color: var(--text); border-color: var(--accent); }
+/* On phones the version and GitHub link are in Settings → About instead */
+@media (max-width: 899px) { .wide-only { display: none; } }
 .sync-chip.state-ready .dot, .sync-chip.state-busy .dot { background: var(--ok); }
 .sync-chip.state-busy .dot { animation: pulse 1s ease-in-out infinite alternate; }
 .sync-chip.state-paused .dot { background: var(--warn); }
