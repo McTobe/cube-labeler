@@ -952,3 +952,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .auto-on { display: flex; align-items: baseline; gap: 8px; }
 .auto-on .dot { width: 9px; height: 9px; border-radius: 50%; background: #e0a100; flex: none; }
 .auto-on .dot.on { background: #2fb36d; }
+.drive-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-height: 60vh; overflow-y: auto; }
+.drive-file { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); color: var(--text); text-align: left; }
+.drive-file:hover { border-color: var(--accent); }
+.drive-file .hint { font-size: 0.8rem; }
+.top-chips { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.sync-chip .dot { background: var(--warn); }

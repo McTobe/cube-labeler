@@ -1,20 +1,22 @@
 // Automatic backups: a moment after the icons, templates or settings change, a backup is
-// written to a folder the user picked, and only the newest few are kept. Picking a folder
-// that Google Drive, OneDrive or Dropbox syncs puts the backups in the cloud, like the
-// desktop app does. Writing to a folder needs Chrome or Edge on a computer.
+// written to a folder the user picked and/or uploaded to Google Drive, and only the newest
+// few are kept. Picking a folder that Google Drive, OneDrive or Dropbox syncs also puts the
+// backups in the cloud, like the desktop app does; writing to a folder needs Chrome or Edge
+// on a computer. Signing in to Google Drive works on phones too.
 
 import * as storage from './storage.js';
 import { createStore } from './state.js';
-import { app, boot, backupDigest, makeBackup } from './app.js';
-import { library } from './library.js';
-import { templates, loadTemplates } from './templates.js';
-import { collectBackup } from './backup.js';
+import { app, boot, say, backupDigest, makeBackup } from './app.js';
+import { library, deleteUserIcon, setFavourites } from './library.js';
+import { templates, loadTemplates, deleteTemplate } from './templates.js';
+import { collectBackup, readBackup, restoreBackup } from './backup.js';
+import { drive, driveReady, loadDrive, uploadDriveBackup, continueDrive, listDriveBackups, downloadDriveBackup } from './gdrive.js';
 
 // Not the desktop app's "Cube Labeler backup ", so the two apps never prune each other's files
 // when they share a folder
 const PREFIX = 'Cube Labeler web backup ';
 const EXTENSION = '.cubebackup';
-const KEEP = 10;
+const KEEP = 3;
 const DELAY_MS = 3000;
 
 export const autoBackup = createStore({
@@ -24,9 +26,13 @@ export const autoBackup = createStore({
   last: null,  // when the last automatic backup was written
   error: '',
   busy: false,
+  driveLast: null,  // when the last backup went to Google Drive
+  driveError: '',
+  drivePending: false,  // a backup waits for the user to sign in to Google again
 });
 
 let timer = null;
+let again = false;  // a change came in while a backup was being made
 
 async function permission(folder, ask) {
   const options = { mode: 'readwrite' };
@@ -56,36 +62,125 @@ async function writeBackup(folder, created, data) {
   for (const old of names.slice(KEEP)) await folder.removeEntry(old).catch(() => {});
 }
 
-// Writes a backup now if anything changed since the last one (or always, with force)
-export async function backupNow({ force = false, ask = false } = {}) {
-  const { folder, busy } = autoBackup.get();
-  // Never before the icons have loaded, or the backup would miss them
-  if (!folder || busy || boot.get().phase !== 'ready' || !library.get().ready) return false;
-  autoBackup.set({ busy: true });
+const failed = (err) => (err && err.message ? err.message : String(err));
+
+async function toFolder(contents, digest, data, { force, ask }) {
+  const { folder } = autoBackup.get();
+  if (!(await permission(folder, ask))) {
+    autoBackup.set({ allowed: false });
+    return;
+  }
+  autoBackup.set({ allowed: true });
+  if (!force && digest === (await storage.load('autoBackupDigest', ''))) return;
   try {
-    if (!(await permission(folder, ask))) {
-      autoBackup.set({ allowed: false });
-      return false;
-    }
-    autoBackup.set({ allowed: true });
-    const contents = await collectBackup();
-    const digest = await backupDigest(contents);
-    if (!force && digest === (await storage.load('autoBackupDigest', ''))) return false;
-    await writeBackup(folder, contents.created, await makeBackup(contents));
+    await writeBackup(folder, contents.created, await data());
     await storage.save('autoBackupDigest', digest);
     await storage.save('autoBackupLast', contents.created);
     autoBackup.set({ last: contents.created, error: '' });
-    return true;
   } catch (err) {
-    autoBackup.set({ error: err && err.message ? err.message : String(err) });
-    return false;
-  } finally {
-    autoBackup.set({ busy: false });
+    autoBackup.set({ error: failed(err) });
   }
 }
 
+const timeOfDay = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+// Brings this device in step with Google Drive. A newer backup from another device is restored
+// first (it adds and replaces, it never deletes), then anything changed here is uploaded.
+async function syncDrive({ force }) {
+  // Google's token lasts an hour; after that syncing waits for a click on Continue
+  if (!driveReady()) {
+    autoBackup.set({ drivePending: true });
+    return;
+  }
+  try {
+    const [newest] = await listDriveBackups();
+    if (newest && newest.id !== (await storage.load('driveSyncedId', null))) {
+      const opened = await readBackup(await downloadDriveBackup(newest));
+      await restoreBackup(opened, { icons: true, settings: true, templates: true }, 'replace');
+      // What was here at the last sync but is gone from the newer backup was deleted on the
+      // other device; anything else only here is new on this one and stays
+      const before = await storage.load('driveSyncedItems', null);
+      if (before) {
+        const icons = new Set(opened.icons.map((entry) => `user/${entry.file}`.toLowerCase()));
+        const names = new Set(opened.templates.map((t) => t.name.trim().toLowerCase()));
+        for (const icon of library.get().user) {
+          if (!icons.has(icon.key.toLowerCase()) && before.icons.includes(icon.key.toLowerCase())) deleteUserIcon(icon.key);
+        }
+        for (const t of templates.get().mine) {
+          if (!names.has(t.name.trim().toLowerCase()) && before.templates.includes(t.name.trim().toLowerCase())) deleteTemplate(t.name);
+        }
+      }
+      if (opened.settings) setFavourites(opened.settings.icon_favourites);
+      await storage.save('driveSyncedId', newest.id);
+      await storage.save('driveBackupDigest', (newest.appProperties && newest.appProperties.digest) || '');
+      await storage.save('driveBackupLast', newest.createdTime);
+      autoBackup.set({ driveLast: newest.createdTime });
+      say(`Synced from Google Drive (saved ${timeOfDay(newest.createdTime)}).`);
+    }
+    const contents = await collectBackup();
+    const digest = await backupDigest(contents);
+    if (force || digest !== (await storage.load('driveBackupDigest', ''))) {
+      const name = `${PREFIX}${fileStamp(contents.created)}${EXTENSION}`;
+      const id = await uploadDriveBackup(name, await makeBackup(contents), KEEP, digest);
+      await storage.save('driveSyncedId', id);
+      await storage.save('driveBackupDigest', digest);
+      await storage.save('driveBackupLast', contents.created);
+      autoBackup.set({ driveLast: contents.created });
+    }
+    await storage.save('driveSyncedItems', {
+      icons: library.get().user.map((icon) => icon.key.toLowerCase()),
+      templates: templates.get().mine.map((t) => t.name.trim().toLowerCase()),
+    });
+    autoBackup.set({ driveError: '', drivePending: false });
+  } catch (err) {
+    autoBackup.set({ driveError: failed(err), drivePending: !driveReady() });
+  }
+}
+
+// Writes a backup now to the folder where anything changed since the last one (or always,
+// with force), and syncs with Google Drive
+export async function backupNow({ force = false, ask = false } = {}) {
+  const { folder, busy } = autoBackup.get();
+  const toDriveToo = drive.get().on;
+  // Never before the icons have loaded, or the backup would miss them
+  if ((!folder && !toDriveToo) || boot.get().phase !== 'ready' || !library.get().ready) return false;
+  if (busy) { again = true; return false; }
+  autoBackup.set({ busy: true });
+  try {
+    // Drive first: what comes from another device then goes in the folder backup too
+    if (toDriveToo) await syncDrive({ force: false });
+    if (folder) {
+      const contents = await collectBackup();
+      const digest = await backupDigest(contents);
+      await toFolder(contents, digest, () => makeBackup(contents), { force, ask });
+    }
+    return true;
+  } catch (err) {
+    autoBackup.set({ error: failed(err) });
+    return false;
+  } finally {
+    autoBackup.set({ busy: false });
+    if (again) { again = false; schedule(); }
+  }
+}
+
+// Signs in to Google again after the hour ran out and syncs. Must run from a click.
+export async function continueDriveBackup() {
+  await continueDrive();
+  autoBackup.set({ driveError: '' });
+  return backupNow();
+}
+
+// Right after signing in: takes what is in Drive first, then uploads what this device adds
+export async function startDriveBackup() {
+  await storage.save('driveSyncedId', null);
+  await storage.save('driveBackupDigest', '');
+  autoBackup.set({ driveError: '' });
+  return backupNow();
+}
+
 function schedule() {
-  if (!autoBackup.get().folder) return;
+  if (!autoBackup.get().folder && !drive.get().on) return;
   clearTimeout(timer);
   timer = setTimeout(() => backupNow(), DELAY_MS);
 }
@@ -116,9 +211,10 @@ export async function stopAutoBackup() {
 
 // Loads the chosen folder and starts watching for changes once the app is ready
 export async function startAutoBackup() {
-  if (!autoBackup.get().supported) return;
-  const [folder, last] = await Promise.all([storage.load('autoBackupFolder', null), storage.load('autoBackupLast', null)]);
-  autoBackup.set({ folder, last });
+  const [folder, last, driveLast] = await Promise.all([
+    storage.load('autoBackupFolder', null), storage.load('autoBackupLast', null), storage.load('driveBackupLast', null), loadDrive(),
+  ]);
+  autoBackup.set({ folder: autoBackup.get().supported ? folder : null, last, driveLast });
   const watch = async () => {
     if (!templates.get().ready) await loadTemplates();
     let seen = { user: library.get().user, favourites: library.get().favourites, mine: templates.get().mine, settings: app.get().settings };
@@ -130,10 +226,12 @@ export async function startAutoBackup() {
     library.subscribe(check);
     templates.subscribe(check);
     app.subscribe(check);
-    if (folder) {
-      autoBackup.set({ allowed: await permission(folder, false) });
-      schedule();
-    }
+    if (autoBackup.get().folder) autoBackup.set({ allowed: await permission(folder, false) });
+    schedule();
+    // Coming back to the app (another tab, the phone's app switcher) picks up other devices' changes
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && drive.get().on) backupNow();
+    });
   };
   if (boot.get().phase === 'ready') watch();
   else {

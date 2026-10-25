@@ -218,7 +218,15 @@ export function restoreIcons(entries, onConflict) {
       png: entry.icon, original: entry.original || null, edit: entry.original ? meta.edit || null : null, touch: entry.touch || null,
     };
     if (index >= 0) {
-      if (sameBytes(user[index].png, entry.icon)) continue;
+      if (sameBytes(user[index].png, entry.icon)) {
+        // The same picture: replacing still takes the backup's name, category and search words
+        if (onConflict === 'replace') {
+          const { title, category, keywords } = icon;
+          user[index] = { ...user[index], title, category, keywords };
+          if (entry.favourite) favourites.add(user[index].key);
+        }
+        continue;
+      }
       if (onConflict === 'skip') { counts.skipped++; continue; }
       if (onConflict === 'replace') {
         forgetUrl(user[index].key);
@@ -240,6 +248,14 @@ export function restoreIcons(entries, onConflict) {
   library.set({ favourites: [...favourites] });
   storage.save('iconFavourites', library.get().favourites);
   return counts;
+}
+
+// Favourites exactly as another device has them (Google Drive sync)
+export function setFavourites(keys) {
+  const known = new Set([...library.get().builtIn, ...library.get().user].map((icon) => icon.key));
+  const favourites = (Array.isArray(keys) ? keys : []).filter((k) => known.has(k));
+  library.set({ favourites });
+  storage.save('iconFavourites', favourites);
 }
 
 // Favourites and recently used from a backup's settings, for the icons that exist here

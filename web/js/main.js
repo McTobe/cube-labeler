@@ -11,7 +11,8 @@ import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
 import { app, start, pageChanged } from './app.js';
 import { useStore } from './state.js';
-import { startAutoBackup } from './autobackup.js';
+import { startAutoBackup, continueDriveBackup } from './autobackup.js';
+import { drive } from './gdrive.js';
 
 const PAGES = [
   { id: 'label', title: 'Label', icon: 'label' },
@@ -24,6 +25,20 @@ const PAGES = [
 function currentPage() {
   const id = location.hash.replace(/^#\/?/, '');
   return PAGES.find((p) => p.id === id) || PAGES[0];
+}
+
+// Shown while Google Drive sync waits for a click: Google's sign-in lasts an hour at a time
+function SyncChip() {
+  const d = useStore(drive);
+  const [error, setError] = useState('');
+  if (!d.on || d.token) return null;
+  const go = async () => {
+    setError('');
+    try { await continueDriveBackup(); } catch (err) { setError(err.message || String(err)); }
+  };
+  return html`<button class="printer-chip sync-chip" title=${error || 'Sign in to Google again to sync your icons, templates and settings'} onClick=${go}>
+    <span class="dot" aria-hidden="true"></span><${Icon} name="cloud" size=${18} /><span class="chip-label">Sync</span>
+  </button>`;
 }
 
 function App() {
@@ -53,7 +68,7 @@ function App() {
     <div class="main-col">
       <header class="topbar">
         <h1>${page.id === 'label' ? html`<span class="brand-inline">Cube Labeler</span><span class="page-name">Label</span>` : page.title}</h1>
-        <${PrinterChip} />
+        <span class="top-chips"><${SyncChip} /><${PrinterChip} /></span>
       </header>
       <main>${body}</main>
     </div>
