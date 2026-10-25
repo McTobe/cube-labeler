@@ -12,7 +12,7 @@ import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
 import { app, start, pageChanged } from './app.js';
 import { useStore } from './state.js';
-import { startAutoBackup, continueDriveBackup, backupNow, autoBackup } from './autobackup.js';
+import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
 
 const PAGES = [
@@ -29,8 +29,7 @@ function currentPage() {
 }
 
 // Google Drive sync at a glance: green when syncing works, amber when Google wants the
-// hourly click, red after an error, grey when it is off. Clicking it opens the sync box and
-// syncs right away (or continues with Google when the hour ran out).
+// hourly click, red after an error, grey when it is off. Clicking it opens the sync box.
 function SyncChip() {
   const d = useStore(drive);
   const auto = useStore(autoBackup);
@@ -47,13 +46,7 @@ function SyncChip() {
     state = auto.busy ? 'busy' : 'ready';
     title = auto.busy ? 'Syncing with Google Drive…' : `Synced with Google Drive${d.email ? ` (${d.email})` : ''}.`;
   }
-  const click = () => {
-    setOpen(true);
-    // The click lets Google open its window; a failure shows in the box
-    if (state === 'paused') continueDriveBackup().catch(() => {});
-    else if (d.on) backupNow();
-  };
-  return html`<button class=${`printer-chip sync-chip state-${state}`} title=${title} aria-label=${title} onClick=${click}>
+  return html`<button class=${`printer-chip sync-chip state-${state}`} title=${title} aria-label=${title} onClick=${() => setOpen(true)}>
       <span class="dot" aria-hidden="true"></span><${Icon} name="cloud" size=${18} /><span class="chip-label">Sync</span>
     </button>
     <${Sheet} open=${open} title="Sync with Google Drive" onClose=${() => setOpen(false)}>

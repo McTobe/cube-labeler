@@ -200,7 +200,11 @@ export function SyncPanel() {
     setError('');
     try { await action(); } catch (err) { setError(errorMessage(err)); }
   };
-  const last = auto.driveLast ? ` Last synced ${formatDate(auto.driveLast)}.` : '';
+  // Syncing shows only for Sync now; the quiet syncs after changes keep the time
+  const [syncing, setSyncing] = useState(false);
+  const syncNow = () => run(async () => { setSyncing(true); try { await backupNow(); } finally { setSyncing(false); } });
+  const lastLine = syncing ? html`<p class="hint last-synced">Syncing…</p>`
+    : auto.driveLast ? html`<p class="hint last-synced">Last synced: ${formatDate(auto.driveLast)}</p>` : null;
   let state;
   if (!d.on) {
     state = html`<p class="hint">Sign in with Google on each device you use, and your own icons, templates and settings follow you.
@@ -211,12 +215,13 @@ export function SyncPanel() {
     const who = d.email ? html`<strong>${d.email}</strong>` : 'Google Drive';
     state = html`
       ${d.token
-        ? html`<p class="auto-on"><span class="dot on"></span><span>${auto.busy ? 'Syncing…' : html`On, synced with ${who}.${last}`}</span></p>`
-        : html`<p class="auto-on"><span class="dot"></span><span>Paused: Google asks you to continue once an hour.${last}</span></p>`}
+        ? html`<p class="auto-on"><span class="dot on"></span><span>On, synced with ${who}.</span></p>`
+        : html`<p class="auto-on"><span class="dot"></span><span>Paused: Google asks you to continue once an hour.</span></p>`}
+      ${lastLine}
       ${auto.driveError && html`<p class="status-line error">${auto.driveError}</p>`}
       <div class="button-row">
         ${!d.token && html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue with Google</button>`}
-        ${d.token && html`<button class="secondary" disabled=${!ready || auto.busy} onClick=${() => run(() => backupNow())}>Sync now</button>`}
+        ${d.token && html`<button class="secondary" disabled=${!ready || auto.busy} onClick=${syncNow}>Sync now</button>`}
         <button class="secondary" disabled=${auto.busy} onClick=${() => run(signOutOfDrive)}>Sign out</button>
       </div>`;
   }
