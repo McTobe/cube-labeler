@@ -63,6 +63,7 @@ export const app = createStore({
   queue: [],  // [{id, mode, label, copies} or {id, mode, bin, copies}], printed as one strip
   queueUndo: null,  // {queue, text}: the queue before the last removal, while it can be undone
   queueRender: null,  // like render, for the whole queue
+  previewDots: false,  // the label page's preview shows the printer's dots instead of the tape
   queuePrinted: 0,  // labels in the last printed queue, until the user keeps or clears it
   thumbs: {},  // queue item id -> preview URL
   settings: DEFAULT_SETTINGS,

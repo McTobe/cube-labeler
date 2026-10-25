@@ -75,7 +75,6 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
   // Rulers are drawn on text labels
   const aids = strip === undefined;
   const { phase, text, error } = useStore(boot);
-  const [view, setView] = useState('tape');
   const [zoom, setZoom] = useState('fit');
   const stageRef = useRef(null);
   const [natural, setNatural] = useState(null);
@@ -109,7 +108,8 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
       ${phase === 'loading' && html`<span class="hint">The first start downloads about 15 MB. After that it starts from this device.</span>`}
     </div>`;
   } else {
-    const dots = view === 'dots';
+    // Only the label being edited can show its dots (Advanced > Show print dots)
+    const dots = strip === undefined && state.mode === 'text' && state.previewDots;
     const tape = dots ? '#ffffff' : render.tape_bg_color;
     // 2× and 4× zoom in from the Fit size, so they are always bigger
     const fit = rows.length > 1 ? fitWidth(box, natural, wide, tapeMm, rows)
@@ -156,10 +156,6 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
     <div class="preview-bar">
       <span class="metrics">${m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · about ${Math.max(1, Math.round(m.print_duration_sec))} s` : ''}</span>
       <span class="preview-controls">
-        <span class="chip-group" role="group" aria-label="Preview view">
-          <button class=${view === 'tape' ? 'on' : ''} onClick=${() => setView('tape')}>Tape</button>
-          <button class=${view === 'dots' ? 'on' : ''} onClick=${() => setView('dots')}>Print dots</button>
-        </span>
         ${aids && html`<span class="chip-group" role="group" aria-label="Measuring aid">
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}
             onClick=${() => updateLabel({ show_rulers: !label.show_rulers })}>Rulers</button>

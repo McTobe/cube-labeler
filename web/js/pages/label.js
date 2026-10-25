@@ -359,7 +359,7 @@ function TapeSection() {
 }
 
 function AdvancedSection() {
-  const { label } = useStore(app);
+  const { label, previewDots } = useStore(app);
   return html`<${Section} id="advanced" title="Advanced" defaultOpen=${false}>
     <${Slider} label="Text scale" min=${50} max=${150} step=${5} value=${label.font_scale} format=${(v) => `${v}%`}
       onChange=${(font_scale) => updateLabel({ font_scale })} />
@@ -371,6 +371,8 @@ function AdvancedSection() {
       onChange=${(stroke_width) => updateLabel({ stroke_width })} />
     <${Slider} label="Darkness cutoff" min=${20} max=${220} step=${5} value=${label.threshold}
       onChange=${(threshold) => updateLabel({ threshold })} />
+    <${Toggle} label="Show print dots in the preview" checked=${previewDots}
+      onChange=${(on) => app.set({ previewDots: on })} />
 
     <button class="secondary" onClick=${() => { if (confirm('Reset font, size, QR code, picture and tape settings? Your text is kept.')) resetLabelSettings(); }}>Reset settings</button>
   <//>`;
