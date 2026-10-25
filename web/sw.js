@@ -1,7 +1,10 @@
 // Offline cache: the app starts without a network once it has loaded one time.
 //
 // The app's own files are fetched from the network first, so a new version shows up on the
-// next load, and come from the cache when offline. Pyodide, Pillow and qrcode come from
+// next load, and come from the cache when offline. Both ask the server, never the browser's
+// own HTTP cache, so a page never mixes files from two versions.
+//
+// Opening the app with ?fresh (see index.html) removes this worker and its caches. Pyodide, Pillow and qrcode come from
 // versioned CDN addresses, so the cached copy is used first. build.py fills in the two values.
 
 const BUILD = '__BUILD__';
@@ -12,7 +15,8 @@ const RUNTIME_CACHE = 'runtime-v1';
 const VERSIONED_HOSTS = ['cdn.jsdelivr.net', 'files.pythonhosted.org'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(APP_CACHE).then((cache) => cache.addAll(APP_FILES)).then(() => self.skipWaiting()));
+  const requests = APP_FILES.map((file) => new Request(file, { cache: 'reload' }));
+  event.waitUntil(caches.open(APP_CACHE).then((cache) => cache.addAll(requests)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (event) => {
@@ -27,7 +31,7 @@ self.addEventListener('activate', (event) => {
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch (err) {

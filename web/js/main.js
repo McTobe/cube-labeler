@@ -120,6 +120,7 @@ render(html`<${App} />`, document.getElementById('root'));
 start();
 startAutoBackup().catch((err) => console.warn('Automatic backups', err));
 
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+// index.html?fresh is removing the offline copy and reloads; don't put it back meanwhile
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !window.freshStart) {
   navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Offline cache unavailable:', err));
 }

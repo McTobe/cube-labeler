@@ -9,6 +9,45 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // Way out of a stuck start: index.html?fresh removes the offline copy of the app (not your
+    // labels, icons or settings) and loads the newest version. If the app hasn't started after a
+    // while, the start screen offers the same.
+    (function () {
+      function freshCopy() {
+        var jobs = [];
+        if (navigator.serviceWorker) {
+          jobs.push(navigator.serviceWorker.getRegistrations().then(function (list) {
+            return Promise.all(list.map(function (r) { return r.unregister(); }));
+          }));
+        }
+        if (window.caches) {
+          jobs.push(caches.keys().then(function (names) {
+            return Promise.all(names.filter(function (n) { return n.indexOf('app-') === 0; })
+              .map(function (n) { return caches.delete(n); }));
+          }));
+        }
+        return Promise.all(jobs).catch(function () {}).then(function () {
+          location.replace(location.pathname);
+        });
+      }
+      window.freshCopy = freshCopy;
+      if (/[?&]fresh(=|&|$)/.test(location.search)) {
+        window.freshStart = true;
+        freshCopy();
+        return;
+      }
+      setTimeout(function () {
+        var boot = document.querySelector('.boot');
+        if (!boot || document.getElementById('stuck')) return;
+        var p = document.createElement('p');
+        p.id = 'stuck';
+        p.className = 'hint';
+        p.innerHTML = 'Taking a long time? <a href="?fresh">Load a fresh copy</a>. Your labels stay.';
+        boot.appendChild(p);
+      }, 12000);
+    })();
+  </script>
   <script type="importmap">
     {
       "imports": {

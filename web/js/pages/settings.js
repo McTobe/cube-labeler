@@ -336,6 +336,7 @@ export function SettingsPage() {
       <h2 class="card-title">About</h2>
       <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT. <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">On GitHub</a></p>
       <p>Cube Labeler is free. If it saves you time, you can <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">buy me a coffee on Ko-fi</a> ♥</p>
+      <p class="hint">Something looks off after an update? <button class="link-button" onClick=${() => window.freshCopy()}>Load a fresh copy</button> of the app. Your labels, icons and settings stay.</p>
       <p class="hint">Labels are drawn by the same Python code as the desktop app, running in this browser with Pyodide.
         Arimo font under the SIL Open Font License.</p>
     </section>

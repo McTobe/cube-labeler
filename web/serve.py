@@ -36,11 +36,20 @@ def lan_addresses() -> list:
     return [a for a in dict.fromkeys(found) if not a.startswith("127.")]
 
 
+class FreshHandler(http.server.SimpleHTTPRequestHandler):
+    """Asks the browser to check every file again, like the Docker image's nginx, so a phone
+    never mixes files from an old build with a new one."""
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
+
 def main() -> int:
     port = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PORT
     build.main()
 
-    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=build.DIST_DIR)
+    handler = functools.partial(FreshHandler, directory=build.DIST_DIR)
     try:
         server = http.server.ThreadingHTTPServer(("0.0.0.0", port), handler)
     except OSError as e:
