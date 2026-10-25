@@ -5,14 +5,34 @@ import { html } from './html.js';
 import { Icon } from './icons.js';
 import { PrinterChip } from './printer-ui.js';
 import { LabelPage } from './pages/label.js';
-import { SettingsPage } from './pages/settings.js';
+import { SettingsPage, SyncPanel } from './pages/settings.js';
+import { Sheet } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
-import { app, start, pageChanged } from './app.js';
+import { app, start, pageChanged, queueLabelCount } from './app.js';
 import { useStore } from './state.js';
-import { startAutoBackup, continueDriveBackup } from './autobackup.js';
+import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
+import { APP_VERSION } from './version.js';
+
+// Marks the page while a phone keyboard is up for a text field, so the page can make room for
+// it. The keyboard shrinks the window (interactive-widget in index.html); a window that is just
+// narrow and tall, with no keyboard, is left alone.
+const TYPING_FIELDS = 'textarea, input:not([type]), input[type="text"], input[type="search"], input[type="number"]';
+let tallest = { width: 0, height: 0 };
+function checkTyping() {
+  if (window.innerWidth !== tallest.width) tallest = { width: window.innerWidth, height: 0 };
+  tallest.height = Math.max(tallest.height, window.innerHeight);
+  const field = document.activeElement && document.activeElement.matches(TYPING_FIELDS);
+  document.body.classList.toggle('typing', Boolean(field) && window.innerHeight < tallest.height * 0.8);
+}
+document.addEventListener('focusin', checkTyping);
+document.addEventListener('focusout', () => setTimeout(checkTyping));
+window.addEventListener('resize', checkTyping);
+
+const REPO_URL = 'https://github.com/McTobe/cube-labeler';
+const KOFI_URL = 'https://ko-fi.com/thetobek';
 
 const PAGES = [
   { id: 'label', title: 'Label', icon: 'label' },
@@ -27,18 +47,30 @@ function currentPage() {
   return PAGES.find((p) => p.id === id) || PAGES[0];
 }
 
-// Shown while Google Drive sync waits for a click: Google's sign-in lasts an hour at a time
+// Google Drive sync at a glance: green when syncing works, amber when Google wants the
+// hourly click, red after an error, grey when it is off. Clicking it opens the sync box.
 function SyncChip() {
   const d = useStore(drive);
-  const [error, setError] = useState('');
-  if (!d.on || d.token) return null;
-  const go = async () => {
-    setError('');
-    try { await continueDriveBackup(); } catch (err) { setError(err.message || String(err)); }
-  };
-  return html`<button class="printer-chip sync-chip" title=${error || 'Sign in to Google again to sync your icons, templates and settings'} onClick=${go}>
-    <span class="dot" aria-hidden="true"></span><${Icon} name="cloud" size=${18} /><span class="chip-label">Sync</span>
-  </button>`;
+  const auto = useStore(autoBackup);
+  const [open, setOpen] = useState(false);
+  let state = 'off';
+  let title = 'Sync is off. Click to set up Google Drive sync, so your icons, templates and settings are on every device.';
+  if (d.on && !d.token) {
+    state = 'paused';
+    title = 'Sync is paused: Google asks you to continue once an hour.';
+  } else if (d.on && auto.driveError) {
+    state = 'error';
+    title = `Sync failed: ${auto.driveError}`;
+  } else if (d.on) {
+    state = auto.busy ? 'busy' : 'ready';
+    title = auto.busy ? 'Syncing with Google Drive…' : `Synced with Google Drive${d.email ? ` (${d.email})` : ''}.`;
+  }
+  return html`<button class=${`printer-chip sync-chip state-${state}`} title=${title} aria-label=${title} onClick=${() => setOpen(true)}>
+      <span class="dot" aria-hidden="true"></span><${Icon} name="cloud" size=${18} /><span class="chip-label">Sync</span>
+    </button>
+    <${Sheet} open=${open} title="Sync with Google Drive" onClose=${() => setOpen(false)}>
+      <${SyncPanel} />
+    <//>`;
 }
 
 function App() {
@@ -63,12 +95,21 @@ function App() {
       <a class="brand" href="#/label"><img src="icon-192.png" alt="" width="28" height="28" /><span>Cube Labeler</span></a>
       ${PAGES.map((p) => html`<a href=${`#/${p.id}`} class=${p.id === page.id ? 'active' : ''}
         aria-current=${p.id === page.id ? 'page' : undefined}>
-        <${Icon} name=${p.icon} /><span>${p.title}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queue.length}</span>`}</a>`)}
+        <${Icon} name=${p.icon} /><span>${p.title}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`)}
     </nav>
     <div class="main-col">
       <header class="topbar">
         <h1>${page.id === 'label' ? html`<span class="brand-inline">Cube Labeler</span><span class="page-name">Label</span>` : page.title}</h1>
-        <span class="top-chips"><${SyncChip} /><${PrinterChip} /></span>
+        <span class="top-chips">
+          <a class="printer-chip link-chip wide-only" href=${`${REPO_URL}/releases`} target="_blank" rel="noopener"
+            title="What's new in each version">v${APP_VERSION}</a>
+          <a class="printer-chip link-chip wide-only" href=${REPO_URL} target="_blank" rel="noopener" title="Cube Labeler on GitHub">
+            <${Icon} name="github" size=${17} /><span class="chip-label">GitHub</span></a>
+          <a class="printer-chip link-chip support-chip wide-only" href=${KOFI_URL} target="_blank" rel="noopener"
+            title="Support Cube Labeler on Ko-fi"><${Icon} name="heart" size=${16} /><span class="chip-label">Support</span></a>
+          <span class="chip-divider wide-only" aria-hidden="true"></span>
+          <${SyncChip} /><${PrinterChip} />
+        </span>
       </header>
       <main>${body}</main>
     </div>
@@ -79,6 +120,7 @@ render(html`<${App} />`, document.getElementById('root'));
 start();
 startAutoBackup().catch((err) => console.warn('Automatic backups', err));
 
-if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+// index.html?fresh is removing the offline copy and reloads; don't put it back meanwhile
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !window.freshStart) {
   navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Offline cache unavailable:', err));
 }

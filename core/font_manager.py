@@ -161,6 +161,30 @@ class FontManager:
         others = sorted(list(available - set(prioritized)), key=lambda s: s.lower())
         return prioritized + others
 
+    def load_user_fonts(self, folder: str) -> List[str]:
+        """Registers every font file the user added (kept in `folder`); returns their names."""
+        names = []
+        if os.path.isdir(folder):
+            for filename in sorted(os.listdir(folder)):
+                if filename.lower().endswith(FONT_EXTENSIONS):
+                    name = self.register_custom_font(os.path.join(folder, filename))
+                    if name:
+                        names.append(name)
+        return names
+
+    def add_user_font(self, file_path: str, folder: str) -> Optional[str]:
+        """Copies a font file into the user's font folder and registers the copy."""
+        try:
+            ImageFont.truetype(file_path, 10)
+        except Exception:
+            return None
+        os.makedirs(folder, exist_ok=True)
+        target = os.path.join(folder, os.path.basename(file_path))
+        if os.path.normcase(os.path.abspath(target)) != os.path.normcase(os.path.abspath(file_path)):
+            with open(file_path, "rb") as src, open(target, "wb") as out:
+                out.write(src.read())
+        return self.register_custom_font(target)
+
     def register_custom_font(self, file_path: str) -> Optional[str]:
         """Registers a user-provided font file and returns its assigned display name."""
         if not os.path.isfile(file_path):

@@ -7,14 +7,18 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
-import { BinEditor } from './bin.js';
+import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
-  addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue,
+  addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
 const LINE_ALIGNS = [['', 'Like the label'], ['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
+const ALIGN_ICONS = { '': 'align-auto', left: 'align-left', center: 'align-center', right: 'align-right' };
+const SIZE_MARKS = { large: 'L', medium: 'M', normal: 'N', small: 'S' };
+// Toolbar buttons don't take the focus, so the phone keyboard and the selection stay put
+const keepFocus = (e) => e.preventDefault();
 const ALIGNS = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
 const FRAMES = [['none', 'None'], ['box', 'Box'], ['rounded', 'Rounded']];
 const SIDES = [['left', 'Left of text'], ['right', 'Right of text']];
@@ -39,6 +43,7 @@ export function LabelPage() {
     <div class="label-preview-col">
       <${Preview} />
       ${textHere && html`<${TextCard} />`}
+      ${mode === 'bin' && wide && html`<${BinCard} />`}
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
@@ -46,7 +51,7 @@ export function LabelPage() {
         <button role="tab" aria-selected=${mode === 'text'} class=${mode === 'text' ? 'on' : ''} onClick=${() => setMode('text')}>Text label</button>
         <button role="tab" aria-selected=${mode === 'bin'} class=${mode === 'bin' ? 'on' : ''} onClick=${() => setMode('bin')}>Bin label</button>
       </div>
-      ${mode === 'bin' ? html`<${BinEditor} />` : html`
+      ${mode === 'bin' ? html`${!wide && html`<${BinCard} />`}<${BinOptions} />` : html`
         ${!wide && html`<${TextCard} />`}
         <${FontSection} />
         <${QrSection} />
@@ -65,7 +70,11 @@ function TextCard() {
   const ref = useRef(null);
   const [lineStyle, setLineStyle] = useState(['normal', null]);
   const [helpOpen, setHelpOpen] = useState(false);
+  // The size or alignment picker open above the toolbar
+  const [picker, setPicker] = useState(null);
   const ready = phase === 'ready';
+  const wide = useWide();
+  useTypingRoom(ref, wide);
 
   const syncLineStyle = async () => {
     const area = ref.current;
@@ -120,22 +129,30 @@ function TextCard() {
       <label class="card-title" for="label-text">Label text</label>
       <button class="link-button" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
     </div>
-    <div class="format-bar" role="toolbar" aria-label="Text style">
-      <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onClick=${() => toggle('bold')}><b>B</b></button>
-      <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onClick=${() => toggle('italic')}><i>I</i></button>
-      <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onClick=${() => toggle('underline')}><u>U</u></button>
-      <button class="fmt inverted" title="White text on black" disabled=${!ready} onClick=${() => toggle('invert')}>Inverted</button>
-      <span class="format-sep" aria-hidden="true"></span>
-      <select class="fmt-select" aria-label="Line size" title="Size of this line" disabled=${!ready}
-        value=${lineStyle[0]} onChange=${(e) => restyle({ size: e.currentTarget.value })}>
-        ${LINE_SIZES.map(([v, t]) => html`<option value=${v}>${t}</option>`)}
-      </select>
-      <select class="fmt-select" aria-label="Line alignment" title="Alignment of this line" disabled=${!ready}
-        value=${lineStyle[1] || ''} onChange=${(e) => restyle({ align: e.currentTarget.value || null })}>
-        ${LINE_ALIGNS.map(([v, t]) => html`<option value=${v}>${t}</option>`)}
-      </select>
-      <button class="fmt" title="Add a column" disabled=${!ready} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text">Column</span></button>
-      <button class="fmt" title="How styling works" aria-label="How styling works" onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+    <div class="format-tools">
+      ${picker && html`<div class="fmt-picker" role="group" aria-label=${picker === 'size' ? 'Line size' : 'Line alignment'}>
+        ${(picker === 'size' ? LINE_SIZES : LINE_ALIGNS).map(([v, t]) => {
+          const on = picker === 'size' ? lineStyle[0] === v : (lineStyle[1] || '') === v;
+          return html`<button class=${`fmt${on ? ' on' : ''}`} aria-pressed=${on} onPointerDown=${keepFocus}
+            onClick=${() => { setPicker(null); restyle(picker === 'size' ? { size: v } : { align: v || null }); }}>
+            ${picker === 'align' && html`<${Icon} name=${ALIGN_ICONS[v]} size=${18} />`}<span class="fmt-text">${t}</span></button>`;
+        })}
+      </div>`}
+      <div class="format-bar" role="toolbar" aria-label="Text style">
+        <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('bold')}><b>B</b></button>
+        <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('italic')}><i>I</i></button>
+        <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('underline')}><u>U</u></button>
+        <button class="fmt" title="White text on black" aria-label="Inverted" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('invert')}><span class="inv-mark">A</span><span class="fmt-text wide-text">Inverted</span></button>
+        <span class="format-sep" aria-hidden="true"></span>
+        <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title="Size of this line" aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
+          <span class="size-mark">A<small>a</small></span><span class="fmt-text">${wide ? LINE_SIZES.find(([v]) => v === lineStyle[0])[1] : SIZE_MARKS[lineStyle[0]]}</span></button>
+        <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
+          <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${18} /></button>
+        <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text wide-text">Column</span></button>
+        <button class="fmt" title="How styling works" aria-label="How styling works" onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+      </div>
     </div>
     <textarea id="label-text" ref=${ref} rows="3" value=${label.text} spellcheck="false"
       placeholder="Type your label"
@@ -145,6 +162,41 @@ function TextCard() {
       <${StylingHelp} />
     <//>
   </section>`;
+}
+
+// On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
+// label kind and the text card in view) and the text box stretches down to the toolbar docked on
+// the keyboard
+function useTypingRoom(ref, wide) {
+  useEffect(() => {
+    const area = ref.current;
+    if (!area || wide) return undefined;
+    let timer = null;
+    const reset = () => {
+      area.style.height = '';
+      document.documentElement.style.scrollPaddingBottom = '';
+    };
+    const fit = () => {
+      if (document.activeElement !== area || !document.body.classList.contains('typing')) { reset(); return; }
+      const tools = area.closest('.text-card').querySelector('.format-tools');
+      const toolsHeight = tools ? tools.offsetHeight : 0;
+      window.scrollTo({ top: 0 });
+      const room = window.innerHeight - toolsHeight - area.getBoundingClientRect().top - 12;
+      area.style.height = `${Math.max(60, room)}px`;
+      // The browser keeps the caret in view; it must look above the toolbar for that
+      document.documentElement.style.scrollPaddingBottom = `${toolsHeight + 8}px`;
+    };
+    const later = () => { clearTimeout(timer); timer = setTimeout(fit, 120); };
+    area.addEventListener('focus', later);
+    area.addEventListener('blur', reset);
+    window.addEventListener('resize', later);
+    return () => {
+      clearTimeout(timer);
+      area.removeEventListener('focus', later);
+      area.removeEventListener('blur', reset);
+      window.removeEventListener('resize', later);
+    };
+  }, [wide]);
 }
 
 function StylingHelp() {
@@ -166,11 +218,10 @@ function StylingHelp() {
 // --- Options -------------------------------------------------------------------------------
 
 function FontSection() {
-  const { label, fonts, render } = useStore(app);
+  const { label, fonts } = useStore(app);
   const { phase } = useStore(boot);
   const fileRef = useRef(null);
   const names = fonts.length ? fonts : [label.font_name];
-  const autoSize = render && render.metrics.effective_font_size;
 
   const onFile = async (e) => {
     const file = e.currentTarget.files[0];
@@ -178,18 +229,14 @@ function FontSection() {
     if (file) await addFont(file);
   };
 
-  return html`<${Section} id="font" title="Font and size" summary=${`${label.font_name}, ${label.auto_fit_font ? 'fit to tape' : `${label.fixed_font_size} pt`}`}>
+  return html`<${Section} id="font" title="Font and layout" summary=${label.font_name}>
     <div class="row">
       <${Select} label="Font" value=${label.font_name} options=${names.map((n) => [n, n])}
         onChange=${(font_name) => updateLabel({ font_name })} />
       <button class="secondary add-font" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Add font</button>
       <input ref=${fileRef} type="file" accept=".ttf,.otf,.ttc" hidden onChange=${onFile} />
     </div>
-    <${Toggle} label="Fit to tape height" checked=${label.auto_fit_font}
-      onChange=${(auto_fit_font) => updateLabel({ auto_fit_font })} />
-    <${Slider} label="Size" min=${8} max=${80} value=${label.fixed_font_size} disabled=${label.auto_fit_font}
-      display=${label.auto_fit_font ? (autoSize ? `Auto (${autoSize} pt)` : 'Auto') : `${label.fixed_font_size} pt`}
-      onChange=${(fixed_font_size) => updateLabel({ fixed_font_size })} />
+    <p class="hint">Text always fills the tape height. Make a line bigger or smaller with the size menu above the text, or all text with Text scale under Advanced.</p>
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
     <${Segmented} label="Frame" options=${FRAMES} value=${label.frame}
@@ -312,7 +359,7 @@ function TapeSection() {
 }
 
 function AdvancedSection() {
-  const { label } = useStore(app);
+  const { label, previewDots } = useStore(app);
   return html`<${Section} id="advanced" title="Advanced" defaultOpen=${false}>
     <${Slider} label="Text scale" min=${50} max=${150} step=${5} value=${label.font_scale} format=${(v) => `${v}%`}
       onChange=${(font_scale) => updateLabel({ font_scale })} />
@@ -324,6 +371,8 @@ function AdvancedSection() {
       onChange=${(stroke_width) => updateLabel({ stroke_width })} />
     <${Slider} label="Darkness cutoff" min=${20} max=${220} step=${5} value=${label.threshold}
       onChange=${(threshold) => updateLabel({ threshold })} />
+    <${Toggle} label="Show print dots in the preview" checked=${previewDots}
+      onChange=${(on) => app.set({ previewDots: on })} />
 
     <button class="secondary" onClick=${() => { if (confirm('Reset font, size, QR code, picture and tape settings? Your text is kept.')) resetLabelSettings(); }}>Reset settings</button>
   <//>`;
@@ -332,7 +381,7 @@ function AdvancedSection() {
 // --- Print ---------------------------------------------------------------------------------
 
 function ActionBar() {
-  const { render, status, queue } = useStore(app);
+  const { render, queue } = useStore(app);
   const p = useStore(printer);
   const { phase } = useStore(boot);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -353,23 +402,28 @@ function ActionBar() {
   }, [ready, p.transport, p.busy]);
 
   const needsPrinter = p.supported && !p.transport;
+  // With labels waiting in the queue, the next step is printing them together
+  const queued = queueLabelCount(queue);
   return html`<div class="action-bar">
-    <p class=${`status-line${status.error ? ' error' : ''}`} role="status">${status.text}</p>
     <div class="action-buttons">
-      ${needsPrinter
+      ${queued > 0
+        ? html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
+            <${Icon} name="queue" size=${20} /> <span>Go to queue (${queued})</span></a>`
+        : needsPrinter
         ? html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
             <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`
         : html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
             title="Print (Ctrl+P)" onClick=${printLabel}>
             <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`}
       <button class="secondary big" disabled=${!ready} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
-        <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Queue</span>
-        ${queue.length > 0 && html`<span class="count">${queue.length}</span>`}
+        <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Add</span>
       </button>
       <span class="menu-anchor">
         <button class="secondary big icon-only" aria-label="More actions" onClick=${() => setMenuOpen(true)}>
           <${Icon} name="more" /></button>
         <${Menu} open=${menuOpen} onClose=${() => setMenuOpen(false)} items=${[
+          queued > 0 && { label: 'Print only this label', icon: 'printer', action: printLabel,
+            disabled: !ready || !render || !p.transport || p.busy },
           { label: 'Save as picture', icon: 'download', action: savePicture, disabled: !render },
           { label: `Feed ${FEED_LENGTH_MM} mm of tape`, icon: 'feed', action: feed, disabled: !p.transport || p.busy || !ready },
         ]} />

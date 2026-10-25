@@ -19,10 +19,10 @@ export function Field({ label, hint, children }) {
 }
 
 // One choice out of a few, shown side by side: [['left', 'Left'], ['center', 'Center']]
-export function Segmented({ label, options, value, onChange, disabled = false }) {
+export function Segmented({ label, ariaLabel, options, value, onChange, disabled = false }) {
   const name = useId('seg');
   return html`<${Field} label=${label}>
-    <div class="segmented" role="radiogroup" aria-label=${label}>
+    <div class="segmented" role="radiogroup" aria-label=${label || ariaLabel}>
       ${options.map(([optionValue, text]) => html`
         <label class=${optionValue === value ? 'selected' : ''}>
           <input type="radio" name=${name} value=${optionValue} checked=${optionValue === value}
@@ -122,7 +122,7 @@ export function Menu({ open, onClose, items }) {
   if (!open) return null;
   return html`<div class="menu-backdrop" onClick=${onClose} onWheel=${onClose}></div>
     <div ref=${ref} class="menu" role="menu" onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); }}>
-      ${items.map((item) => html`<button role="menuitem" disabled=${item.disabled}
+      ${items.filter(Boolean).map((item) => html`<button role="menuitem" disabled=${item.disabled}
         onClick=${() => { onClose(); item.action(); }}>
         ${item.icon && html`<${Icon} name=${item.icon} />`}<span>${item.label}</span>
       </button>`)}

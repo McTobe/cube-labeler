@@ -25,7 +25,7 @@ from core.printer import (
     list_serial_ports,
 )
 from core.ptstatus import PrinterStatus
-from core.config import config_manager
+from core.config import USER_FONTS_DIR, config_manager
 from core.specs import (
     INVENTORY_TAPE_WIDTH_MM,
     TAPE_LEAD_MM,
@@ -530,6 +530,8 @@ class PrintLabelApp(ctk.CTk):
         field_label(body, "Font")
         font_row = ctk.CTkFrame(body, fg_color="transparent")
         font_row.pack(fill="x")
+        # Fonts added earlier (or restored from a backup) are kept in the app's own folder
+        font_manager.load_user_fonts(USER_FONTS_DIR)
         available_fonts = font_manager.get_font_names()
         self.font_combo = ctk.CTkComboBox(
             font_row, values=available_fonts[:40], width=190, command=self._on_font_changed
@@ -1174,7 +1176,8 @@ class PrintLabelApp(ctk.CTk):
             filetypes=[("Font files", "*.ttf *.otf *.ttc"), ("All files", "*.*")],
         )
         if p and os.path.isfile(p):
-            display_name = font_manager.register_custom_font(p)
+            # A copy goes in the app's folder, so it is backed up and keeps working if the file moves
+            display_name = font_manager.add_user_font(p, USER_FONTS_DIR)
             if display_name:
                 self.font_combo.configure(values=[display_name] + font_manager.get_font_names()[:40])
                 self.font_combo.set(display_name)

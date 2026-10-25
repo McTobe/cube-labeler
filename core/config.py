@@ -12,6 +12,8 @@ from typing import Any, Callable, Dict, List, Optional
 from core import secret_store
 
 CONFIG_DIR = os.path.normpath(os.path.expanduser("~/.printlabel"))
+# Fonts the user added, copied here so they are backed up and still work if the original moves
+USER_FONTS_DIR = os.path.join(CONFIG_DIR, "fonts")
 CONFIG_FILE = os.path.normpath(os.path.join(CONFIG_DIR, "config.json"))
 
 DEFAULT_GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image"

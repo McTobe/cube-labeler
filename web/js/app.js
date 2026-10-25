@@ -44,7 +44,8 @@ export const DEFAULT_SETTINGS = {
   ai_models: {},
   theme: 'system',  // 'system', 'light', 'dark'
   match_printer_tape: true,
-  label_language: 'en',  // words suggested for bin labels
+  label_language: 'en',  // kept for the desktop app's backups; the web version is in English
+  bin_label_mm: null,  // the user's own bin label length for Reset, instead of 32 mm
 };
 
 export const MAX_TAPE_MM = 499;
@@ -59,8 +60,10 @@ export const app = createStore({
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
   languages: [['en', 'English']],
-  queue: [],  // [{id, mode, label} or {id, mode, bin}], printed as one strip
+  queue: [],  // [{id, mode, label, copies} or {id, mode, bin, copies}], printed as one strip
+  queueUndo: null,  // {queue, text}: the queue before the last removal, while it can be undone
   queueRender: null,  // like render, for the whole queue
+  previewDots: false,  // the label page's preview shows the printer's dots instead of the tape
   queuePrinted: 0,  // labels in the last printed queue, until the user keeps or clears it
   thumbs: {},  // queue item id -> preview URL
   settings: DEFAULT_SETTINGS,
@@ -83,10 +86,20 @@ export const printer = createStore({
 let py = null;
 
 let saidAt = 0;
+let sayTimer = null;
+// How long a message stays up; errors stay until they are closed or replaced
+const SAY_SECONDS = 6;
 
 export function say(text, error = false) {
   saidAt = Date.now();
-  app.set({ status: { text, error } });
+  clearTimeout(sayTimer);
+  app.set({ status: { text, error, id: saidAt } });
+  if (!error) sayTimer = setTimeout(hush, SAY_SECONDS * 1000);
+}
+
+export function hush() {
+  clearTimeout(sayTimer);
+  if (app.get().status.text) app.set({ status: { text: '', error: false } });
 }
 
 // A message belongs to the page it was said on; one said just before moving to another page
@@ -108,10 +121,11 @@ export async function start() {
   ]);
   app.set({
     settings: { ...DEFAULT_SETTINGS, ...settings },
-    label: { ...DEFAULT_LABEL, ...label },
+    // The printable-area guides no longer have a switch, so a label saved with them on drops them
+    label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     mode,
     bin,
-    queue,
+    queue: mergeCopies(queue),
   });
   applyTheme(app.get().settings.theme);
   storage.askToPersist();
@@ -139,7 +153,8 @@ export async function start() {
   for (const font of fonts) {
     try { await py.add_font(font.filename, font.data); } catch (err) { console.warn(err); }
   }
-  const lang = app.get().settings.label_language;
+  // Bin labels are in English; a language from a desktop backup is kept for the desktop app only
+  const lang = 'en';
   const [tapeWidths, fontNames, binNames, languages, binDefaults] = await Promise.all([
     py.tape_widths(), py.font_names(), py.bin_name_suggestions(lang), py.label_languages(), py.bin_defaults(lang),
   ]);
@@ -170,10 +185,6 @@ export async function updateSettings(change) {
   app.set({ settings });
   storage.save('settings', settings);
   if ('theme' in change) applyTheme(settings.theme);
-  if ('label_language' in change && py) {
-    // Only the suggestions change; names already typed stay as they are
-    app.set({ binNames: await py.bin_name_suggestions(settings.label_language) });
-  }
 }
 
 // --- Editing and rendering -----------------------------------------------------------------
@@ -222,6 +233,9 @@ export function renderOptions(label) {
   const { image, ...options } = label;
   options.qr_enabled = label.qr_enabled && label.qr_data.trim() !== '';
   options.image_data = image ? image.data : null;
+  // The web app always fits text to the tape (line sizes and Text scale adjust it), so a
+  // label saved by the desktop app with a fixed size fits too
+  options.auto_fit_font = true;
   if (!options.text.trim() && !options.qr_enabled && !image) options.text = ' ';
   return options;
 }
@@ -245,15 +259,19 @@ function itemTapeWidth(item) {
   return item.mode === 'bin' ? BIN_TAPE_MM : item.label.tape_width_mm;
 }
 
+// A text label's lines without their styling marks
+export function textLines(label) {
+  return label.text.split('\n')
+    .map((l) => l.replace(/^(#{1,2}|-#|<<|><|>>)\s+/g, '').replace(/(\*\*|__|==|\*)/g, '').trim())
+    .filter((l) => l && l !== '---');
+}
+
 export function itemTitle(item) {
   if (item.mode === 'bin') {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
   }
-  const line = item.label.text.split('\n')
-    .map((l) => l.replace(/^(#{1,2}|-#|<<|><|>>)\s+/g, '').replace(/(\*\*|__|==|\*)/g, '').trim())
-    .find((l) => l && l !== '---');
-  return line || (item.label.qr_enabled ? 'QR code' : item.label.image ? 'Picture' : 'Label');
+  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : item.label.image ? 'Picture' : 'Label');
 }
 
 // Renders the current label. Calls made while one runs fold into a single follow-up render.
@@ -269,7 +287,11 @@ export async function renderNow() {
       renderAgain = false;
       const item = currentItem();
       try {
-        const result = await py.render_label(itemOptions(item));
+        // The rulers are only for this preview, so a bin label takes the text label's choice
+        // here and not in its queue item
+        const options = itemOptions(item);
+        if (item.mode === 'bin') options.show_rulers = app.get().label.show_rulers;
+        const result = await py.render_label(options);
         const old = app.get().render;
         if (old) { URL.revokeObjectURL(old.previewUrl); URL.revokeObjectURL(old.dotsUrl); }
         app.set({
@@ -315,6 +337,27 @@ export async function addFont(file) {
   updateLabel({ font_name: name });
   say(`Added ${name}.`);
   return name;
+}
+
+// Fonts from a backup: added, or replaced by the backup's file of the same name. Returns how many changed.
+export async function restoreFonts(list) {
+  const fonts = await storage.load('fonts', []);
+  const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+  let changed = 0;
+  for (const { filename, data } of list) {
+    const bytes = new Uint8Array(data);
+    const had = fonts.find((f) => f.filename === filename);
+    if (had && same(new Uint8Array(had.data), bytes)) continue;
+    if (!(await py.add_font(filename, bytes))) continue;
+    if (had) had.data = bytes;
+    else fonts.push({ filename, data: bytes });
+    changed++;
+  }
+  if (changed) {
+    await storage.save('fonts', fonts);
+    app.set({ fonts: await py.font_names() });
+  }
+  return changed;
 }
 
 export async function setBinIcon(file) {
@@ -467,9 +510,29 @@ export function savePicture(fromQueue = false) {
 // --- Queue ---------------------------------------------------------------------------------
 
 let nextQueueId = Date.now();
+let undoTimer = null;
+const UNDO_SECONDS = 8;
 
-function saveQueue(queue) {
-  app.set({ queue, queuePrinted: 0 });
+const sameLabel = (a, b) => a.mode === b.mode && JSON.stringify(a.mode === 'bin' ? a.bin : a.label) === JSON.stringify(b.mode === 'bin' ? b.bin : b.label);
+export const copiesOf = (item) => Math.max(1, item.copies || 1);
+// Every printed label, copies included
+export const queueLabelCount = (queue) => queue.reduce((sum, item) => sum + copiesOf(item), 0);
+
+// Queues saved before copies existed hold the same label several times in a row
+function mergeCopies(queue) {
+  const merged = [];
+  for (const item of queue) {
+    const last = merged[merged.length - 1];
+    if (last && sameLabel(last, item)) last.copies = copiesOf(last) + copiesOf(item);
+    else merged.push({ ...item, copies: copiesOf(item) });
+  }
+  return merged;
+}
+
+function saveQueue(queue, undo = null) {
+  clearTimeout(undoTimer);
+  if (undo) undoTimer = setTimeout(() => app.set({ queueUndo: null }), UNDO_SECONDS * 1000);
+  app.set({ queue, queuePrinted: 0, queueUndo: undo });
   storage.save('queue', queue);
   queueRenderStale = true;
   if (queueShown) renderQueue();
@@ -490,43 +553,62 @@ export function addToQueue() {
   const item = { id: nextQueueId++, ...structuredClone(currentItem()) };
   if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !item.label.image) {
     say('Add some text, a QR code or a picture first.', true);
-    return;
+    return false;
   }
   const { queue } = app.get();
   // A queue prints as one strip, so every label in it needs the same tape
   if (queue.length && itemTapeWidth(queue[0]) !== itemTapeWidth(item)) {
     say(`The queue is for ${itemTapeWidth(queue[0])} mm tape, but this label is ${itemTapeWidth(item)} mm. Print or clear the queue first.`, true);
-    return;
+    return false;
   }
-  saveQueue([...queue, item]);
-  makeThumb(item);
-  const count = queue.length + 1;
   const title = itemTitle(item);
   const short = title.length > 25 ? `${title.slice(0, 24)}…` : title;
-  say(count > 1
-    ? `Added "${short}" to the queue (${count} labels, saves ${25 * (count - 1)} mm of tape).`
-    : `Added "${short}" to the queue.`);
+  const last = queue[queue.length - 1];
+  // The same label again is one more copy of it
+  if (last && sameLabel(last, item)) {
+    saveQueue([...queue.slice(0, -1), { ...last, copies: copiesOf(last) + 1 }]);
+  } else {
+    saveQueue([...queue, { ...item, copies: 1 }]);
+    makeThumb(item);
+  }
+  const count = queueLabelCount(app.get().queue);
+  const copies = copiesOf(app.get().queue[app.get().queue.length - 1]);
+  say(`Added "${short}"${copies > 1 ? ` (×${copies})` : ''} to the queue${count > 1 ? ` (${count} labels, saves ${25 * (count - 1)} mm of tape)` : ''}.`);
+  return true;
 }
 
-export function moveQueueItem(index, step) {
+// Moves a queued label from one place in the list to another
+export function moveQueueItem(from, to) {
   const queue = [...app.get().queue];
-  const to = index + step;
-  if (to < 0 || to >= queue.length) return;
-  [queue[index], queue[to]] = [queue[to], queue[index]];
+  if (from === to || to < 0 || to >= queue.length) return;
+  const [item] = queue.splice(from, 1);
+  queue.splice(to, 0, item);
+  saveQueue(queue);
+}
+
+export function setQueueCopies(index, copies) {
+  if (copies < 1) { removeQueueItem(index); return; }
+  const queue = app.get().queue.map((item, i) => (i === index ? { ...item, copies: Math.min(99, copies) } : item));
   saveQueue(queue);
 }
 
 export function removeQueueItem(index) {
-  const queue = app.get().queue.filter((_, i) => i !== index);
-  saveQueue(queue);
-  say(`Removed from the queue (${queue.length} left).`);
+  const before = app.get().queue;
+  const title = itemTitle(before[index]);
+  saveQueue(before.filter((_, i) => i !== index), { queue: before, text: `Removed "${title.length > 30 ? `${title.slice(0, 29)}…` : title}".` });
 }
 
 export function clearQueue() {
-  Object.values(app.get().thumbs).forEach((url) => URL.revokeObjectURL(url));
-  app.set({ thumbs: {} });
-  saveQueue([]);
-  say('Queue cleared.');
+  const before = app.get().queue;
+  saveQueue([], before.length ? { queue: before, text: `Cleared ${queueLabelCount(before)} labels.` } : null);
+}
+
+// Puts back what the last removal or clearing took out
+export function undoQueueRemoval() {
+  const { queueUndo } = app.get();
+  if (!queueUndo) return;
+  saveQueue(queueUndo.queue);
+  queueUndo.queue.forEach(makeThumb);
 }
 
 export function keepPrintedQueue() {
@@ -573,7 +655,9 @@ export async function renderQueue() {
     app.set({ queueRender: null });
   } else {
     try {
-      const result = await py.render_queue(queue.map(itemOptions));
+      const result = await py.render_queue(queue.map(itemOptions), queue.map(copiesOf));
+      // Which list item each printed label on the strip belongs to
+      const owners = queue.flatMap((item, i) => Array(copiesOf(item)).fill(i));
       app.set({
         queueRender: {
           previewUrl: URL.createObjectURL(new Blob([result.preview_png], { type: 'image/png' })),
@@ -582,7 +666,8 @@ export async function renderQueue() {
           metrics: result.metrics,
           tape_width_mm: itemTapeWidth(queue[0]),
           tape_bg_color: queue[0].mode === 'bin' ? '#FFFFFF' : queue[0].label.tape_bg_color,
-          count: queue.length,
+          count: queueLabelCount(queue),
+          spans: result.spans.map(([from, to], n) => ({ from, to, item: owners[n] })),
           bins: queue.some((item) => item.mode === 'bin'),
         },
       });

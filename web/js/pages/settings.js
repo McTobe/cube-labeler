@@ -1,11 +1,11 @@
 // Settings: printer, how the app looks, and what this device keeps
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
-import { Segmented, Select, Sheet, Toggle } from '../ui.js';
+import { Segmented, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateSettings } from '../app.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
-import { autoBackup, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
+import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
 import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
 import { ai, loadAi, setKey, setModel } from '../ai.js';
 import { errorMessage } from '../../printer.js';
@@ -31,7 +31,7 @@ function formatDate(iso) {
 }
 
 function RestoreSheet({ opened, onClose, onDone }) {
-  const [parts, setParts] = useState({ icons: true, settings: true, templates: true });
+  const [parts, setParts] = useState({ icons: true, settings: true, templates: true, fonts: true });
   const [onConflict, setOnConflict] = useState('skip');
   const [busy, setBusy] = useState(false);
   if (!opened) return html`<${Sheet} open=${false} title="" onClose=${onClose} />`;
@@ -39,12 +39,13 @@ function RestoreSheet({ opened, onClose, onDone }) {
     icons: opened.icons.length > 0,
     settings: opened.settings !== null,
     templates: opened.templates.length > 0,
+    fonts: (opened.fonts || []).length > 0,
   };
   const conflicts = (parts.icons ? opened.iconPlan.conflicts : 0) + (parts.templates ? opened.templatePlan.conflicts : 0);
   const restore = async () => {
     setBusy(true);
     try {
-      onDone(await restoreBackup(opened, { icons: parts.icons && has.icons, settings: parts.settings && has.settings, templates: parts.templates && has.templates }, onConflict));
+      onDone(await restoreBackup(opened, { icons: parts.icons && has.icons, settings: parts.settings && has.settings, templates: parts.templates && has.templates, fonts: parts.fonts && has.fonts }, onConflict));
     } catch (err) {
       onDone(null, errorMessage(err));
     } finally {
@@ -60,7 +61,8 @@ function RestoreSheet({ opened, onClose, onDone }) {
     <p class="hint">${opened.created ? `Made ${formatDate(opened.created)}.` : 'An older backup.'} Nothing here is deleted; restoring only adds or replaces.</p>
     ${Object.values(has).filter(Boolean).length <= 1
       ? html`<p>${has.icons ? `${plural(opened.icons.length, 'icon')} (${iconNote})` : has.templates ? plural(opened.templates.length, 'template')
-        : has.settings ? 'Your settings, favourites and recently used icons' : 'This backup is empty.'}</p>`
+        : has.settings ? 'Your settings, favourites and recently used icons' : has.fonts ? plural(opened.fonts.length, 'added font')
+        : 'This backup is empty.'}</p>`
       : html`<div class="restore-parts">
       ${has.icons && html`<${Toggle} label=${`${plural(opened.icons.length, 'icon')} (${iconNote})`} checked=${parts.icons}
         onChange=${(icons) => setParts({ ...parts, icons })} />`}
@@ -68,6 +70,8 @@ function RestoreSheet({ opened, onClose, onDone }) {
         onChange=${(templates) => setParts({ ...parts, templates })} />`}
       ${has.settings && html`<${Toggle} label="Settings, favourites and recently used icons" checked=${parts.settings}
         onChange=${(settings) => setParts({ ...parts, settings })} />`}
+      ${has.fonts && html`<${Toggle} label=${plural(opened.fonts.length, 'added font')} checked=${parts.fonts}
+        onChange=${(fonts) => setParts({ ...parts, fonts })} />`}
     </div>`}
     ${opened.skipped_templates.length > 0 && html`<p class="hint">Left out, could not be read: ${opened.skipped_templates.join(', ')}.</p>`}
     ${conflicts > 0 && html`<${Segmented} label=${`${plural(conflicts, 'icon or template', 'icons or templates')} with the same name as one of yours`}
@@ -130,6 +134,7 @@ function BackupCard() {
     if (result.icons) said.push(`${plural(result.icons.added + result.icons.replaced, 'icon')} restored`);
     if (result.templates) said.push(`${plural(result.templates.added + result.templates.replaced, 'template')} restored`);
     if (result.settings) said.push('settings restored');
+    if (result.fonts) said.push(`${plural(result.fonts, 'font')} added`);
     const skipped = (result.icons ? result.icons.skipped : 0) + (result.templates ? result.templates.skipped : 0);
     if (skipped) said.push(`${skipped} kept as yours`);
     setMessage({ text: said.length ? `Done: ${said.join(', ')}.` : 'Everything in the backup was already here.', error: false });
@@ -183,6 +188,15 @@ function DrivePicker({ open, onClose, onPick }) {
 
 // Sync through Google Drive: the same icons, templates and settings on every device
 function SyncCard() {
+  return html`<section class="card">
+    <h2 class="card-title">Sync with Google Drive</h2>
+    <${SyncPanel} />
+  </section>`;
+}
+
+// Google Drive sync: sign in, see that it works, sync now, sign out. Also opened from the
+// Sync chip in the top bar.
+export function SyncPanel() {
   const ready = useStore(boot).phase === 'ready';
   const d = useStore(drive);
   const auto = useStore(autoBackup);
@@ -191,7 +205,11 @@ function SyncCard() {
     setError('');
     try { await action(); } catch (err) { setError(errorMessage(err)); }
   };
-  const last = auto.driveLast ? ` Last synced ${formatDate(auto.driveLast)}.` : '';
+  // Syncing shows only for Sync now; the quiet syncs after changes keep the time
+  const [syncing, setSyncing] = useState(false);
+  const syncNow = () => run(async () => { setSyncing(true); try { await backupNow(); } finally { setSyncing(false); } });
+  const lastLine = syncing ? html`<p class="hint last-synced">Syncing…</p>`
+    : auto.driveLast ? html`<p class="hint last-synced">Last synced: ${formatDate(auto.driveLast)}</p>` : null;
   let state;
   if (!d.on) {
     state = html`<p class="hint">Sign in with Google on each device you use, and your own icons, templates and settings follow you.
@@ -202,19 +220,20 @@ function SyncCard() {
     const who = d.email ? html`<strong>${d.email}</strong>` : 'Google Drive';
     state = html`
       ${d.token
-        ? html`<p class="auto-on"><span class="dot on"></span><span>${auto.busy ? 'Syncing…' : html`On, synced with ${who}.${last}`}</span></p>`
-        : html`<p class="auto-on"><span class="dot"></span><span>Paused: Google asks you to continue once an hour.${last}</span></p>`}
+        ? html`<p class="auto-on"><span class="dot on"></span><span>On, synced with ${who}.</span></p>`
+        : html`<p class="auto-on"><span class="dot"></span><span>Paused: Google asks you to continue once an hour.</span></p>`}
+      ${lastLine}
       ${auto.driveError && html`<p class="status-line error">${auto.driveError}</p>`}
       <div class="button-row">
         ${!d.token && html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue with Google</button>`}
+        ${d.token && html`<button class="secondary" disabled=${!ready || auto.busy} onClick=${syncNow}>Sync now</button>`}
         <button class="secondary" disabled=${auto.busy} onClick=${() => run(signOutOfDrive)}>Sign out</button>
       </div>`;
   }
-  return html`<section class="card">
-    <h2 class="card-title">Sync with Google Drive</h2>
+  return html`<div class="sync-panel">
     ${state}
     ${error && html`<p class="status-line error">${error}</p>`}
-  </section>`;
+  </div>`;
 }
 
 // Automatic backups to a folder, which can be one that Google Drive, OneDrive or Dropbox syncs
@@ -286,19 +305,13 @@ function AiCard() {
 }
 
 export function SettingsPage() {
-  const { settings, languages } = useStore(app);
+  const { settings } = useStore(app);
   return html`<div class="settings-page">
     <section class="card">
       <h2 class="card-title">Printer</h2>
       <${PrinterPanel} />
       <${Toggle} label="Set the tape width from the printer" checked=${settings.match_printer_tape}
         onChange=${(match_printer_tape) => updateSettings({ match_printer_tape })} />
-    </section>
-
-    <section class="card">
-      <h2 class="card-title">Bin labels</h2>
-      <${Select} label="Language for suggested names, like Screws or Bearings" value=${settings.label_language}
-        options=${languages} onChange=${(label_language) => updateSettings({ label_language })} />
     </section>
 
     <section class="card">
@@ -315,13 +328,15 @@ export function SettingsPage() {
 
     <section class="card">
       <h2 class="card-title">Your data</h2>
-      <p>Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the server.</p>
+      <p>Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the Cube Labeler server; with Google Drive sync on, a backup of them also goes to your own Drive.</p>
       <${StorageUse} />
     </section>
 
     <section class="card about">
       <h2 class="card-title">About</h2>
-      <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT.</p>
+      <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT. <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">On GitHub</a></p>
+      <p>Cube Labeler is free. If it saves you time, you can <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">buy me a coffee on Ko-fi</a> ♥</p>
+      <p class="hint">Something looks off after an update? <button class="link-button" onClick=${() => window.freshCopy()}>Load a fresh copy</button> of the app. Your labels, icons and settings stay.</p>
       <p class="hint">Labels are drawn by the same Python code as the desktop app, running in this browser with Pyodide.
         Arimo font under the SIL Open Font License.</p>
     </section>

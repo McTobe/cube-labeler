@@ -87,7 +87,7 @@ class TestIconBrowser(unittest.TestCase):
     def test_sidebar_lists_every_view_with_counts(self):
         dlg = self._open(initial_category="Screw drives")
         self.assertEqual(list(dlg._sidebar_buttons), self.mgr.views)
-        self.assertIn("(6)", dlg._sidebar_buttons["Screw drives"].cget("text"))
+        self.assertIn("(8)", dlg._sidebar_buttons["Screw drives"].cget("text"))
         self.assertEqual(sorted(self._shown_ids(dlg)), sorted(i.id for i in self.mgr.list_icons("Screw drives")))
 
     def test_unknown_initial_category_shows_all(self):
