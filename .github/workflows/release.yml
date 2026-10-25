@@ -57,5 +57,6 @@ jobs:
           files: dist/CubeLabeler.exe
           name: Cube Labeler ${{ github.ref_name }}
           draft: false
-          prerelease: false
+          # v2.0.0-rc.1 and the like are marked as pre-releases
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
