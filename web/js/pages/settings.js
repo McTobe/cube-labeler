@@ -1,7 +1,7 @@
 // Settings: printer, how the app looks, and what this device keeps
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
-import { Segmented, Select, Sheet, Toggle } from '../ui.js';
+import { Segmented, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateSettings } from '../app.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
@@ -305,19 +305,13 @@ function AiCard() {
 }
 
 export function SettingsPage() {
-  const { settings, languages } = useStore(app);
+  const { settings } = useStore(app);
   return html`<div class="settings-page">
     <section class="card">
       <h2 class="card-title">Printer</h2>
       <${PrinterPanel} />
       <${Toggle} label="Set the tape width from the printer" checked=${settings.match_printer_tape}
         onChange=${(match_printer_tape) => updateSettings({ match_printer_tape })} />
-    </section>
-
-    <section class="card">
-      <h2 class="card-title">Bin labels</h2>
-      <${Select} label="Language for suggested names, like Screws or Bearings" value=${settings.label_language}
-        options=${languages} onChange=${(label_language) => updateSettings({ label_language })} />
     </section>
 
     <section class="card">

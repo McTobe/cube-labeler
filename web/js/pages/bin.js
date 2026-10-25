@@ -9,7 +9,6 @@ import { Field, Section, Segmented, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say } from '../app.js';
 
-const SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8', 'M10', 'M12'];
 const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8'];
 const QUICK_LENGTHS = ['4', '6', '8', '10', '12', '16', '20', '25', '30', '35', '40', '50'];
 const BINS = [['single', 'One'], ['dual', 'Two'], ['quad', 'Four']];
@@ -54,16 +53,6 @@ const unformatLength = (text) => {
   const m = String(text || '').trim().match(/^[x×]\s*(\d+(?:[.,]\d+)?)$/i);
   return m ? m[1] : String(text || '');
 };
-
-// A text box with suggestions that still takes anything typed
-function Suggest({ label, value, options, placeholder, onChange, hint }) {
-  const id = useRef(`list-${Math.random().toString(36).slice(2)}`).current;
-  return html`<${Field} label=${label} hint=${hint}>
-    <input type="text" list=${id} value=${value} placeholder=${placeholder} autocomplete="off"
-      onInput=${(e) => onChange(e.currentTarget.value)} />
-    <datalist id=${id}>${options.map((o) => html`<option value=${o} />`)}</datalist>
-  <//>`;
-}
 
 function Text({ label, value, placeholder, onChange, hint }) {
   return html`<${Field} label=${label} hint=${hint}>
@@ -169,25 +158,27 @@ function FastenerForm({ cfg, names }) {
     </div>`;
   }
   return html`
-    <div class="bin-grid">
+    <div class="bin-grid three">
       <div class="bin-col">
-        <div class="row">
-          <${Suggest} label="Size" value=${cfg.thread_size} options=${SIZES} placeholder="M3"
-            onChange=${(thread_size) => updateBin({ thread_size })} />
-          <${Suggest} label="Name" value=${cfg.category} options=${names} placeholder="SCREWS"
-            onChange=${(category) => updateBin({ category })} />
-        </div>
+        <${Text} label="Size" value=${cfg.thread_size} placeholder="M3" onChange=${(thread_size) => updateBin({ thread_size })} />
         <${Chips} label="Common sizes" values=${QUICK_SIZES} current=${cfg.thread_size}
           onPick=${(thread_size) => updateBin({ thread_size })} />
+        <${Text} label="Name" value=${cfg.category} placeholder="SCREWS" onChange=${(category) => updateBin({ category })} />
+        <${Chips} label="Common names" values=${names.slice(0, 4)} current=${cfg.category}
+          onPick=${(category) => updateBin({ category })} />
+      </div>
+      <div class="bin-col">
         <${Segmented} label="Bins" options=${BINS} value=${mode === 'assortment' ? '' : mode}
           onChange=${(compartment_mode) => { lastLength = null; updateBin({ compartment_mode }); }} />
-        <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'} >${lengths}<//>
+        <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'}>${lengths}<//>
         ${mode !== 'assortment' && html`<${Chips} label="Common lengths" values=${QUICK_LENGTHS} onPick=${(v) => pickLength(cfg, v)} />`}
       </div>
       <div class="bin-col">
         <${IconTiles} cfg=${cfg} field="tool_type"
           tiles=${cfg.tool_type === 'washer' ? [...DRIVE_TILES, { value: 'washer', name: 'Washer' }] : DRIVE_TILES} />
-        <${Text} label="Drive size" value=${cfg.tool_size} placeholder="2.5" onChange=${(tool_size) => updateBin({ tool_size })} />
+        <div class="row">
+          <${Text} label="Drive size" value=${cfg.tool_size} placeholder="2.5" onChange=${(tool_size) => updateBin({ tool_size })} />
+        </div>
       </div>
     </div>
   `;
@@ -197,8 +188,9 @@ function PartForm({ cfg, names }) {
   return html`
     <div class="bin-grid">
       <div class="bin-col">
-        <${Suggest} label="Name" value=${cfg.category_banner} options=${names} placeholder="BEARINGS"
-          onChange=${(category_banner) => updateBin({ category_banner })} />
+        <${Text} label="Name" value=${cfg.category_banner} placeholder="BEARINGS" onChange=${(category_banner) => updateBin({ category_banner })} />
+        <${Chips} label="Common names" values=${names.slice(0, 4)} current=${cfg.category_banner}
+          onPick=${(category_banner) => updateBin({ category_banner })} />
         <${Text} label="Part number" value=${cfg.spec_primary} placeholder="608ZZ" onChange=${(spec_primary) => updateBin({ spec_primary })} />
         <${Text} label="Note" value=${cfg.spec_secondary} placeholder="Optional, e.g. 0.2–4.0 mm²" onChange=${(spec_secondary) => updateBin({ spec_secondary })} />
       </div>

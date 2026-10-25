@@ -44,7 +44,7 @@ export const DEFAULT_SETTINGS = {
   ai_models: {},
   theme: 'system',  // 'system', 'light', 'dark'
   match_printer_tape: true,
-  label_language: 'en',  // words suggested for bin labels
+  label_language: 'en',  // kept for the desktop app's backups; the web version is in English
   bin_label_mm: null,  // the user's own bin label length for Reset, instead of 38 mm
 };
 
@@ -141,7 +141,8 @@ export async function start() {
   for (const font of fonts) {
     try { await py.add_font(font.filename, font.data); } catch (err) { console.warn(err); }
   }
-  const lang = app.get().settings.label_language;
+  // Bin labels are in English; a language from a desktop backup is kept for the desktop app only
+  const lang = 'en';
   const [tapeWidths, fontNames, binNames, languages, binDefaults] = await Promise.all([
     py.tape_widths(), py.font_names(), py.bin_name_suggestions(lang), py.label_languages(), py.bin_defaults(lang),
   ]);
@@ -172,10 +173,6 @@ export async function updateSettings(change) {
   app.set({ settings });
   storage.save('settings', settings);
   if ('theme' in change) applyTheme(settings.theme);
-  if ('label_language' in change && py) {
-    // Only the suggestions change; names already typed stay as they are
-    app.set({ binNames: await py.bin_name_suggestions(settings.label_language) });
-  }
 }
 
 // --- Editing and rendering -----------------------------------------------------------------
