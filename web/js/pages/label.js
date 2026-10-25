@@ -164,46 +164,37 @@ function TextCard() {
   </section>`;
 }
 
-// On a phone, while the label text has the focus, the text box grows to fill the room between
-// the pinned preview and the toolbar docked on the keyboard, and the page scrolls it into place
+// On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
+// label kind and the text card in view) and the text box stretches down to the toolbar docked on
+// the keyboard
 function useTypingRoom(ref, wide) {
   useEffect(() => {
     const area = ref.current;
     if (!area || wide) return undefined;
     let timer = null;
-    const fit = () => {
-      if (document.activeElement !== area || !document.body.classList.contains('typing')) { reset(); return; }
-      const pinned = document.querySelector('.label-preview-col');
-      const tools = area.closest('.text-card').querySelector('.format-tools');
-      const top = pinned ? pinned.getBoundingClientRect().bottom : 0;
-      const room = window.innerHeight - top - (tools ? tools.offsetHeight : 0) - 16;
-      // Tall enough for the text and a few more lines, but never taller than the room left
-      area.style.height = '0px';
-      const wanted = Math.max(120, Math.min(area.scrollHeight + 72, 260));
-      area.style.height = `${Math.max(96, Math.min(room, wanted))}px`;
-      // The browser keeps the caret in view after each edit; it must look below the pinned
-      // preview and above the toolbar for that
-      const root = document.documentElement.style;
-      root.scrollPaddingTop = `${top + 8}px`;
-      root.scrollPaddingBottom = `${(tools ? tools.offsetHeight : 0) + 8}px`;
-      window.scrollBy({ top: area.getBoundingClientRect().top - top - 8 });
-    };
-    const later = () => { clearTimeout(timer); timer = setTimeout(fit, 120); };
     const reset = () => {
       area.style.height = '';
-      document.documentElement.style.scrollPaddingTop = '';
       document.documentElement.style.scrollPaddingBottom = '';
     };
+    const fit = () => {
+      if (document.activeElement !== area || !document.body.classList.contains('typing')) { reset(); return; }
+      const tools = area.closest('.text-card').querySelector('.format-tools');
+      const toolsHeight = tools ? tools.offsetHeight : 0;
+      window.scrollTo({ top: 0 });
+      const room = window.innerHeight - toolsHeight - area.getBoundingClientRect().top - 12;
+      area.style.height = `${Math.max(60, room)}px`;
+      // The browser keeps the caret in view; it must look above the toolbar for that
+      document.documentElement.style.scrollPaddingBottom = `${toolsHeight + 8}px`;
+    };
+    const later = () => { clearTimeout(timer); timer = setTimeout(fit, 120); };
     area.addEventListener('focus', later);
     area.addEventListener('blur', reset);
     window.addEventListener('resize', later);
-    area.addEventListener('input', later);
     return () => {
       clearTimeout(timer);
       area.removeEventListener('focus', later);
       area.removeEventListener('blur', reset);
       window.removeEventListener('resize', later);
-      area.removeEventListener('input', later);
     };
   }, [wide]);
 }
