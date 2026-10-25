@@ -8,11 +8,14 @@ import { useWide } from './ui.js';
 const ZOOMS = [['fit', 'Fit'], ['2', '2×'], ['4', '4×']];
 // Room Fit leaves around the strip, in pixels, and the share of a tall stage the label may fill
 const FIT_SIDE = 80;
-const FIT_HEIGHT_SHARE = 0.6;
+const FIT_HEIGHT_SHARE = 0.35;
 const PHONE_FIT_HEIGHT = 120;
+// Fit never draws the tape more than this many pixels per millimetre (about 3× real size on a
+// desktop screen), so a short label sits on the stage like a label instead of filling it
+const FIT_MAX_PX_PER_MM = 11;
 
 // The width that shows the whole label as big as the stage allows (Fit)
-function useFitWidth(stageRef, natural, wide) {
+function useFitWidth(stageRef, natural, wide, tapeMm) {
   const [box, setBox] = useState(null);
   useEffect(() => {
     const stage = stageRef.current;
@@ -22,7 +25,7 @@ function useFitWidth(stageRef, natural, wide) {
     return () => observer.disconnect();
   }, [stageRef.current]);
   if (!box || !natural) return null;
-  const maxHeight = wide ? (box[1] - 40) * FIT_HEIGHT_SHARE : PHONE_FIT_HEIGHT;
+  const maxHeight = wide ? Math.min((box[1] - 40) * FIT_HEIGHT_SHARE, tapeMm * FIT_MAX_PX_PER_MM) : PHONE_FIT_HEIGHT;
   const scale = Math.min((box[0] - FIT_SIDE) / natural[0], maxHeight / natural[1]);
   return Math.max(40, Math.floor(natural[0] * scale));
 }
@@ -41,7 +44,9 @@ export function Preview({ strip, empty }) {
   const stageRef = useRef(null);
   const [natural, setNatural] = useState(null);
   const wide = useWide();
-  const fitWidth = useFitWidth(stageRef, natural, wide);
+  // Bin labels and queue strips are on 12 mm tape
+  const tapeMm = strip === undefined && state.mode === 'text' ? Number(label.tape_width_mm) || 12 : 12;
+  const fitWidth = useFitWidth(stageRef, natural, wide, tapeMm);
   // Zooming makes the stage taller, which must not change the size it zooms from
   const fitBase = useRef(null);
   if (zoom === 'fit' || !fitBase.current) fitBase.current = fitWidth;

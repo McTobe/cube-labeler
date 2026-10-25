@@ -11,7 +11,7 @@ import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
 import { app, start, pageChanged } from './app.js';
 import { useStore } from './state.js';
-import { startAutoBackup, continueDriveBackup } from './autobackup.js';
+import { startAutoBackup, continueDriveBackup, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
 
 const PAGES = [
@@ -27,16 +27,30 @@ function currentPage() {
   return PAGES.find((p) => p.id === id) || PAGES[0];
 }
 
-// Shown while Google Drive sync waits for a click: Google's sign-in lasts an hour at a time
+// Google Drive sync at a glance: green when syncing works, amber when Google wants the
+// hourly click (one click continues), red after an error, grey when it is off
 function SyncChip() {
   const d = useStore(drive);
+  const auto = useStore(autoBackup);
   const [error, setError] = useState('');
-  if (!d.on || d.token) return null;
-  const go = async () => {
+  let state = 'off';
+  let title = 'Sync is off. Turn it on in Settings to have your icons, templates and settings on every device.';
+  if (d.on && !d.token) {
+    state = 'paused';
+    title = 'Sync is paused: Google asks you to continue once an hour. Click to continue.';
+  } else if (d.on && (auto.driveError || error)) {
+    state = 'error';
+    title = `Sync failed: ${auto.driveError || error}`;
+  } else if (d.on) {
+    state = auto.busy ? 'busy' : 'ready';
+    title = auto.busy ? 'Syncing with Google Drive…' : `Synced with Google Drive${d.email ? ` (${d.email})` : ''}.`;
+  }
+  const click = async () => {
+    if (state !== 'paused') { location.hash = '#/settings'; return; }
     setError('');
     try { await continueDriveBackup(); } catch (err) { setError(err.message || String(err)); }
   };
-  return html`<button class="printer-chip sync-chip" title=${error || 'Sign in to Google again to sync your icons, templates and settings'} onClick=${go}>
+  return html`<button class=${`printer-chip sync-chip state-${state}`} title=${title} aria-label=${title} onClick=${click}>
     <span class="dot" aria-hidden="true"></span><${Icon} name="cloud" size=${18} /><span class="chip-label">Sync</span>
   </button>`;
 }
