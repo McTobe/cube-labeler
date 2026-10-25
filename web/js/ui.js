@@ -122,7 +122,7 @@ export function Menu({ open, onClose, items }) {
   if (!open) return null;
   return html`<div class="menu-backdrop" onClick=${onClose} onWheel=${onClose}></div>
     <div ref=${ref} class="menu" role="menu" onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); }}>
-      ${items.map((item) => html`<button role="menuitem" disabled=${item.disabled}
+      ${items.filter(Boolean).map((item) => html`<button role="menuitem" disabled=${item.disabled}
         onClick=${() => { onClose(); item.action(); }}>
         ${item.icon && html`<${Icon} name=${item.icon} />`}<span>${item.label}</span>
       </button>`)}

@@ -154,6 +154,22 @@ class TestWebBinLabelsAndQueue(unittest.TestCase):
         configs = [cube_web._label_config(label) for label in labels]
         self.assertEqual(result["raster"], LabelRenderer().render_batch(configs)[2])
 
+    def test_queue_copies_repeat_a_label_and_spans_point_at_each(self):
+        labels = [{"text": "One"}, {"text": "Two"}]
+        result = cube_web.render_queue(labels, [3, 1])
+        self.assertEqual(result["metrics"]["label_count"], 4)
+        configs = [cube_web._label_config(labels[0])] * 3 + [cube_web._label_config(labels[1])]
+        self.assertEqual(result["raster"], LabelRenderer().render_batch(configs)[2])
+        spans = result["spans"]
+        self.assertEqual(len(spans), 4)
+        # In order, apart, and inside the strip
+        for (s0, e0), (s1, e1) in zip(spans, spans[1:]):
+            self.assertLess(s0, e0)
+            self.assertLess(e0, s1)
+        self.assertGreater(spans[0][0], 0)
+        self.assertLess(spans[-1][1], 1)
+        self.assertEqual(cube_web.render_queue([{"text": "Solo"}])["spans"], [[0.0, 1.0]])
+
     def test_bin_defaults_and_suggestions_follow_the_language(self):
         self.assertEqual(cube_web.bin_defaults("sv")["fastener"]["category"], "SKRUV")
         self.assertIn("KULLAGER", cube_web.bin_name_suggestions("sv")["component"])

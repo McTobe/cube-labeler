@@ -60,7 +60,8 @@ export const app = createStore({
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
   languages: [['en', 'English']],
-  queue: [],  // [{id, mode, label} or {id, mode, bin}], printed as one strip
+  queue: [],  // [{id, mode, label, copies} or {id, mode, bin, copies}], printed as one strip
+  queueUndo: null,  // {queue, text}: the queue before the last removal, while it can be undone
   queueRender: null,  // like render, for the whole queue
   queuePrinted: 0,  // labels in the last printed queue, until the user keeps or clears it
   thumbs: {},  // queue item id -> preview URL
@@ -113,7 +114,7 @@ export async function start() {
     label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     mode,
     bin,
-    queue,
+    queue: mergeCopies(queue),
   });
   applyTheme(app.get().settings.theme);
   storage.askToPersist();
@@ -491,9 +492,29 @@ export function savePicture(fromQueue = false) {
 // --- Queue ---------------------------------------------------------------------------------
 
 let nextQueueId = Date.now();
+let undoTimer = null;
+const UNDO_SECONDS = 8;
 
-function saveQueue(queue) {
-  app.set({ queue, queuePrinted: 0 });
+const sameLabel = (a, b) => a.mode === b.mode && JSON.stringify(a.mode === 'bin' ? a.bin : a.label) === JSON.stringify(b.mode === 'bin' ? b.bin : b.label);
+export const copiesOf = (item) => Math.max(1, item.copies || 1);
+// Every printed label, copies included
+export const queueLabelCount = (queue) => queue.reduce((sum, item) => sum + copiesOf(item), 0);
+
+// Queues saved before copies existed hold the same label several times in a row
+function mergeCopies(queue) {
+  const merged = [];
+  for (const item of queue) {
+    const last = merged[merged.length - 1];
+    if (last && sameLabel(last, item)) last.copies = copiesOf(last) + copiesOf(item);
+    else merged.push({ ...item, copies: copiesOf(item) });
+  }
+  return merged;
+}
+
+function saveQueue(queue, undo = null) {
+  clearTimeout(undoTimer);
+  if (undo) undoTimer = setTimeout(() => app.set({ queueUndo: null }), UNDO_SECONDS * 1000);
+  app.set({ queue, queuePrinted: 0, queueUndo: undo });
   storage.save('queue', queue);
   queueRenderStale = true;
   if (queueShown) renderQueue();
@@ -522,36 +543,54 @@ export function addToQueue() {
     say(`The queue is for ${itemTapeWidth(queue[0])} mm tape, but this label is ${itemTapeWidth(item)} mm. Print or clear the queue first.`, true);
     return false;
   }
-  saveQueue([...queue, item]);
-  makeThumb(item);
-  const count = queue.length + 1;
   const title = itemTitle(item);
   const short = title.length > 25 ? `${title.slice(0, 24)}…` : title;
-  say(count > 1
-    ? `Added "${short}" to the queue (${count} labels, saves ${25 * (count - 1)} mm of tape).`
-    : `Added "${short}" to the queue.`);
+  const last = queue[queue.length - 1];
+  // The same label again is one more copy of it
+  if (last && sameLabel(last, item)) {
+    saveQueue([...queue.slice(0, -1), { ...last, copies: copiesOf(last) + 1 }]);
+  } else {
+    saveQueue([...queue, { ...item, copies: 1 }]);
+    makeThumb(item);
+  }
+  const count = queueLabelCount(app.get().queue);
+  const copies = copiesOf(app.get().queue[app.get().queue.length - 1]);
+  say(`Added "${short}"${copies > 1 ? ` (×${copies})` : ''} to the queue${count > 1 ? ` (${count} labels, saves ${25 * (count - 1)} mm of tape)` : ''}.`);
   return true;
 }
 
-export function moveQueueItem(index, step) {
+// Moves a queued label from one place in the list to another
+export function moveQueueItem(from, to) {
   const queue = [...app.get().queue];
-  const to = index + step;
-  if (to < 0 || to >= queue.length) return;
-  [queue[index], queue[to]] = [queue[to], queue[index]];
+  if (from === to || to < 0 || to >= queue.length) return;
+  const [item] = queue.splice(from, 1);
+  queue.splice(to, 0, item);
+  saveQueue(queue);
+}
+
+export function setQueueCopies(index, copies) {
+  if (copies < 1) { removeQueueItem(index); return; }
+  const queue = app.get().queue.map((item, i) => (i === index ? { ...item, copies: Math.min(99, copies) } : item));
   saveQueue(queue);
 }
 
 export function removeQueueItem(index) {
-  const queue = app.get().queue.filter((_, i) => i !== index);
-  saveQueue(queue);
-  say(`Removed from the queue (${queue.length} left).`);
+  const before = app.get().queue;
+  const title = itemTitle(before[index]);
+  saveQueue(before.filter((_, i) => i !== index), { queue: before, text: `Removed "${title.length > 30 ? `${title.slice(0, 29)}…` : title}".` });
 }
 
 export function clearQueue() {
-  Object.values(app.get().thumbs).forEach((url) => URL.revokeObjectURL(url));
-  app.set({ thumbs: {} });
-  saveQueue([]);
-  say('Queue cleared.');
+  const before = app.get().queue;
+  saveQueue([], before.length ? { queue: before, text: `Cleared ${queueLabelCount(before)} labels.` } : null);
+}
+
+// Puts back what the last removal or clearing took out
+export function undoQueueRemoval() {
+  const { queueUndo } = app.get();
+  if (!queueUndo) return;
+  saveQueue(queueUndo.queue);
+  queueUndo.queue.forEach(makeThumb);
 }
 
 export function keepPrintedQueue() {
@@ -598,7 +637,9 @@ export async function renderQueue() {
     app.set({ queueRender: null });
   } else {
     try {
-      const result = await py.render_queue(queue.map(itemOptions));
+      const result = await py.render_queue(queue.map(itemOptions), queue.map(copiesOf));
+      // Which list item each printed label on the strip belongs to
+      const owners = queue.flatMap((item, i) => Array(copiesOf(item)).fill(i));
       app.set({
         queueRender: {
           previewUrl: URL.createObjectURL(new Blob([result.preview_png], { type: 'image/png' })),
@@ -607,7 +648,8 @@ export async function renderQueue() {
           metrics: result.metrics,
           tape_width_mm: itemTapeWidth(queue[0]),
           tape_bg_color: queue[0].mode === 'bin' ? '#FFFFFF' : queue[0].label.tape_bg_color,
-          count: queue.length,
+          count: queueLabelCount(queue),
+          spans: result.spans.map(([from, to], n) => ({ from, to, item: owners[n] })),
           bins: queue.some((item) => item.mode === 'bin'),
         },
       });

@@ -184,12 +184,26 @@ def render_label(options: Any) -> Dict[str, Any]:
     return _render_result((_hide_cut_line(preview, config), *rest))
 
 
-def render_queue(labels: Any) -> Dict[str, Any]:
-    """Renders queued labels as one strip with cut lines between them, like the desktop queue."""
+def render_queue(labels: Any, copies: Any = None) -> Dict[str, Any]:
+    """
+    Renders queued labels as one strip with cut lines between them, like the desktop queue.
+    copies[i] prints labels[i] that many times in a row. "spans" holds each printed label's
+    [start, end] as a share of the strip's width, for pointing at it in the preview.
+    """
     if hasattr(labels, "to_py"):
         labels = labels.to_py()
-    configs = [_label_config(label) for label in labels]
-    return _render_result(_get_renderer().render_batch(configs))
+    if hasattr(copies, "to_py"):
+        copies = copies.to_py()
+    configs = []
+    for i, label in enumerate(labels):
+        config = _label_config(label)
+        configs += [config] * max(1, int(copies[i]) if copies else 1)
+    spans: List[Any] = []
+    rendered = _get_renderer().render_batch(configs, spans=spans)
+    result = _render_result(rendered)
+    width = rendered[0].width
+    result["spans"] = [[start / width, end / width] for start, end in spans]
+    return result
 
 
 def label_thumbnail(options: Any, height: int = 48) -> bytes:

@@ -10,7 +10,7 @@ import { Sheet } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
-import { app, start, pageChanged } from './app.js';
+import { app, start, pageChanged, queueLabelCount } from './app.js';
 import { useStore } from './state.js';
 import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
@@ -79,7 +79,7 @@ function App() {
       <a class="brand" href="#/label"><img src="icon-192.png" alt="" width="28" height="28" /><span>Cube Labeler</span></a>
       ${PAGES.map((p) => html`<a href=${`#/${p.id}`} class=${p.id === page.id ? 'active' : ''}
         aria-current=${p.id === page.id ? 'page' : undefined}>
-        <${Icon} name=${p.icon} /><span>${p.title}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queue.length}</span>`}</a>`)}
+        <${Icon} name=${p.icon} /><span>${p.title}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`)}
     </nav>
     <div class="main-col">
       <header class="topbar">

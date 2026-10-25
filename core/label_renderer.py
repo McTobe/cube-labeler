@@ -393,26 +393,35 @@ class LabelRenderer:
         return preview_img, padded_128, raster_bytes, metrics
 
     def render_batch(
-        self, configs: List[LabelConfig], gap_dots: int = BATCH_GAP_DOTS
+        self, configs: List[LabelConfig], gap_dots: int = BATCH_GAP_DOTS,
+        spans: Optional[List[Tuple[int, int]]] = None,
     ) -> Tuple[Image.Image, Image.Image, bytes, LabelMetrics]:
         """
         Renders a continuous batch chain of multiple labels with dotted cut lines in between,
         eliminating the ~25mm wasted tape between consecutive individual prints.
         Every label gets the same half-gap of tape on both sides, first and last included.
         The strip starts with a cut line; its end needs none, since it stops at the cutter.
+        A list passed as spans gets each label's (start, end) x in the preview. The same
+        config object passed more than once (copies) is drawn once.
         """
         if not configs:
             return self.render(LabelConfig(text=""))
         if len(configs) == 1:
-            return self.render(configs[0])
+            result = self.render(configs[0])
+            if spans is not None:
+                spans.append((0, result[0].width))
+            return result
 
         canvases = []
         specs = []
         borders = []
         printable_hs = []
+        drawn = {}
 
         for cfg in configs:
-            c, spec, p_border, p_h, _, _ = self._render_base_canvas(cfg)
+            if id(cfg) not in drawn:
+                drawn[id(cfg)] = self._render_base_canvas(cfg)
+            c, spec, p_border, p_h, _, _ = drawn[id(cfg)]
             canvases.append(c)
             specs.append(spec)
             borders.append(p_border)
@@ -437,6 +446,8 @@ class LabelRenderer:
         cur_x = margin
         for idx, c in enumerate(canvases):
             batch_canvas.paste(c, (cur_x, 0))
+            if spans is not None:
+                spans.append((cur_x, cur_x + c.width))
             cur_x += c.width
             if idx < len(canvases) - 1:
                 cut_line(cur_x + margin)

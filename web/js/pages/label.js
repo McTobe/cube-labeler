@@ -10,7 +10,7 @@ import { Preview } from '../preview.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
-  addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue,
+  addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -354,10 +354,15 @@ function ActionBar() {
   }, [ready, p.transport, p.busy]);
 
   const needsPrinter = p.supported && !p.transport;
+  // With labels waiting in the queue, the next step is printing them together
+  const queued = queueLabelCount(queue);
   return html`<div class="action-bar">
     <p class=${`status-line${status.error ? ' error' : ''}`} role="status">${status.text}</p>
     <div class="action-buttons">
-      ${needsPrinter
+      ${queued > 0
+        ? html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
+            <${Icon} name="queue" size=${20} /> <span>Go to queue (${queued})</span></a>`
+        : needsPrinter
         ? html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
             <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`
         : html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
@@ -365,12 +370,13 @@ function ActionBar() {
             <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`}
       <button class="secondary big" disabled=${!ready} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
         <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Queue</span>
-        ${queue.length > 0 && html`<span class="count">${queue.length}</span>`}
       </button>
       <span class="menu-anchor">
         <button class="secondary big icon-only" aria-label="More actions" onClick=${() => setMenuOpen(true)}>
           <${Icon} name="more" /></button>
         <${Menu} open=${menuOpen} onClose=${() => setMenuOpen(false)} items=${[
+          queued > 0 && { label: 'Print only this label', icon: 'printer', action: printLabel,
+            disabled: !ready || !render || !p.transport || p.busy },
           { label: 'Save as picture', icon: 'download', action: savePicture, disabled: !render },
           { label: `Feed ${FEED_LENGTH_MM} mm of tape`, icon: 'feed', action: feed, disabled: !p.transport || p.busy || !ready },
         ]} />

@@ -48,6 +48,28 @@ const PART_TILES = [
   { value: 'none', name: 'None' },
 ];
 
+// What sets a bin label apart from others with the same name, for lists: lengths, drive or icon, length
+export function binSummary(cfg) {
+  const pictureName = () => (cfg.icon ? cfg.icon.name.replace(/\.[a-z]+$/i, '').replace(/[_-]+/g, ' ') : '');
+  const parts = [];
+  if (cfg.kind === 'component') {
+    parts.push(cfg.spec_secondary);
+    const tile = PART_TILES.find((t) => t.value === cfg.icon_type);
+    parts.push(cfg.icon_type === 'custom' ? pictureName() : tile && tile.value !== 'none' ? tile.name : '');
+  } else {
+    const lengths = cfg.compartment_mode === 'assortment'
+      ? [cfg.assortment_line1, cfg.assortment_line2]
+      : LENGTH_FIELDS[cfg.compartment_mode || 'single'].map((f) => cfg[f]);
+    parts.push(lengths.filter((t) => t && t.trim()).join(' '));
+    const tile = DRIVE_TILES.find((t) => t.value === cfg.tool_type);
+    const drive = cfg.tool_type === 'custom' ? (DRIVE_TILES.find((t) => t.picture && cfg.icon && t.picture === cfg.icon.name) || {}).name || pictureName()
+      : tile && tile.value !== 'none' ? tile.name : '';
+    parts.push([cfg.tool_size, drive].filter(Boolean).join(' '));
+  }
+  parts.push(`${cfg.label_width_mm} mm`);
+  return parts.filter((t) => t && t.trim()).join(' · ');
+}
+
 // A plain number is a length and prints as "x30"; anything else prints as typed
 const formatLength = (text) => (/^\d+(?:[.,]\d+)?$/.test(text.trim()) ? `x${text.trim()}` : text);
 const unformatLength = (text) => {
