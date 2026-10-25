@@ -6,7 +6,10 @@ import { app, boot, updateLabel, hush } from './app.js';
 import { Icon } from './icons.js';
 import { useWide } from './ui.js';
 
-const ZOOMS = [['fit', 'Fit'], ['2', '2×'], ['4', '4×']];
+const ZOOMS = [['fit', 'Fit'], ['real', 'Real size']];
+// Preview pixels are print dots (0.1411 mm); a CSS millimetre is 96 / 25.4 pixels, about real
+// size on most screens
+const REAL_PX_PER_DOT = 0.1411 * (96 / 25.4);
 // Room Fit leaves around the strip, in pixels, and the share of a tall stage the label may fill
 const FIT_SIDE = 80;
 const FIT_HEIGHT_SHARE = 0.35;
@@ -111,9 +114,9 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
     // Only the label being edited can show its dots (Advanced > Show print dots)
     const dots = strip === undefined && state.mode === 'text' && state.previewDots;
     const tape = dots ? '#ffffff' : render.tape_bg_color;
-    // 2× and 4× zoom in from the Fit size, so they are always bigger
+    // Real size draws each dot at its size on paper; a long strip scrolls inside the stage
     const fit = rows.length > 1 ? fitWidth(box, natural, wide, tapeMm, rows)
-      : fitBase.current ? fitBase.current * (zoom === 'fit' ? 1 : Number(zoom)) : null;
+      : zoom === 'real' ? (natural ? Math.round(natural[0] * REAL_PX_PER_DOT) : null) : fitBase.current;
     const src = dots ? render.dotsUrl : render.previewUrl;
     const alt = dots ? 'The dots the printer will print' : 'Label preview';
     const loaded = (e) => setNatural([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight]);
