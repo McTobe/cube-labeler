@@ -518,7 +518,14 @@ class InventoryRenderer:
     def _render_fastener_dual(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int, line_w: int
     ):
-        f_len = font_manager.load_font("Arial Bold", 22 * scale)
+        # The two lengths sit 0.44 w apart, so long ones shrink until a clear gap stays between them
+        texts = (cfg.length_dual_1, cfg.length_dual_2)
+        room = w * 0.44 - 8 * scale
+        size = 22 * scale
+        f_len = font_manager.load_font("Arial Bold", size)
+        while size > 10 * scale and max(draw.textlength(t, font=f_len) for t in texts) > room:
+            size -= scale
+            f_len = font_manager.load_font("Arial Bold", size)
         draw.text((x0 + w * 0.28, y0 + h // 2), cfg.length_dual_1, font=f_len, fill=0, anchor="mm")
         draw.text((x0 + w * 0.72, y0 + h // 2), cfg.length_dual_2, font=f_len, fill=0, anchor="mm")
 
