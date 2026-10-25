@@ -7,12 +7,14 @@ import { html } from '../html.js';
 import { IconPickerSheet } from './icons.js';
 import { Field, Section, Segmented, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, updateBin, setBinIcon, setBinIconBytes, addToQueue, say } from '../app.js';
+import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say } from '../app.js';
 
 const SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8', 'M10', 'M12'];
 const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8'];
 const QUICK_LENGTHS = ['4', '6', '8', '10', '12', '16', '20', '25', '30', '35', '40', '50'];
 const BINS = [['single', 'One'], ['dual', 'Two'], ['quad', 'Four']];
+// The bin label length Reset goes back to until the user saves their own
+const FACTORY_LABEL_MM = 38;
 const LENGTH_FIELDS = {
   single: ['length_single'],
   dual: ['length_dual_1', 'length_dual_2'],
@@ -248,7 +250,7 @@ export function BinCard() {
 
 // The bin label's less used options, in the side panel
 export function BinOptions() {
-  const { bin } = useStore(app);
+  const { bin, settings } = useStore(app);
   const [widthText, setWidthText] = useState(null);
   if (!bin) return null;
   const cfg = bin[bin.kind];
@@ -260,6 +262,10 @@ export function BinOptions() {
     if (mm >= 10) updateBin({ label_width_mm: mm });
   };
   const builtInDrive = DRIVES.some(([v]) => v === cfg.tool_type && v !== 'none');
+  const fallback = settings.bin_label_mm || FACTORY_LABEL_MM;
+  const current = Number(cfg.label_width_mm);
+  const reset = () => { setWidthText(null); updateBin({ label_width_mm: fallback }); };
+  const keep = () => { updateSettings({ bin_label_mm: current }); say(`Reset now goes back to ${current} mm.`); };
 
   return html`
     <${Section} id="bin-size" title="Label length" summary=${`${cfg.label_width_mm} mm, 12 mm tape`}>
@@ -267,6 +273,11 @@ export function BinOptions() {
         <input type="text" inputmode="decimal" value=${widthText ?? String(cfg.label_width_mm)} onInput=${onWidth}
           onBlur=${() => setWidthText(null)} />
       <//>
+      <div class="button-row">
+        <button class="secondary" disabled=${current === fallback} onClick=${reset}>Reset to ${fallback} mm</button>
+        ${current !== fallback && current >= 10 && html`<button class="secondary" onClick=${keep}>Make ${current} mm my default</button>`}
+      </div>
+      <p class="hint">${settings.bin_label_mm ? `Your default is ${settings.bin_label_mm} mm. It goes with your backups and sync.` : `Make a length your default and Reset goes back to it on every device.`}</p>
     <//>
     ${bin.kind === 'fastener' && html`<${Section} id="bin-drive" title="Drive icon" summary=${cfg.simple_drive_icon ? 'Simple' : 'Library picture'}>
       <${Toggle} label="Simple drive icon" checked=${cfg.simple_drive_icon} disabled=${!builtInDrive}

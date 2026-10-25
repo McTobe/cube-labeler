@@ -9,7 +9,7 @@ import { downloadBlob } from './ui.js';
 
 // Settings of the web version go in a backup with this prefix; the desktop app keeps them unused
 const WEB_PREFIX = 'web_';
-const WEB_SETTINGS = ['theme', 'match_printer_tape'];
+const WEB_SETTINGS = ['theme', 'match_printer_tape', 'bin_label_mm'];
 // AI settings shared with the desktop app (the keys never go in a backup)
 const AI_SERVICES = ['gemini', 'openai', 'openrouter'];
 
@@ -105,6 +105,7 @@ export async function restoreBackup(opened, parts, onConflict) {
     if (typeof s.label_language === 'string') change.label_language = s.label_language;
     if (!['system', 'light', 'dark'].includes(change.theme)) delete change.theme;
     if ('match_printer_tape' in change) change.match_printer_tape = !!change.match_printer_tape;
+    if ('bin_label_mm' in change && !(Number(change.bin_label_mm) >= 10)) change.bin_label_mm = null;
     await storage.save('desktopSettings', desktop);
     await updateSettings(change);
     restoreIconLists(s.icon_favourites, s.icon_recent);
