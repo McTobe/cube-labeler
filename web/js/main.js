@@ -16,10 +16,20 @@ import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
 import { APP_VERSION } from './version.js';
 
-// Marks the page while a text field has the focus, so a phone can make room for its keyboard
+// Marks the page while a phone keyboard is up for a text field, so the page can make room for
+// it. The keyboard shrinks the window (interactive-widget in index.html); a window that is just
+// narrow and tall, with no keyboard, is left alone.
 const TYPING_FIELDS = 'textarea, input:not([type]), input[type="text"], input[type="search"], input[type="number"]';
-document.addEventListener('focusin', (e) => document.body.classList.toggle('typing', e.target.matches(TYPING_FIELDS)));
-document.addEventListener('focusout', () => document.body.classList.remove('typing'));
+let tallest = { width: 0, height: 0 };
+function checkTyping() {
+  if (window.innerWidth !== tallest.width) tallest = { width: window.innerWidth, height: 0 };
+  tallest.height = Math.max(tallest.height, window.innerHeight);
+  const field = document.activeElement && document.activeElement.matches(TYPING_FIELDS);
+  document.body.classList.toggle('typing', Boolean(field) && window.innerHeight < tallest.height * 0.8);
+}
+document.addEventListener('focusin', checkTyping);
+document.addEventListener('focusout', () => setTimeout(checkTyping));
+window.addEventListener('resize', checkTyping);
 
 const REPO_URL = 'https://github.com/McTobe/cube-labeler';
 const KOFI_URL = 'https://ko-fi.com/thetobek';

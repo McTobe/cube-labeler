@@ -172,12 +172,15 @@ function useTypingRoom(ref, wide) {
     if (!area || wide) return undefined;
     let timer = null;
     const fit = () => {
-      if (document.activeElement !== area) return;
+      if (document.activeElement !== area || !document.body.classList.contains('typing')) { reset(); return; }
       const pinned = document.querySelector('.label-preview-col');
       const tools = area.closest('.text-card').querySelector('.format-tools');
       const top = pinned ? pinned.getBoundingClientRect().bottom : 0;
       const room = window.innerHeight - top - (tools ? tools.offsetHeight : 0) - 16;
-      area.style.height = `${Math.max(96, room)}px`;
+      // Tall enough for the text and a few more lines, but never taller than the room left
+      area.style.height = '0px';
+      const wanted = Math.max(120, Math.min(area.scrollHeight + 72, 260));
+      area.style.height = `${Math.max(96, Math.min(room, wanted))}px`;
       // The browser keeps the caret in view after each edit; it must look below the pinned
       // preview and above the toolbar for that
       const root = document.documentElement.style;
@@ -194,11 +197,13 @@ function useTypingRoom(ref, wide) {
     area.addEventListener('focus', later);
     area.addEventListener('blur', reset);
     window.addEventListener('resize', later);
+    area.addEventListener('input', later);
     return () => {
       clearTimeout(timer);
       area.removeEventListener('focus', later);
       area.removeEventListener('blur', reset);
       window.removeEventListener('resize', later);
+      area.removeEventListener('input', later);
     };
   }, [wide]);
 }
