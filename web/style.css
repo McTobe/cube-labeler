@@ -767,7 +767,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .icon-choice > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .icon-choice:hover:not(:disabled) { border-color: var(--accent); }
 .icon-choice.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.icon-choice.more { color: var(--muted); }
+.icon-sources { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.icon-sources button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 4px 10px; }
 
 .action-buttons .count {
   min-width: 22px;

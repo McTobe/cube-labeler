@@ -4,6 +4,7 @@
 // Bin labels are designed for 12 mm tape and always print at 12 mm.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
+import { Icon } from '../icons.js';
 import { IconPickerSheet } from './icons.js';
 import { Field, Section, Segmented, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
@@ -102,10 +103,12 @@ function IconTiles({ cfg, tiles, field }) {
         <span>${tile.name}</span></button>`)}
       ${thumb && html`<button class="icon-choice on" aria-pressed="true" title=${icon.name}>
         <img src=${thumb} alt="" /><span>${icon.name.replace(/\.[a-z]+$/i, '')}</span></button>`}
-      <button class="icon-choice more" disabled=${phase !== 'ready'} onClick=${() => setPicking(true)}>
-        <span class="none-mark" aria-hidden="true">⋯</span><span>Library</span></button>
-      <button class="icon-choice more" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>
-        <span class="none-mark" aria-hidden="true">+</span><span>Own picture</span></button>
+    </div>
+    <div class="icon-sources">
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => setPicking(true)}>
+        <${Icon} name="icons" size=${18} /> Library</button>
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>
+        <${Icon} name="image" size=${18} /> Own picture</button>
     </div>
     <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
     <${IconPickerSheet} open=${picking} target="bin" onClose=${() => setPicking(false)} />
