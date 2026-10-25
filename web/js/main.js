@@ -5,13 +5,14 @@ import { html } from './html.js';
 import { Icon } from './icons.js';
 import { PrinterChip } from './printer-ui.js';
 import { LabelPage } from './pages/label.js';
-import { SettingsPage } from './pages/settings.js';
+import { SettingsPage, SyncPanel } from './pages/settings.js';
+import { Sheet } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
 import { app, start, pageChanged } from './app.js';
 import { useStore } from './state.js';
-import { startAutoBackup, continueDriveBackup, autoBackup } from './autobackup.js';
+import { startAutoBackup, continueDriveBackup, backupNow, autoBackup } from './autobackup.js';
 import { drive } from './gdrive.js';
 
 const PAGES = [
@@ -28,31 +29,36 @@ function currentPage() {
 }
 
 // Google Drive sync at a glance: green when syncing works, amber when Google wants the
-// hourly click (one click continues), red after an error, grey when it is off
+// hourly click, red after an error, grey when it is off. Clicking it opens the sync box and
+// syncs right away (or continues with Google when the hour ran out).
 function SyncChip() {
   const d = useStore(drive);
   const auto = useStore(autoBackup);
-  const [error, setError] = useState('');
+  const [open, setOpen] = useState(false);
   let state = 'off';
-  let title = 'Sync is off. Turn it on in Settings to have your icons, templates and settings on every device.';
+  let title = 'Sync is off. Click to set up Google Drive sync, so your icons, templates and settings are on every device.';
   if (d.on && !d.token) {
     state = 'paused';
-    title = 'Sync is paused: Google asks you to continue once an hour. Click to continue.';
-  } else if (d.on && (auto.driveError || error)) {
+    title = 'Sync is paused: Google asks you to continue once an hour.';
+  } else if (d.on && auto.driveError) {
     state = 'error';
-    title = `Sync failed: ${auto.driveError || error}`;
+    title = `Sync failed: ${auto.driveError}`;
   } else if (d.on) {
     state = auto.busy ? 'busy' : 'ready';
     title = auto.busy ? 'Syncing with Google Drive…' : `Synced with Google Drive${d.email ? ` (${d.email})` : ''}.`;
   }
-  const click = async () => {
-    if (state !== 'paused') { location.hash = '#/settings'; return; }
-    setError('');
-    try { await continueDriveBackup(); } catch (err) { setError(err.message || String(err)); }
+  const click = () => {
+    setOpen(true);
+    // The click lets Google open its window; a failure shows in the box
+    if (state === 'paused') continueDriveBackup().catch(() => {});
+    else if (d.on) backupNow();
   };
   return html`<button class=${`printer-chip sync-chip state-${state}`} title=${title} aria-label=${title} onClick=${click}>
-    <span class="dot" aria-hidden="true"></span><${Icon} name="cloud" size=${18} /><span class="chip-label">Sync</span>
-  </button>`;
+      <span class="dot" aria-hidden="true"></span><${Icon} name="cloud" size=${18} /><span class="chip-label">Sync</span>
+    </button>
+    <${Sheet} open=${open} title="Sync with Google Drive" onClose=${() => setOpen(false)}>
+      <${SyncPanel} />
+    <//>`;
 }
 
 function App() {

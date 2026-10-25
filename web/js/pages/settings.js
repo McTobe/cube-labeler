@@ -5,7 +5,7 @@ import { Segmented, Select, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateSettings } from '../app.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
-import { autoBackup, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
+import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
 import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
 import { ai, loadAi, setKey, setModel } from '../ai.js';
 import { errorMessage } from '../../printer.js';
@@ -183,6 +183,15 @@ function DrivePicker({ open, onClose, onPick }) {
 
 // Sync through Google Drive: the same icons, templates and settings on every device
 function SyncCard() {
+  return html`<section class="card">
+    <h2 class="card-title">Sync with Google Drive</h2>
+    <${SyncPanel} />
+  </section>`;
+}
+
+// Google Drive sync: sign in, see that it works, sync now, sign out. Also opened from the
+// Sync chip in the top bar.
+export function SyncPanel() {
   const ready = useStore(boot).phase === 'ready';
   const d = useStore(drive);
   const auto = useStore(autoBackup);
@@ -207,14 +216,14 @@ function SyncCard() {
       ${auto.driveError && html`<p class="status-line error">${auto.driveError}</p>`}
       <div class="button-row">
         ${!d.token && html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue with Google</button>`}
+        ${d.token && html`<button class="secondary" disabled=${!ready || auto.busy} onClick=${() => run(() => backupNow())}>Sync now</button>`}
         <button class="secondary" disabled=${auto.busy} onClick=${() => run(signOutOfDrive)}>Sign out</button>
       </div>`;
   }
-  return html`<section class="card">
-    <h2 class="card-title">Sync with Google Drive</h2>
+  return html`<div class="sync-panel">
     ${state}
     ${error && html`<p class="status-line error">${error}</p>`}
-  </section>`;
+  </div>`;
 }
 
 // Automatic backups to a folder, which can be one that Google Drive, OneDrive or Dropbox syncs
