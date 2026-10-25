@@ -64,7 +64,7 @@ class TestIconManager(unittest.TestCase):
              "Tools", "Home & Kitchen", "Safety & handling", "Symbols", "My Icons"],
         )
         self.assertGreater(len(self.mgr.list_icons(category="Fasteners")), 5)
-        self.assertEqual(len(self.mgr.list_icons(category="Screw drives")), 6)
+        self.assertEqual(len(self.mgr.list_icons(category="Screw drives")), 8)
         self.assertGreaterEqual(len(self.mgr.list_icons(category="Mechanical")), 3)
         self.assertGreater(len(self.mgr.list_icons(category="Electronics")), 5)
 
