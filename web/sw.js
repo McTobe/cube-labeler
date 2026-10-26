@@ -54,6 +54,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
+  // Google sign-in (web/drive_auth.py) always goes to the server and is never cached
+  if (url.origin === self.location.origin && url.pathname.startsWith('/auth/')) return;
   if (url.origin === self.location.origin) {
     event.respondWith(networkFirst(request, APP_CACHE));
   } else if (VERSIONED_HOSTS.includes(url.hostname)) {

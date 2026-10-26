@@ -111,6 +111,11 @@ straight away. On Android, the first visit still needs Chrome's **Nearby devices
 and a force stop of Chrome, as described above; the Chrome flag for insecure origins is not
 needed.
 
+**Staying signed in to Google Drive:** set `GOOGLE_CLIENT_SECRET` and `PUBLIC_URL` on the
+container, and people sign in once per device instead of clicking Continue every hour. The
+image runs a small helper beside nginx for it. See [docs/google-sign-in.md](../docs/google-sign-in.md)
+for the Google Console, Dockge and consent screen steps.
+
 To build the image yourself from a checkout instead: `docker compose up -d --build`.
 
 ## How it fits together
@@ -127,6 +132,9 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 | `vendor/` | [Preact](https://preactjs.com) and [htm](https://github.com/developit/htm), copied in so there is no build step (see `vendor/README.md`). |
 | `printer.js` | Web Serial transport and the print flow (status check, job, wait for completion). |
 | `cube_web.py` | The Python functions the page calls: render a label, build and read printer bytes. |
+| `js/gdrive.js` | Google Drive sync: sign-in, the backups folder, upload and download. |
+| `drive_auth.py` | The Docker image's sign-in helper, which keeps people signed in to Google Drive (see `docs/google-sign-in.md`). |
+| `privacy.html` | The privacy page Google's consent screen links to. |
 | `serve.py` | Builds the site and serves it on this computer and the local network (`run_web.bat` runs it). |
 | `build.py` | Packs the page, the needed `core/` modules, `cube_web.py` and the fonts into `web/dist/`. |
 | `fonts/` | Arimo, an Arial-compatible font under the SIL Open Font License (`fonts/OFL.txt`). Browsers can't hand system fonts to Python, so the app ships its own; **Add font** loads more. |
