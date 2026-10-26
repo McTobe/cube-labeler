@@ -786,8 +786,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
+/* The kinds of label as tiles; more kinds wrap onto more rows */
 .mode-switch {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 4px;
   padding: 4px;
   margin-bottom: 12px;
@@ -796,8 +798,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   border-radius: 12px;
 }
 .mode-switch button {
-  flex: 1;
-  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
   border: none;
   border-radius: 9px;
   background: none;
@@ -813,11 +818,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .picture-thumb.small { width: 44px; height: 44px; }
 
 /* The bin label card: the fields on the left, the icon on the right when there is room */
-.bin-card .card-head { align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.bin-card .card-head { align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .bin-card .card-head .field { margin: 0; flex: 1 1 220px; max-width: 360px; }
 .bin-card .card-head > .secondary { flex: none; }
 .bin-grid { display: grid; gap: 14px 24px; }
-.bin-grid > .bin-col > :first-child { margin-top: 0; }
+.bin-grid .bin-col > :first-child, .bin-grid .bin-group > :first-child { margin-top: 0; }
+.bin-col { display: flex; flex-direction: column; gap: 14px; }
 @media (min-width: 900px) { .bin-grid { grid-template-columns: 1fr 1fr; } }
 /* Three columns with dividers on a wide screen, like the icon editor */
 @media (min-width: 1500px) {
@@ -826,11 +832,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .bin-grid.three > .bin-col:first-child { padding-left: 0; }
   .bin-grid.three > .bin-col:last-child { padding-right: 0; }
   .bin-grid.three > .bin-col + .bin-col { border-left: 1px solid var(--border); }
+  /* The columns reach the bottom of the card: the first group at the top, the last at the bottom */
+  .label-preview-col .bin-card { display: flex; flex-direction: column; }
+  .label-preview-col .bin-card > .card-head { flex: none; }
+  .label-preview-col .bin-card .bin-grid.three { flex: 1 0 auto; }
+  .bin-grid.three > .bin-col { justify-content: space-between; }
   .bin-grid.three .quick-chips { gap: 5px; }
   .bin-grid.three .quick-chips button { padding: 2px 8px; }
 }
 .bin-kind { margin: 12px 0 14px; }
-.drawer-card .hint { margin: 4px 0 12px; }
+.drawer-card .hint { margin: 4px 0 10px; }
+.how-to { margin: 0 0 10px; padding-left: 20px; font-size: 0.92rem; line-height: 1.5; }
+.how-to li + li { margin-top: 2px; }
 .drawer-card button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
 .quick-chips button { min-height: 28px; padding: 2px 9px; font-size: 0.8rem; }
 .quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }

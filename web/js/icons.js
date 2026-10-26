@@ -2,6 +2,8 @@
 import { html } from './html.js';
 
 const PATHS = {
+  text: html`<path d="M5 7V5h14v2M12 5v14M9 19h6"/>`,
+  bin: html`<path d="M3 8h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M5 8l1.5-4h11L19 8"/><rect x="8" y="11.5" width="8" height="4" rx="0.8"/>`,
   label: html`<path d="M3 11.6V4a1 1 0 0 1 1-1h7.6a1 1 0 0 1 .7.3l8.4 8.4a1 1 0 0 1 0 1.4l-7.6 7.6a1 1 0 0 1-1.4 0L3.3 12.3a1 1 0 0 1-.3-.7z"/><circle cx="7.5" cy="7.5" r="1.5"/>`,
   queue: html`<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke-width="3"/>`,
   icons: html`<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>`,
