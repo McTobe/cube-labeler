@@ -1172,7 +1172,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .head-buttons { display: flex; flex-wrap: wrap; gap: 8px; flex: none; }
 .section-heading { font-size: 0.95rem; margin: 18px 4px 10px; color: var(--muted); }
 .page-head + .section-heading { margin-top: 4px; }
-/* Three cards a row on a wide screen, so the six starting points make two full rows */
+/* More cards a row on bigger screens: 2, 3, 4, then 6, so the six starting points never leave one alone */
 .template-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 @media (min-width: 641px) { .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .template-card { position: relative; display: flex; padding: 0; margin: 0; overflow: visible; }
@@ -1189,6 +1189,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .template-thumb { height: 84px; }
   .template-thumb img { max-height: 60px; }
 }
+@media (min-width: 1500px) { .template-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1800px) { .template-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
 .primary.danger { background: var(--error); border-color: var(--error); }
 .restore-parts { display: grid; gap: 4px; margin: 12px 0; }
 .key-row { display: flex; gap: 8px; }
