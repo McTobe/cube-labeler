@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Cube Labeler is a free web app for designing and printing labels on the Brother PT-P300BT label printer, straight from Chrome or Edge.">
+<title>About · Cube Labeler</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  :root { --bg: #f4f5f7; --card: #ffffff; --text: #1f2430; --muted: #5d6475; --accent: #2f6fde; --on-accent: #ffffff; --line: #dfe2e8; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #1f2430; --card: #272d3b; --text: #e8eaf0; --muted: #a3a9b8; --accent: #8ab4ff; --on-accent: #1f2430; --line: #363d4d; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 44rem; margin: 32px auto; padding: 28px 32px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  header img { width: 56px; height: 56px; border-radius: 12px; }
+  h1 { font-size: 1.7rem; margin: 0; }
+  h2 { font-size: 1.1rem; margin: 28px 0 6px; }
+  p, li { margin: 0 0 10px; }
+  ul { padding-left: 1.2rem; }
+  .lead { font-size: 1.08rem; }
+  .muted { color: var(--muted); font-size: 0.92rem; }
+  a { color: var(--accent); }
+  .button { display: inline-block; margin: 8px 0 4px; padding: 10px 20px; border-radius: 10px; background: var(--accent); color: var(--on-accent);
+    text-decoration: none; font-weight: 600; }
+  footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line); }
+  @media (max-width: 720px) { main { margin: 0; border: 0; border-radius: 0; padding: 20px 16px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon-192.png" alt="">
+    <h1>Cube Labeler</h1>
+  </header>
+  <p class="lead">A free web app for designing and printing labels on the <strong>Brother PT-P300BT</strong>
+    (P-touch Cube) label printer. It runs in Chrome or Edge on Windows, Mac, Linux and Android and prints over
+    Bluetooth, with nothing to install and no account needed.</p>
+  <a class="button" href="./">Open Cube Labeler</a>
+
+  <h2>What it does</h2>
+  <ul>
+    <li><strong>Text labels</strong> with bold, italic, underlined and inverted text, sizes per line, columns, frames, QR codes and pictures.</li>
+    <li><strong>Bin labels</strong> for screws, bolts and parts: size, name, lengths and a drive or part icon.</li>
+    <li><strong>A print queue</strong> that prints several labels as one strip, to save tape.</li>
+    <li><strong>An icon library and icon editor</strong>: turn a photo into a crisp black and white icon.</li>
+    <li><strong>Templates and backups</strong>, so your labels, icons and settings move between devices.</li>
+    <li>A live preview that shows exactly how the label prints, dot for dot.</li>
+  </ul>
+
+  <h2>Google Drive sync (optional)</h2>
+  <p>You can sign in with Google to keep your own icons, templates and settings in step across your devices. Cube Labeler
+    then saves backups in a <strong>Cube Labeler backups</strong> folder in your Google Drive and reads them on your other
+    devices. It only asks for access to the files it creates itself, and can't see anything else in your Drive.
+    Everything else in the app works without signing in. Read the <a href="privacy.html">privacy policy</a> for the details.</p>
+
+  <h2>Who makes it</h2>
+  <p>Cube Labeler is a free hobby project by McTobe, released as free software under the GNU AGPL v3.
+    The source code is on <a href="https://github.com/McTobe/cube-labeler">GitHub</a>.
+    Questions: <a href="mailto:admin@tobezone.com">admin@tobezone.com</a>.</p>
+
+  <footer class="muted">
+    <a href="./">Open the app</a> · <a href="privacy.html">Privacy policy</a> · <a href="https://ko-fi.com/thetobek">Buy me a coffee</a><br>
+    Brother and P-touch are trademarks of Brother Industries, Ltd. Cube Labeler is not affiliated with or endorsed by Brother.
+  </footer>
+</main>
+</body>
+</html>

@@ -393,7 +393,7 @@ export function SettingsPage() {
     <footer class="about">
       <p>
         <span>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT</span>
-        <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener" title="Cube Labeler is free software under the GNU AGPL v3">Source code</a>
         <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">Buy me a coffee${'\u00a0'}♥</a>
         <a href="privacy.html" target="_blank" rel="noopener">Privacy</a>
         <button class="link-button" title="Something looks off after an update? Reloads the app; your labels, icons and settings stay."

@@ -82,10 +82,16 @@ cancels their refresh tokens after 7 days. Publishing fixes both. Cube Labeler o
 
 1. **Google Auth Platform › Branding**:
    - App name **Cube Labeler**, your email as the user support email and developer contact.
-   - App home page: `https://print.tobezone.com`
+   - App home page: `https://print.tobezone.com/about.html` (a plain page that explains the app;
+     Google's check doesn't run the app itself, so the main page looks empty to it)
    - Privacy policy: `https://print.tobezone.com/privacy.html`
    - Authorized domains: `tobezone.com`
    - Leave the logo empty. Adding a logo makes Google want to verify the brand first.
+   - Brand verification is optional with only `drive.file`. Without it the consent screen shows
+     the domain instead of the name "Cube Labeler". To get it verified, the About and privacy
+     pages above are what Google's check looks at; then click **Verify branding**. The domain
+     also has to be verified in [Google Search Console](https://search.google.com/search-console)
+     with the same Google account.
 2. **Google Auth Platform › Data access**: the only scope listed should be
    `.../auth/drive.file`. Don't add more.
 3. **Google Auth Platform › Audience**: click **Publish app** and confirm. The status changes

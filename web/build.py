@@ -19,7 +19,7 @@ WEB_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(WEB_DIR)
 DIST_DIR = os.path.join(WEB_DIR, "dist")
 
-PAGE_FILES = ["index.html", "printer.js", "style.css", "privacy.html"]
+PAGE_FILES = ["index.html", "printer.js", "style.css", "about.html", "privacy.html"]
 PAGE_DIRS = ["js", "vendor"]
 
 # The parts of core/ the web app runs; the rest needs the desktop (tkinter, pyserial, registry)
