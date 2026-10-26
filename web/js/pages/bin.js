@@ -145,6 +145,9 @@ function Chips({ label, values, current, onPick, cols = 4 }) {
   </div>`;
 }
 
+// Names in one row when there are up to three, else two by two, so no name sits alone
+const nameCols = (names) => (Math.min(names.length, 4) === 4 ? 2 : Math.max(1, Math.min(names.length, 3)));
+
 // A length chip fills the bin that was last clicked (or the first empty one, or bin 1) and then
 // moves on to the next bin, so clicking a few chips fills the label in order
 let lastLength = null;
@@ -194,7 +197,7 @@ function FastenerForm({ cfg, names }) {
         </div>
         <div class="bin-group">
           <${Text} label="Name" value=${cfg.category} placeholder="SCREWS" onChange=${(category) => updateBin({ category })} />
-          <${Chips} label="Common names" cols=${2} values=${names.slice(0, 4)} current=${cfg.category}
+          <${Chips} label="Common names" cols=${nameCols(names)} values=${names.slice(0, 4)} current=${cfg.category}
             onPick=${(category) => updateBin({ category })} />
         </div>
       </div>
@@ -227,7 +230,7 @@ function PartForm({ cfg, names }) {
       <div class="bin-col">
         <div class="bin-group">
           <${Text} label="Name" value=${cfg.category_banner} placeholder="BEARINGS" onChange=${(category_banner) => updateBin({ category_banner })} />
-          <${Chips} label="Common names" cols=${2} values=${names.slice(0, 4)} current=${cfg.category_banner}
+          <${Chips} label="Common names" cols=${nameCols(names)} values=${names.slice(0, 4)} current=${cfg.category_banner}
             onPick=${(category_banner) => updateBin({ category_banner })} />
         </div>
         <div class="bin-group">
