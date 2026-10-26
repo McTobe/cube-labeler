@@ -7,7 +7,7 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
-import { BinCard, BinOptions } from './bin.js';
+import { BinCard, BinKind, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
   addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount,
@@ -51,7 +51,7 @@ export function LabelPage() {
         <button role="tab" aria-selected=${mode === 'text'} class=${mode === 'text' ? 'on' : ''} onClick=${() => setMode('text')}>Text label</button>
         <button role="tab" aria-selected=${mode === 'bin'} class=${mode === 'bin' ? 'on' : ''} onClick=${() => setMode('bin')}>Bin label</button>
       </div>
-      ${mode === 'bin' ? html`${!wide && html`<${BinCard} />`}<${BinOptions} />` : html`
+      ${mode === 'bin' ? html`<${BinKind} />${!wide && html`<${BinCard} />`}<${BinOptions} />` : html`
         ${!wide && html`<${TextCard} />`}
         <${FontSection} />
         <${QrSection} />

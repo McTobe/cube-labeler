@@ -211,11 +211,13 @@ function FastenerForm({ cfg, names }) {
 
 function PartForm({ cfg, names }) {
   return html`
-    <div class="bin-grid">
+    <div class="bin-grid three">
       <div class="bin-col">
         <${Text} label="Name" value=${cfg.category_banner} placeholder="BEARINGS" onChange=${(category_banner) => updateBin({ category_banner })} />
         <${Chips} label="Common names" values=${names.slice(0, 4)} current=${cfg.category_banner}
           onPick=${(category_banner) => updateBin({ category_banner })} />
+      </div>
+      <div class="bin-col">
         <${Text} label="Part number" value=${cfg.spec_primary} placeholder="608ZZ" onChange=${(spec_primary) => updateBin({ spec_primary })} />
         <${Text} label="Note" value=${cfg.spec_secondary} placeholder="Optional, e.g. 0.2–4.0 mm²" onChange=${(spec_secondary) => updateBin({ spec_secondary })} />
       </div>
@@ -246,19 +248,22 @@ function addAndNext() {
   });
 }
 
+// Fasteners or parts: at the top of the side panel, under Text label / Bin label
+export function BinKind() {
+  const { bin } = useStore(app);
+  if (!bin) return null;
+  return html`<div class="bin-kind">
+    <${Segmented} ariaLabel="Label for" options=${[['fastener', 'Fasteners'], ['component', 'Parts']]} value=${bin.kind}
+      onChange=${(kind) => { lastLength = null; updateBin({ kind }); }} />
+  </div>`;
+}
+
 // The bin label's main fields: under the preview on a wide screen, like the text label's text
 export function BinCard() {
   const { bin, binNames } = useStore(app);
-  const { phase } = useStore(boot);
   if (!bin) return html`<section class="card bin-card"><p class="hint">Loading...</p></section>`;
   const cfg = bin[bin.kind];
   return html`<section class="card bin-card">
-    <div class="card-head">
-      <${Segmented} ariaLabel="Label for" options=${[['fastener', 'Fasteners'], ['component', 'Parts']]} value=${bin.kind}
-        onChange=${(kind) => { lastLength = null; updateBin({ kind }); }} />
-      <button class="secondary" disabled=${phase !== 'ready'} title="Add to the queue and clear the lengths for the next bin"
-        onClick=${addAndNext}>Add to queue and start the next</button>
-    </div>
     ${bin.kind === 'fastener'
       ? html`<${FastenerForm} cfg=${cfg} names=${binNames.fastener} />`
       : html`<${PartForm} cfg=${cfg} names=${binNames.component} />`}
@@ -268,6 +273,7 @@ export function BinCard() {
 // The bin label's less used options, in the side panel
 export function BinOptions() {
   const { bin, settings } = useStore(app);
+  const { phase } = useStore(boot);
   const [widthText, setWidthText] = useState(null);
   if (!bin) return null;
   const cfg = bin[bin.kind];
@@ -285,6 +291,14 @@ export function BinOptions() {
   const keep = () => { updateSettings({ bin_label_mm: current }); say(`Reset now goes back to ${current} mm.`); };
 
   return html`
+    <section class="card drawer-card">
+      <h2 class="card-title">Filling a drawer?</h2>
+      <p class="hint">${bin.kind === 'fastener'
+        ? 'Adds this label to the queue and clears the lengths, so you only type what changes for the next bin.'
+        : 'Adds this label to the queue and clears the part number and note for the next bin.'}</p>
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${addAndNext}>
+        <${Icon} name="queue" size=${18} /> Add to queue and start the next</button>
+    </section>
     <${Section} id="bin-size" title="Label length" summary=${`${cfg.label_width_mm} mm, 12 mm tape`}>
       <${Field} label="Length in mm" hint="Bin labels are designed for 12 mm tape and always print at 12 mm.">
         <input type="text" inputmode="decimal" value=${widthText ?? String(cfg.label_width_mm)} onInput=${onWidth}
