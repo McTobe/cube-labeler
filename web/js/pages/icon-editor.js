@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Icon } from '../icons.js';
-import { Field, Segmented, Select, Sheet, Slider, Toggle } from '../ui.js';
+import { Field, Segmented, Sheet, Slider, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app } from '../app.js';
 import { prepareIconOriginal, editIcon } from '../app.js';
@@ -27,7 +27,7 @@ const MODE_HINTS = {
   silhouette: 'Like Drawing, with every enclosed gap filled for a solid shape, like the built-in icons.',
   outline: 'Traces the edges of a photo. Best for photos of a part on a plain background.',
 };
-const THICKNESS = [[-1, 'Thinner'], [0, 'Normal'], [1, 'Bold'], [2, 'Bolder'], [3, 'Heavy']];
+const THICKNESS = [[-1, 'Thin'], [0, 'Normal'], [1, 'Bold'], [2, 'Bolder'], [3, 'Heavy']];
 const TOOLS = [['look', 'Look'], ['pencil', 'Pencil'], ['eraser', 'Eraser']];
 const TOOL_HINTS = {
   look: 'Pick Pencil or Eraser to fix single dots.',
@@ -39,10 +39,16 @@ const FROM_ICON = { threshold: 128, remove_specks: false };
 
 const blobUrl = (png) => (png ? URL.createObjectURL(new Blob([png], { type: 'image/png' })) : null);
 
-// "m3_hex-nut.png" gives "M3 hex nut"
+// Names cameras, browsers and AI services give their files, which say nothing about the icon
+const NAMELESS = /^(img|image|photo|pic|picture|screenshot|scan|dsc|pxl|download|pasted|gemini|chatgpt|dall|untitled)\b/i;
+
+// "m3_hex-nut.png" gives "M3 hex nut"; "IMG_2041.jpg" or a random "NtXJBc.png" gives nothing
 export function suggestedName(fileName) {
   const stem = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-  return stem ? stem[0].toUpperCase() + stem.slice(1) : '';
+  if (!stem || NAMELESS.test(stem) || !/[a-z]{2}/i.test(stem)) return '';
+  // One word with three or more capitals, some mid-word, like "NtXJBc": a random id
+  if (!stem.includes(' ') && /[a-z][A-Z]/.test(stem) && /[A-Z].*[A-Z].*[A-Z]/.test(stem)) return '';
+  return stem[0].toUpperCase() + stem.slice(1);
 }
 
 // An object URL for a PNG that is let go when the PNG changes or the component goes
@@ -204,16 +210,20 @@ function AiBox({ picture, onPicture, onRestore, canRestore }) {
     }
   };
   return html`<div class="ai-box">
-    <h4>Redraw it with ${service.name}</h4>
-    <${Select} label="Style" value=${chosen} onChange=${setPreset}
-      options=${[...state.presets.map((p) => [p.label, p.label]), [state.custom, 'Custom: your own words']]} />
+    <div class="editor-head">
+      <h4><${Icon} name="sparkle" size=${16} /> Redraw it with ${service.name}</h4>
+      ${canRestore && !busy && html`<button class="link-button" onClick=${() => onRestore(true)}>Use my picture</button>`}
+    </div>
+    ${hasKey ? html`<div class="ai-row">
+      <select aria-label="Style" value=${chosen} disabled=${busy} onChange=${(e) => setPreset(e.currentTarget.value)}>
+        ${[...state.presets.map((p) => [p.label, p.label]), [state.custom, 'Custom: your own words']].map(([v, t]) => html`<option value=${v}>${t}</option>`)}
+      </select>
+      <button class="primary" disabled=${busy || !picture} onClick=${run}>${busy ? 'Redrawing…' : 'Redraw'}</button>
+    </div>
     ${isCustom && html`<input type="text" value=${custom} placeholder="e.g. front view, keep the two screw holes"
-      onInput=${(e) => setCustom(e.currentTarget.value)} onKeyDown=${(e) => { if (e.key === 'Enter') run(); }} />`}
-    ${hasKey
-      ? html`<button class="primary" disabled=${busy || !picture} onClick=${run}>${busy ? 'Redrawing…' : 'Redraw my picture'}</button>`
+      onInput=${(e) => setCustom(e.currentTarget.value)} onKeyDown=${(e) => { if (e.key === 'Enter') run(); }} />`}`
       : html`<p class="hint">Needs your own ${service.name} API key: add it under <a href="#/settings" onClick=${() => onRestore(null)}>Settings</a>.
         ${service.id === 'gemini' ? ' Or make the picture at gemini.google.com and open or paste it here.' : ''}</p>`}
-    ${canRestore && !busy && html`<button class="link-button" onClick=${() => onRestore(true)}>Use my own picture again</button>`}
     ${message.text && html`<p class=${`status-line${message.error ? ' error' : ''}`} role="status">${message.text}</p>`}
   </div>`;
 }
@@ -397,26 +407,6 @@ function EditorBody({ start, onDone, dirtyRef }) {
         }} />
     </section>
 
-    <section class="editor-settings">
-      <${Segmented} label="Read the picture as" options=${MODES} value=${shown.mode} onChange=${(mode) => changeEdit({ mode })} />
-      <p class="hint mode-hint">${MODE_HINTS[shown.mode]}</p>
-      <${Toggle} label="Automatic darkness cutoff" checked=${auto}
-        onChange=${(on) => changeEdit({ threshold: on ? null : (result ? result.threshold : 128) })} />
-      <${Slider} label="Darkness cutoff" min=${1} max=${254} value=${auto && result ? result.threshold : (shown.threshold ?? 128)}
-        disabled=${auto} display=${auto ? `Automatic (${result ? result.threshold : '…'})` : String(shown.threshold)}
-        onChange=${(threshold) => changeEdit({ threshold })} />
-      <${Toggle} label="Swap black and white" checked=${!!shown.invert} onChange=${(invert) => changeEdit({ invert })} />
-      <${Segmented} label="Line thickness" options=${THICKNESS} value=${shown.thickness || 0} onChange=${(thickness) => changeEdit({ thickness })} />
-      <${Toggle} label="Remove specks" checked=${!!shown.remove_specks} onChange=${(remove_specks) => changeEdit({ remove_specks })} />
-      <${Toggle} label="Fill enclosed gaps" checked=${!!shown.fill_holes} onChange=${(fill_holes) => changeEdit({ fill_holes })} />
-      <div class="button-row">
-        <button class="secondary" aria-label="Turn left" onClick=${() => turn(-1)}><${Icon} name="rotate-left" size=${18} /></button>
-        <button class="secondary" aria-label="Turn right" onClick=${() => turn(1)}><${Icon} name="rotate-right" size=${18} /></button>
-        <button class="secondary" onClick=${() => changeEdit({ flip: !shown.flip, crop: null })}>Mirror</button>
-        <button class="secondary" onClick=${() => update({ edit: null })}>Reset</button>
-      </div>
-    </section>
-
     <section class="editor-result">
       <div class="editor-head">
         <h3>Icon</h3>
@@ -425,9 +415,17 @@ function EditorBody({ start, onDone, dirtyRef }) {
           <button class="link-button" onClick=${clearTouch}>Clear touch-ups</button>
         </span>
       </div>
-      <div class="chip-group tool-pick" role="radiogroup" aria-label="Tool">
-        ${TOOLS.map(([id, label]) => html`<button role="radio" aria-checked=${tool === id} class=${tool === id ? 'on' : ''}
-          onClick=${() => setTool(id)}>${label}</button>`)}
+      <div class="tool-row">
+        <div class="chip-group tool-pick" role="radiogroup" aria-label="Tool">
+          ${TOOLS.map(([id, label]) => html`<button role="radio" aria-checked=${tool === id} class=${tool === id ? 'on' : ''}
+            onClick=${() => setTool(id)}>${label}</button>`)}
+        </div>
+        <span class="turn-buttons">
+          <button class="icon-button" aria-label="Turn left" title="Turn left" onClick=${() => turn(-1)}><${Icon} name="rotate-left" size=${18} /></button>
+          <button class="icon-button" aria-label="Turn right" title="Turn right" onClick=${() => turn(1)}><${Icon} name="rotate-right" size=${18} /></button>
+          <button class=${`icon-button${shown.flip ? ' on' : ''}`} aria-label="Mirror" title="Mirror" aria-pressed=${!!shown.flip}
+            onClick=${() => changeEdit({ flip: !shown.flip, crop: null })}><${Icon} name="mirror" size=${18} /></button>
+        </span>
       </div>
       <div class="result-row">
         <${TouchCanvas} basePng=${result && result.base_png} touch=${state.touch} tool=${tool}
@@ -437,6 +435,24 @@ function EditorBody({ start, onDone, dirtyRef }) {
       <p class="hint">${TOOL_HINTS[tool]}</p>
       ${result && !result.has_ink && html`<p class="status-line error">No ink left. Try another darkness cutoff or Swap black and white.</p>`}
 
+      <${Segmented} label="Read the picture as" options=${MODES} value=${shown.mode} onChange=${(mode) => changeEdit({ mode })} />
+      <p class="hint mode-hint">${MODE_HINTS[shown.mode]}</p>
+      <${Segmented} label="Line thickness" options=${THICKNESS} value=${shown.thickness || 0} onChange=${(thickness) => changeEdit({ thickness })} />
+      <details class="fine-tune">
+        <summary><span>Fine-tune</span><span class="hint">${fineTuneSummary(shown, auto, result)}</span></summary>
+        <${Toggle} label="Automatic darkness cutoff" checked=${auto}
+          onChange=${(on) => changeEdit({ threshold: on ? null : (result ? result.threshold : 128) })} />
+        <${Slider} label="Darkness cutoff" min=${1} max=${254} value=${auto && result ? result.threshold : (shown.threshold ?? 128)}
+          disabled=${auto} display=${auto ? `Automatic (${result ? result.threshold : '…'})` : String(shown.threshold)}
+          onChange=${(threshold) => changeEdit({ threshold })} />
+        <${Toggle} label="Swap black and white" checked=${!!shown.invert} onChange=${(invert) => changeEdit({ invert })} />
+        <${Toggle} label="Remove specks" checked=${!!shown.remove_specks} onChange=${(remove_specks) => changeEdit({ remove_specks })} />
+        <${Toggle} label="Fill enclosed gaps" checked=${!!shown.fill_holes} onChange=${(fill_holes) => changeEdit({ fill_holes })} />
+        <button class="link-button" onClick=${() => update({ edit: null })}>Reset all settings</button>
+      </details>
+    </section>
+
+    <section class="editor-details">
       <${Field} label="Name">
         <input type="text" value=${state.title} placeholder="e.g. WAGO 221, M3 hex screw"
           onInput=${(e) => update({ title: e.currentTarget.value })} />
@@ -446,8 +462,9 @@ function EditorBody({ start, onDone, dirtyRef }) {
           ${[USER_CATEGORY, ...categories].map((c) => html`<option value=${c}>${c}</option>`)}
         </select>
       <//>
-      <${Field} label="Search words" hint="Separate with commas">
-        <input type="text" value=${state.keywords} onInput=${(e) => update({ keywords: e.currentTarget.value })} />
+      <${Field} label="Search words, with commas">
+        <input type="text" value=${state.keywords} placeholder="e.g. connector, lever"
+          onInput=${(e) => update({ keywords: e.currentTarget.value })} />
       <//>
     </section>
 
@@ -457,6 +474,15 @@ function EditorBody({ start, onDone, dirtyRef }) {
       <button class="primary" disabled=${!canSave} onClick=${save}>Save icon</button>
     </footer>
   </div>`;
+}
+
+// What Fine-tune holds, folded: only the settings that differ from how a new picture opens
+function fineTuneSummary(edit, auto, result) {
+  const parts = [auto ? `Cutoff auto${result ? ` (${result.threshold})` : ''}` : `Cutoff ${edit.threshold}`];
+  if (edit.invert) parts.push('swapped');
+  if (!edit.remove_specks) parts.push('specks kept');
+  if (edit.fill_holes) parts.push('gaps filled');
+  return parts.join(' · ');
 }
 
 function PrintDots({ png }) {
