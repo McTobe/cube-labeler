@@ -1,9 +1,10 @@
-// Settings: printer, how the app looks, and what this device keeps
+// Settings: printer, label defaults, how the app looks, AI icons, backups and sync, about
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Segmented, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, updateSettings } from '../app.js';
+import { app, boot, updateSettings, labelDefaults } from '../app.js';
+import { FACTORY_LABEL_MM } from './bin.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
 import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
 import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
@@ -141,17 +142,24 @@ function BackupCard() {
   };
 
   const ready = phase === 'ready';
-  return html`<section class="card">
-    <h2 class="card-title">Backups</h2>
-    <p>One file with your own icons, templates and settings. It restores here or in the desktop app, on any device.</p>
-    <p class="hint">${last ? `Last backup: ${formatDate(last)}.` : 'No backup saved from this browser yet.'}</p>
+  return html`<section class="card backups-card">
+    <h2 class="card-title">Backups and sync</h2>
+    <div class="settings-part">
+      <h3>Google Drive sync</h3>
+      <${SyncPanel} />
+    </div>
+    <div class="settings-part">
+    <h3>Backup file</h3>
+    <p class="hint">One file with your own icons, templates and settings. It restores here or in the desktop app, on any device.
+      ${last ? ` Last backup: ${formatDate(last)}.` : ' No backup saved from this browser yet.'}</p>
     <div class="button-row">
       <button class="primary" disabled=${!ready || busy} onClick=${save}>${busy ? 'Saving…' : 'Save a backup'}</button>
       <button class="secondary" disabled=${!ready} onClick=${() => fileRef.current.click()}>Restore from a backup</button>
-      ${d.on && html`<button class="secondary" disabled=${!ready} onClick=${() => setPicking(true)}>Restore an older one from Google Drive</button>`}
+      ${d.on && html`<button class="secondary" disabled=${!ready} onClick=${() => setPicking(true)}>Restore from Google Drive</button>`}
       <input ref=${fileRef} type="file" accept=".cubebackup,.cubeicons,application/zip" hidden onChange=${onFile} />
     </div>
     ${message.text && html`<p class=${`status-line${message.error ? ' error' : ''}`} role="status">${message.text}</p>`}
+    </div>
     <${AutoBackup} ready=${ready} />
     <${RestoreSheet} opened=${opened} onClose=${() => setOpened(null)} onDone=${done} />
     <${DrivePicker} open=${picking} onClose=${() => setPicking(false)} onPick=${fromDrive} />
@@ -184,14 +192,6 @@ function DrivePicker({ open, onClose, onPick }) {
               </button></li>`)}</ul>`}
     ${error && files !== null && html`<p class="status-line error">${error}</p>`}
   <//>`;
-}
-
-// Sync through Google Drive: the same icons, templates and settings on every device
-function SyncCard() {
-  return html`<section class="card">
-    <h2 class="card-title">Sync with Google Drive</h2>
-    <${SyncPanel} />
-  </section>`;
 }
 
 // Google Drive sync: sign in, see that it works, sync now, sign out. Also opened from the
@@ -263,7 +263,7 @@ function AutoBackup({ ready }) {
         <button class="secondary" disabled=${auto.busy} onClick=${() => run(stopAutoBackup)}>Turn off</button>
       </div>`;
   }
-  return html`<div class="auto-backup">
+  return html`<div class="settings-part">
     <h3>Folder on this computer</h3>
     ${state}
     ${error && html`<p class="status-line error">${error}</p>`}
@@ -293,14 +293,57 @@ function AiCard() {
       </div>
       <p class="hint"><a href=${service.key_url} target="_blank" rel="noopener">Get a ${service.name} key</a>. ${service.key_note}</p>
     </div>
-    <div class="field">
-      <label class="field-label" for="ai-model">Model</label>
-      <input id="ai-model" key=${`model-${service.id}`} type="text" spellcheck="false"
-        value=${settings.ai_models[service.id] || ''} placeholder=${service.default_model}
-        onChange=${(e) => setModel(service.id, e.currentTarget.value)} />
-      <p class="hint">Leave empty for ${service.default_model}.</p>
-    </div>
     <p class="hint">Keys stay in this browser on this device. They are sent only to ${service.name} and never go in backups.</p>
+    <details class="help advanced" open=${!!settings.ai_models[service.id]}>
+      <summary>Advanced</summary>
+      <div class="field">
+        <label class="field-label" for="ai-model">Model</label>
+        <input id="ai-model" key=${`model-${service.id}`} type="text" spellcheck="false"
+          value=${settings.ai_models[service.id] || ''} placeholder=${service.default_model}
+          onChange=${(e) => setModel(service.id, e.currentTarget.value)} />
+        <p class="hint">Leave empty for ${service.default_model}.</p>
+      </div>
+    </details>
+  </section>`;
+}
+
+// The defaults new and reset labels start from; they go with backups and sync
+function LabelDefaultsCard() {
+  const { settings, fonts, tapeWidths } = useStore(app);
+  const [binText, setBinText] = useState(null);
+  const defaults = labelDefaults();
+  const onBin = (e) => {
+    const text = e.currentTarget.value;
+    setBinText(text);
+    const mm = Number(text.replace(',', '.'));
+    if (!text.trim()) updateSettings({ bin_label_mm: null });
+    else if (mm >= 10 && mm <= 499) updateSettings({ bin_label_mm: mm });
+  };
+  return html`<section class="card">
+    <h2 class="card-title">Label defaults</h2>
+    <p class="hint">What Reset goes back to on the Label page. These go with your backups and sync.</p>
+    <div class="defaults-grid">
+      <label class="field">
+        <span class="field-label">Text label tape</span>
+        <select value=${defaults.tape_width_mm} onChange=${(e) => updateSettings({ default_tape_mm: Number(e.currentTarget.value) })}>
+          ${tapeWidths.map((w) => html`<option value=${w}>${w} mm</option>`)}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Text label font</span>
+        <select value=${defaults.font_name} onChange=${(e) => updateSettings({ default_font: e.currentTarget.value })}>
+          ${fonts.map((f) => html`<option value=${f}>${f}</option>`)}
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Bin label length</span>
+        <span class="unit-input">
+          <input type="text" inputmode="decimal" value=${binText ?? String(settings.bin_label_mm || '')}
+            placeholder=${String(FACTORY_LABEL_MM)} onInput=${onBin} onBlur=${() => setBinText(null)} />
+          <span>mm</span>
+        </span>
+      </label>
+    </div>
   </section>`;
 }
 
@@ -314,6 +357,8 @@ export function SettingsPage() {
         onChange=${(match_printer_tape) => updateSettings({ match_printer_tape })} />
     </section>
 
+    <${LabelDefaultsCard} />
+
     <section class="card">
       <h2 class="card-title">Appearance</h2>
       <${Segmented} label="Theme" value=${settings.theme}
@@ -323,19 +368,15 @@ export function SettingsPage() {
 
     <${AiCard} />
 
-    <${SyncCard} />
     <${BackupCard} />
-
-    <section class="card">
-      <h2 class="card-title">Your data</h2>
-      <p>Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the Cube Labeler server; with Google Drive sync on, a backup of them also goes to your own Drive.</p>
-      <${StorageUse} />
-    </section>
 
     <section class="card about">
       <h2 class="card-title">About</h2>
       <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT. <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">On GitHub</a></p>
-      <p>Cube Labeler is free. If it saves you time, you can <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">buy me a coffee on Ko-fi</a> ♥</p>
+      <p>Cube Labeler is free. If it saves you time, you can <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">buy me a coffee on Ko-fi${'\u00a0'}♥</a></p>
+      <h3>Your data</h3>
+      <p class="hint">Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the Cube Labeler server; with Google Drive sync on, a backup of them also goes to your own Drive.</p>
+      <${StorageUse} />
       <p class="hint">Something looks off after an update? <button class="link-button" onClick=${() => window.freshCopy()}>Load a fresh copy</button> of the app. Your labels, icons and settings stay.</p>
       <p class="hint">Labels are drawn by the same Python code as the desktop app, running in this browser with Pyodide.
         Arimo font under the SIL Open Font License.</p>

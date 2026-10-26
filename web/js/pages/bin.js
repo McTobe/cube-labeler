@@ -14,7 +14,7 @@ const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8'];
 const QUICK_LENGTHS = ['4', '6', '8', '10', '12', '16', '20', '25', '30', '35', '40', '50'];
 const BINS = [['single', 'One'], ['dual', 'Two'], ['quad', 'Four']];
 // The bin label length Reset goes back to until the user saves their own
-const FACTORY_LABEL_MM = 32;
+export const FACTORY_LABEL_MM = 32;
 const LENGTH_FIELDS = {
   single: ['length_single'],
   dual: ['length_dual_1', 'length_dual_2'],

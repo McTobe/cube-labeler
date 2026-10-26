@@ -767,6 +767,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .settings-page { max-width: 1400px; columns: 2; column-gap: 16px; }
   .settings-page > * { break-inside: avoid; }
 }
+/* Very wide screens: three columns across more of the window */
+@media (min-width: 1700px) {
+  .page-settings main { max-width: 1800px; }
+  .settings-page { max-width: none; columns: 3; }
+}
 .settings-page .toggle { margin-top: 16px; }
 
 
@@ -1116,8 +1121,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .details-panel h2 { text-align: left; }
 
 /* --- Automatic backups ---------------------------------------------------------------------- */
-.auto-backup { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
-.auto-backup h3 { font-size: 0.95rem; margin: 0 0 6px; }
+.settings-part + .settings-part, .settings-part + .settings-part { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.settings-part h3, .about h3 { font-size: 0.95rem; margin: 0 0 6px; }
+.about h3 { margin-top: 14px; }
+.settings-part > p { margin-top: 0; }
+.defaults-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.defaults-grid .field { margin-top: 0; }
+.unit-input { display: flex; align-items: center; gap: 8px; }
+.unit-input input { flex: 1; min-width: 0; }
+.unit-input span { color: var(--muted); }
+.advanced { margin-top: 12px; }
+.printer-panel .button-row .forget { margin-left: auto; color: var(--muted); }
 .auto-on { display: flex; align-items: baseline; gap: 8px; }
 .auto-on .dot { width: 9px; height: 9px; border-radius: 50%; background: #e0a100; flex: none; }
 .auto-on .dot.on { background: #2fb36d; }

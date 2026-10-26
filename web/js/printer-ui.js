@@ -61,8 +61,8 @@ export function PrinterPanel() {
         ${p.transport ? 'Pick another printer' : 'Connect printer'}</button>
       ${p.transport && html`<button class="secondary" disabled=${p.busy || !ready} onClick=${feed}>
         <${Icon} name="feed" size=${18} /> Feed ${FEED_LENGTH_MM} mm</button>`}
+      ${p.transport && html`<button class="link-button forget" disabled=${p.busy} onClick=${forgetPrinter}>Forget this printer</button>`}
     </div>
-    ${p.transport && html`<button class="link-button" disabled=${p.busy} onClick=${forgetPrinter}>Forget this printer</button>`}
 
     <details class="help">
       <summary>Printer not in the list?</summary>
