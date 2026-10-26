@@ -46,6 +46,8 @@ export const DEFAULT_SETTINGS = {
   match_printer_tape: true,
   label_language: 'en',  // kept for the desktop app's backups; the web version is in English
   bin_label_mm: null,  // the user's own bin label length for Reset, instead of 32 mm
+  default_tape_mm: null,  // tape width a reset text label goes back to, instead of 12 mm
+  default_font: null,  // font a reset text label goes back to, instead of Arimo
 };
 
 export const MAX_TAPE_MM = 499;
@@ -223,8 +225,17 @@ export function setMode(mode) {
   renderNow();
 }
 
+// The tape width and font a reset text label goes back to: the user's defaults from Settings
+export function labelDefaults() {
+  const { settings, fonts, tapeWidths } = app.get();
+  return {
+    tape_width_mm: tapeWidths.includes(settings.default_tape_mm) ? settings.default_tape_mm : DEFAULT_LABEL.tape_width_mm,
+    font_name: fonts.includes(settings.default_font) ? settings.default_font : DEFAULT_LABEL.font_name,
+  };
+}
+
 export function resetLabelSettings() {
-  updateLabel({ ...DEFAULT_LABEL, text: app.get().label.text, font_name: app.get().fonts.includes('Arimo') ? 'Arimo' : DEFAULT_LABEL.font_name });
+  updateLabel({ ...DEFAULT_LABEL, ...labelDefaults(), text: app.get().label.text });
   say('Settings reset. Your text is kept.');
 }
 
