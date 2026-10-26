@@ -324,21 +324,21 @@ function LabelDefaultsCard() {
   return html`<section class="card">
     <h2 class="card-title">Label defaults</h2>
     <p class="hint">What Reset goes back to on the Label page. These go with your backups and sync.</p>
-    <div class="defaults-grid">
-      <label class="field">
-        <span class="field-label">Text label tape</span>
+    <div class="defaults-rows">
+      <label class="default-row">
+        <span><span class="field-label">Text label tape</span><span class="hint">New text labels start on this tape width.</span></span>
         <select value=${defaults.tape_width_mm} onChange=${(e) => updateSettings({ default_tape_mm: Number(e.currentTarget.value) })}>
           ${tapeWidths.map((w) => html`<option value=${w}>${w} mm</option>`)}
         </select>
       </label>
-      <label class="field">
-        <span class="field-label">Text label font</span>
+      <label class="default-row">
+        <span><span class="field-label">Text label font</span><span class="hint">The font Reset picks for the text.</span></span>
         <select value=${defaults.font_name} onChange=${(e) => updateSettings({ default_font: e.currentTarget.value })}>
           ${fonts.map((f) => html`<option value=${f}>${f}</option>`)}
         </select>
       </label>
-      <label class="field">
-        <span class="field-label">Bin label length</span>
+      <label class="default-row">
+        <span><span class="field-label">Bin label length</span><span class="hint">Empty means the factory ${FACTORY_LABEL_MM} mm.</span></span>
         <span class="unit-input">
           <input type="text" inputmode="decimal" value=${binText ?? String(settings.bin_label_mm || '')}
             placeholder=${String(FACTORY_LABEL_MM)} onInput=${onBin} onBlur=${() => setBinText(null)} />
@@ -347,6 +347,20 @@ function LabelDefaultsCard() {
       </label>
     </div>
   </section>`;
+}
+
+// Theme choice as small pictures of the app in light, dark or both
+function ThemePicker({ value, onChange }) {
+  const themes = [['system', 'Like the device'], ['light', 'Light'], ['dark', 'Dark']];
+  return html`<div class="theme-picker" role="radiogroup" aria-label="Theme">
+    ${themes.map(([key, text]) => html`<label class=${'theme-option' + (value === key ? ' selected' : '')}>
+      <input type="radio" name="theme" value=${key} checked=${value === key} onChange=${() => onChange(key)} />
+      <span class=${'theme-thumb ' + key} aria-hidden="true">
+        <span class="t-side"></span><span class="t-main"><span class="t-bar"></span><span class="t-card"></span><span class="t-card short"></span></span>
+      </span>
+      <span class="theme-name">${text}</span>
+    </label>`)}
+  </div>`;
 }
 
 export function SettingsPage() {
@@ -368,9 +382,7 @@ export function SettingsPage() {
       <${AiCard} />
       <section class="card">
         <h2 class="card-title">Appearance</h2>
-        <${Segmented} label="Theme" value=${settings.theme}
-          options=${[['system', 'Like the device'], ['light', 'Light'], ['dark', 'Dark']]}
-          onChange=${(theme) => updateSettings({ theme })} />
+        <${ThemePicker} value=${settings.theme} onChange=${(theme) => updateSettings({ theme })} />
       </section>
     </div>
 
