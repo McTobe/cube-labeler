@@ -47,10 +47,7 @@ export function LabelPage() {
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
-      <div class="mode-switch" role="tablist" aria-label="Kind of label">
-        <button role="tab" aria-selected=${mode === 'text'} class=${mode === 'text' ? 'on' : ''} onClick=${() => setMode('text')}>Text label</button>
-        <button role="tab" aria-selected=${mode === 'bin'} class=${mode === 'bin' ? 'on' : ''} onClick=${() => setMode('bin')}>Bin label</button>
-      </div>
+      <${ModePicker} mode=${mode} />
       ${mode === 'bin' ? html`${!wide && html`<${BinCard} />`}<${BinOptions} />` : html`
         ${!wide && html`<${TextCard} />`}
         <${FontSection} />
@@ -59,6 +56,19 @@ export function LabelPage() {
         <${TapeSection} />
         <${AdvancedSection} />`}
     </div>
+  </div>`;
+}
+
+// The kinds of label, as tiles that wrap onto more rows when more kinds are added
+const MODES = [
+  { id: 'text', name: 'Text label', icon: 'text' },
+  { id: 'bin', name: 'Bin label', icon: 'bin' },
+];
+
+function ModePicker({ mode }) {
+  return html`<div class="mode-switch" role="tablist" aria-label="Kind of label">
+    ${MODES.map((m) => html`<button role="tab" aria-selected=${mode === m.id} class=${mode === m.id ? 'on' : ''}
+      onClick=${() => setMode(m.id)}><${Icon} name=${m.icon} size=${20} /> ${m.name}</button>`)}
   </div>`;
 }
 

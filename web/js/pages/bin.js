@@ -10,7 +10,7 @@ import { Field, Section, Segmented, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say } from '../app.js';
 
-const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8'];
+const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8', 'M10'];
 const QUICK_LENGTHS = ['4', '6', '8', '10', '12', '16', '20', '25', '30', '35', '40', '50'];
 const BINS = [['single', 'One'], ['dual', 'Two'], ['quad', 'Four']];
 // The bin label length Reset goes back to until the user saves their own
@@ -28,7 +28,7 @@ const DRIVE_TILES = [
   { value: 'torx', name: 'Torx', file: 'screw_drives/torx.png' },
   { value: 'internal_hex', name: 'Allen', file: 'screw_drives/hex_socket.png' },
   { value: 'slotted', name: 'Slot', file: 'screw_drives/slotted.png' },
-  { picture: 'robertson.png', name: 'Robertson', file: 'screw_drives/robertson.png' },
+  { picture: 'robertson.png', name: 'Robertson', short: 'Square', file: 'screw_drives/robertson.png' },
   { value: 'external_hex', name: 'Hex head', file: 'screw_drives/external_hex.png' },
   { picture: 'hex_nut_drive.png', name: 'Hex nut', file: 'screw_drives/hex_nut_drive.png' },
   { value: 'none', name: 'None' },
@@ -120,9 +120,9 @@ function IconTiles({ cfg, tiles, field }) {
   return html`<${Field} label="Icon">
     <div class="icon-tiles" role="group" aria-label="Icon">
       ${tiles.map((tile) => html`<button class=${`icon-choice${on(tile) ? ' on' : ''}`} aria-pressed=${on(tile)}
-        title=${tile.name} onClick=${() => pick(tile)}>
+        title=${tile.short ? `${tile.name} (${tile.short.toLowerCase()})` : tile.name} onClick=${() => pick(tile)}>
         ${tile.file ? html`<img src=${`icons/${tile.file}`} alt="" />` : html`<span class="none-mark" aria-hidden="true">—</span>`}
-        <span>${tile.name}</span></button>`)}
+        <span>${tile.short || tile.name}</span></button>`)}
       ${thumb && html`<button class="icon-choice on" aria-pressed="true" title=${icon.name}>
         <img src=${thumb} alt="" /><span>${icon.name.replace(/\.[a-z]+$/i, '')}</span></button>`}
     </div>
@@ -137,12 +137,19 @@ function IconTiles({ cfg, tiles, field }) {
   <//>`;
 }
 
-// Chips that fill in a common value; typing still works
-function Chips({ label, values, current, onPick }) {
-  return html`<div class="quick-chips" role="group" aria-label=${label}>
-    ${values.map((v) => html`<button class=${current === v ? 'on' : ''} onClick=${() => onPick(v)}>${v}</button>`)}
+// Chips that fill in a common value; typing still works. On a wide screen they are a grid of
+// cols columns whose rows stretch to fill the column.
+function Chips({ label, values, current, onPick, cols = 4 }) {
+  return html`<div class="quick-chips" role="group" aria-label=${label} style=${`--cols: ${cols}`}>
+    ${values.map((v) => {
+      const on = Array.isArray(current) ? current.includes(v) : current === v;
+      return html`<button class=${on ? 'on' : ''} aria-pressed=${on} onClick=${() => onPick(v)}>${v}</button>`;
+    })}
   </div>`;
 }
+
+// Names in one row when there are up to three, else two by two, so no name sits alone
+const nameCols = (names) => (Math.min(names.length, 4) === 4 ? 2 : Math.max(1, Math.min(names.length, 3)));
 
 // A length chip fills the bin that was last clicked (or the first empty one, or bin 1) and then
 // moves on to the next bin, so clicking a few chips fills the label in order
@@ -182,26 +189,38 @@ function FastenerForm({ cfg, names }) {
       <${Length} label="Bin 2" value=${cfg.length_dual_2} field="length_dual_2" onFocus=${focus('length_dual_2')} />
     </div>`;
   }
+  // Each column holds two groups: one at the top, one at the bottom, so the columns fill the card
   return html`
     <div class="bin-grid three">
       <div class="bin-col">
-        <${Text} label="Size" value=${cfg.thread_size} placeholder="M3" onChange=${(thread_size) => updateBin({ thread_size })} />
-        <${Chips} label="Common sizes" values=${QUICK_SIZES} current=${cfg.thread_size}
-          onPick=${(thread_size) => updateBin({ thread_size })} />
-        <${Text} label="Name" value=${cfg.category} placeholder="SCREWS" onChange=${(category) => updateBin({ category })} />
-        <${Chips} label="Common names" values=${names.slice(0, 4)} current=${cfg.category}
-          onPick=${(category) => updateBin({ category })} />
+        <div class="bin-group">
+          <${Text} label="Size" value=${cfg.thread_size} placeholder="M3" onChange=${(thread_size) => updateBin({ thread_size })} />
+          <${Chips} label="Common sizes" values=${QUICK_SIZES} current=${cfg.thread_size}
+            onPick=${(thread_size) => updateBin({ thread_size })} />
+        </div>
+        <div class="bin-group">
+          <${Text} label="Name" value=${cfg.category} placeholder="SCREWS" onChange=${(category) => updateBin({ category })} />
+          <${Chips} label="Common names" cols=${nameCols(names)} values=${names.slice(0, 4)} current=${cfg.category}
+            onPick=${(category) => updateBin({ category })} />
+        </div>
       </div>
       <div class="bin-col">
-        <${Segmented} label="Bins" options=${BINS} value=${mode === 'assortment' ? '' : mode}
-          onChange=${(compartment_mode) => { lastLength = null; updateBin({ compartment_mode }); }} />
-        <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'}>${lengths}<//>
-        ${mode !== 'assortment' && html`<${Chips} label="Common lengths" values=${QUICK_LENGTHS} onPick=${(v) => pickLength(cfg, v)} />`}
+        <div class="bin-group">
+          <${Segmented} label="Bins" options=${BINS} value=${mode === 'assortment' ? '' : mode}
+            onChange=${(compartment_mode) => { lastLength = null; updateBin({ compartment_mode }); }} />
+        </div>
+        <div class="bin-group">
+          <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'}>${lengths}<//>
+          ${mode !== 'assortment' && html`<${Chips} label="Common lengths" cols=${6} values=${QUICK_LENGTHS}
+            current=${(LENGTH_FIELDS[mode] || []).map((f) => unformatLength(cfg[f]).trim())} onPick=${(v) => pickLength(cfg, v)} />`}
+        </div>
       </div>
       <div class="bin-col">
-        <${IconTiles} cfg=${cfg} field="tool_type"
-          tiles=${cfg.tool_type === 'washer' ? [...DRIVE_TILES, { value: 'washer', name: 'Washer' }] : DRIVE_TILES} />
-        <div class="row">
+        <div class="bin-group">
+          <${IconTiles} cfg=${cfg} field="tool_type"
+            tiles=${cfg.tool_type === 'washer' ? [...DRIVE_TILES, { value: 'washer', name: 'Washer' }] : DRIVE_TILES} />
+        </div>
+        <div class="bin-group">
           <${Text} label="Drive size" value=${cfg.tool_size} placeholder="2.5" onChange=${(tool_size) => updateBin({ tool_size })} />
         </div>
       </div>
@@ -211,16 +230,22 @@ function FastenerForm({ cfg, names }) {
 
 function PartForm({ cfg, names }) {
   return html`
-    <div class="bin-grid">
+    <div class="bin-grid three parts">
       <div class="bin-col">
-        <${Text} label="Name" value=${cfg.category_banner} placeholder="BEARINGS" onChange=${(category_banner) => updateBin({ category_banner })} />
-        <${Chips} label="Common names" values=${names.slice(0, 4)} current=${cfg.category_banner}
-          onPick=${(category_banner) => updateBin({ category_banner })} />
-        <${Text} label="Part number" value=${cfg.spec_primary} placeholder="608ZZ" onChange=${(spec_primary) => updateBin({ spec_primary })} />
-        <${Text} label="Note" value=${cfg.spec_secondary} placeholder="Optional, e.g. 0.2–4.0 mm²" onChange=${(spec_secondary) => updateBin({ spec_secondary })} />
+        <div class="bin-group">
+          <${Text} label="Name" value=${cfg.category_banner} placeholder="BEARINGS" onChange=${(category_banner) => updateBin({ category_banner })} />
+          <${Chips} label="Common names" cols=${nameCols(names)} values=${names.slice(0, 4)} current=${cfg.category_banner}
+            onPick=${(category_banner) => updateBin({ category_banner })} />
+        </div>
+        <div class="bin-group">
+          <${Text} label="Part number" value=${cfg.spec_primary} placeholder="608ZZ" onChange=${(spec_primary) => updateBin({ spec_primary })} />
+          <${Text} label="Note" value=${cfg.spec_secondary} placeholder="Optional, e.g. 0.2–4.0 mm²" onChange=${(spec_secondary) => updateBin({ spec_secondary })} />
+        </div>
       </div>
       <div class="bin-col">
-        <${IconTiles} cfg=${cfg} field="icon_type" tiles=${PART_TILES} />
+        <div class="bin-group">
+          <${IconTiles} cfg=${cfg} field="icon_type" tiles=${PART_TILES} />
+        </div>
       </div>
     </div>
   `;
@@ -256,7 +281,7 @@ export function BinCard() {
     <div class="card-head">
       <${Segmented} ariaLabel="Label for" options=${[['fastener', 'Fasteners'], ['component', 'Parts']]} value=${bin.kind}
         onChange=${(kind) => { lastLength = null; updateBin({ kind }); }} />
-      <button class="secondary" disabled=${phase !== 'ready'} title="Add to the queue and clear the lengths for the next bin"
+      <button class="secondary" disabled=${phase !== 'ready'} title="Add to the queue and clear what changes for the next bin"
         onClick=${addAndNext}>Add to queue and start the next</button>
     </div>
     ${bin.kind === 'fastener'
@@ -285,6 +310,22 @@ export function BinOptions() {
   const keep = () => { updateSettings({ bin_label_mm: current }); say(`Reset now goes back to ${current} mm.`); };
 
   return html`
+    <section class="card drawer-card">
+      <h2 class="card-title">${bin.kind === 'fastener' ? 'Fastener bin labels' : 'Part bin labels'}</h2>
+      <p class="hint">${bin.kind === 'fastener'
+        ? 'Small labels for drawers and bins of screws, nuts and washers, on 12 mm tape.'
+        : 'Small labels for drawers and bins of bearings, connectors and other parts, on 12 mm tape.'}</p>
+      <ol class="how-to">
+        ${bin.kind === 'fastener' ? html`
+          <li>Pick the size and name, like M3 SCREWS.</li>
+          <li>Pick how many bins the label covers and type their lengths.</li>
+          <li>Pick the drive, then add the label to the queue.</li>` : html`
+          <li>Type the name and the part number.</li>
+          <li>Pick a picture, or use one of your own.</li>
+          <li>Add the label to the queue.</li>`}
+      </ol>
+      <p class="hint">Filling a whole drawer? "Add to queue and start the next" keeps what stays the same and clears the rest for the next bin.</p>
+    </section>
     <${Section} id="bin-size" title="Label length" summary=${`${cfg.label_width_mm} mm, 12 mm tape`}>
       <${Field} label="Length in mm" hint="Bin labels are designed for 12 mm tape and always print at 12 mm.">
         <input type="text" inputmode="decimal" value=${widthText ?? String(cfg.label_width_mm)} onInput=${onWidth}
@@ -299,6 +340,6 @@ export function BinOptions() {
     ${bin.kind === 'fastener' && html`<${Section} id="bin-drive" title="Drive icon" summary=${cfg.simple_drive_icon ? 'Simple' : 'Library picture'}>
       <${Toggle} label="Simple drive icon" checked=${cfg.simple_drive_icon} disabled=${!builtInDrive}
         onChange=${(simple_drive_icon) => updateBin({ simple_drive_icon })} />
-      <p class="hint">A plain drawn symbol instead of the library picture. Robertson, hex nut and your own pictures always print as pictures.</p>
+      <p class="hint">A plain drawn symbol instead of the library picture. Square (Robertson), hex nut and your own pictures always print as pictures.</p>
     <//>`}`;
 }
