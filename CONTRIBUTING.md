@@ -35,4 +35,4 @@ CI runs the same tests on Windows and Linux for every pull request.
 
 ## License of contributions
 
-By contributing, you agree that your contribution is released under the same license as the project (see [LICENSE](LICENSE)).
+Cube Labeler is licensed under the GNU AGPL v3.0. By contributing, you agree that your contribution is released under the same license (see [LICENSE](LICENSE)). Please don't add code copied from projects whose license doesn't allow that; [NOTICE.md](NOTICE.md) lists the parts that come from elsewhere.
