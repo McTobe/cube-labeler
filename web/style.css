@@ -864,9 +864,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 .bin-kind { margin: 12px 0 14px; }
 .drawer-card .hint { margin: 4px 0 10px; }
+.drawer-card .hint:last-child { margin-bottom: 0; }
 .how-to { margin: 0 0 10px; padding-left: 20px; font-size: 0.92rem; line-height: 1.5; }
 .how-to li + li { margin-top: 2px; }
-.drawer-card button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
 .quick-chips button { min-height: 28px; padding: 2px 9px; font-size: 0.8rem; }
 .quick-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
 .quick-chips button {

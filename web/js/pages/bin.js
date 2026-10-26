@@ -267,12 +267,15 @@ function addAndNext() {
 // The bin label's main fields: under the preview on a wide screen, like the text label's text
 export function BinCard() {
   const { bin, binNames } = useStore(app);
+  const { phase } = useStore(boot);
   if (!bin) return html`<section class="card bin-card"><p class="hint">Loading...</p></section>`;
   const cfg = bin[bin.kind];
   return html`<section class="card bin-card">
     <div class="card-head">
       <${Segmented} ariaLabel="Label for" options=${[['fastener', 'Fasteners'], ['component', 'Parts']]} value=${bin.kind}
         onChange=${(kind) => { lastLength = null; updateBin({ kind }); }} />
+      <button class="secondary" disabled=${phase !== 'ready'} title="Add to the queue and clear what changes for the next bin"
+        onClick=${addAndNext}>Add to queue and start the next</button>
     </div>
     ${bin.kind === 'fastener'
       ? html`<${FastenerForm} cfg=${cfg} names=${binNames.fastener} />`
@@ -283,7 +286,6 @@ export function BinCard() {
 // The bin label's less used options, in the side panel
 export function BinOptions() {
   const { bin, settings } = useStore(app);
-  const { phase } = useStore(boot);
   const [widthText, setWidthText] = useState(null);
   if (!bin) return null;
   const cfg = bin[bin.kind];
@@ -315,9 +317,7 @@ export function BinOptions() {
           <li>Pick a picture, or use one of your own.</li>
           <li>Add the label to the queue.</li>`}
       </ol>
-      <p class="hint">Filling a whole drawer? This keeps what stays the same and clears the rest for the next bin.</p>
-      <button class="secondary" disabled=${phase !== 'ready'} onClick=${addAndNext}>
-        <${Icon} name="queue" size=${18} /> Add to queue and start the next</button>
+      <p class="hint">Filling a whole drawer? "Add to queue and start the next" keeps what stays the same and clears the rest for the next bin.</p>
     </section>
     <${Section} id="bin-size" title="Label length" summary=${`${cfg.label_width_mm} mm, 12 mm tape`}>
       <${Field} label="Length in mm" hint="Bin labels are designed for 12 mm tape and always print at 12 mm.">
