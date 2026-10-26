@@ -28,7 +28,7 @@ const DRIVE_TILES = [
   { value: 'torx', name: 'Torx', file: 'screw_drives/torx.png' },
   { value: 'internal_hex', name: 'Allen', file: 'screw_drives/hex_socket.png' },
   { value: 'slotted', name: 'Slot', file: 'screw_drives/slotted.png' },
-  { picture: 'robertson.png', name: 'Robertson', file: 'screw_drives/robertson.png' },
+  { picture: 'robertson.png', name: 'Robertson', short: 'Square', file: 'screw_drives/robertson.png' },
   { value: 'external_hex', name: 'Hex head', file: 'screw_drives/external_hex.png' },
   { picture: 'hex_nut_drive.png', name: 'Hex nut', file: 'screw_drives/hex_nut_drive.png' },
   { value: 'none', name: 'None' },
@@ -120,9 +120,9 @@ function IconTiles({ cfg, tiles, field }) {
   return html`<${Field} label="Icon">
     <div class="icon-tiles" role="group" aria-label="Icon">
       ${tiles.map((tile) => html`<button class=${`icon-choice${on(tile) ? ' on' : ''}`} aria-pressed=${on(tile)}
-        title=${tile.name} onClick=${() => pick(tile)}>
+        title=${tile.short ? `${tile.name} (${tile.short.toLowerCase()})` : tile.name} onClick=${() => pick(tile)}>
         ${tile.file ? html`<img src=${`icons/${tile.file}`} alt="" />` : html`<span class="none-mark" aria-hidden="true">—</span>`}
-        <span>${tile.name}</span></button>`)}
+        <span>${tile.short || tile.name}</span></button>`)}
       ${thumb && html`<button class="icon-choice on" aria-pressed="true" title=${icon.name}>
         <img src=${thumb} alt="" /><span>${icon.name.replace(/\.[a-z]+$/i, '')}</span></button>`}
     </div>
@@ -141,7 +141,10 @@ function IconTiles({ cfg, tiles, field }) {
 // cols columns whose rows stretch to fill the column.
 function Chips({ label, values, current, onPick, cols = 4 }) {
   return html`<div class="quick-chips" role="group" aria-label=${label} style=${`--cols: ${cols}`}>
-    ${values.map((v) => html`<button class=${current === v ? 'on' : ''} onClick=${() => onPick(v)}>${v}</button>`)}
+    ${values.map((v) => {
+      const on = Array.isArray(current) ? current.includes(v) : current === v;
+      return html`<button class=${on ? 'on' : ''} aria-pressed=${on} onClick=${() => onPick(v)}>${v}</button>`;
+    })}
   </div>`;
 }
 
@@ -208,7 +211,8 @@ function FastenerForm({ cfg, names }) {
         </div>
         <div class="bin-group">
           <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'}>${lengths}<//>
-          ${mode !== 'assortment' && html`<${Chips} label="Common lengths" cols=${6} values=${QUICK_LENGTHS} onPick=${(v) => pickLength(cfg, v)} />`}
+          ${mode !== 'assortment' && html`<${Chips} label="Common lengths" cols=${6} values=${QUICK_LENGTHS}
+            current=${(LENGTH_FIELDS[mode] || []).map((f) => unformatLength(cfg[f]).trim())} onPick=${(v) => pickLength(cfg, v)} />`}
         </div>
       </div>
       <div class="bin-col">
@@ -336,6 +340,6 @@ export function BinOptions() {
     ${bin.kind === 'fastener' && html`<${Section} id="bin-drive" title="Drive icon" summary=${cfg.simple_drive_icon ? 'Simple' : 'Library picture'}>
       <${Toggle} label="Simple drive icon" checked=${cfg.simple_drive_icon} disabled=${!builtInDrive}
         onChange=${(simple_drive_icon) => updateBin({ simple_drive_icon })} />
-      <p class="hint">A plain drawn symbol instead of the library picture. Robertson, hex nut and your own pictures always print as pictures.</p>
+      <p class="hint">A plain drawn symbol instead of the library picture. Square (Robertson), hex nut and your own pictures always print as pictures.</p>
     <//>`}`;
 }
