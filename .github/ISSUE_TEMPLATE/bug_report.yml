@@ -1,0 +1,39 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead. Screenshots help.
+    validations:
+      required: true
+  - type: dropdown
+    id: app
+    attributes:
+      label: Which app?
+      options:
+        - Web app
+        - Desktop app (Windows .exe)
+        - Command line
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown under About in Settings, or the Docker image tag.
+      placeholder: "2.1.0"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Browser and system
+      placeholder: "Chrome 141 on Android 15 / Windows 11"
+  - type: input
+    id: tape
+    attributes:
+      label: Tape width (if it's about printing)
+      placeholder: "12 mm"
