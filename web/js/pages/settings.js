@@ -349,7 +349,10 @@ function LabelDefaultsCard() {
 
 export function SettingsPage() {
   const { settings } = useStore(app);
+  // Three columns that end on one line (the last card in each stretches), with About as a
+  // strip across the bottom; on narrower screens the same cards in two columns or one
   return html`<div class="settings-page">
+    <div class="settings-col">
     <section class="card">
       <h2 class="card-title">Printer</h2>
       <${PrinterPanel} />
@@ -365,21 +368,30 @@ export function SettingsPage() {
         options=${[['system', 'Like the device'], ['light', 'Light'], ['dark', 'Dark']]}
         onChange=${(theme) => updateSettings({ theme })} />
     </section>
+    </div>
 
-    <${AiCard} />
+    <div class="settings-col"><${AiCard} /></div>
 
-    <${BackupCard} />
+    <div class="settings-col"><${BackupCard} /></div>
 
     <section class="card about">
       <h2 class="card-title">About</h2>
+      <div class="about-cols">
+      <div>
       <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT. <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">On GitHub</a></p>
       <p>Cube Labeler is free. If it saves you time, you can <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">buy me a coffee on Ko-fi${'\u00a0'}♥</a></p>
+      </div>
+      <div>
       <h3>Your data</h3>
       <p class="hint">Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the Cube Labeler server; with Google Drive sync on, a backup of them also goes to your own Drive.</p>
       <${StorageUse} />
+      </div>
+      <div>
       <p class="hint">Something looks off after an update? <button class="link-button" onClick=${() => window.freshCopy()}>Load a fresh copy</button> of the app. Your labels, icons and settings stay.</p>
       <p class="hint">Labels are drawn by the same Python code as the desktop app, running in this browser with Pyodide.
         Arimo font under the SIL Open Font License.</p>
+      </div>
+      </div>
     </section>
   </div>`;
 }

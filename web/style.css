@@ -762,15 +762,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* --- Other pages --------------------------------------------------------------------------- */
 
 .settings-page { max-width: 680px; }
-/* Wide screens: the cards in two columns instead of one narrow strip */
+.about-cols > div + div { margin-top: 14px; }
+/* Wide screens: a bento grid. The columns end on one line because the last card in each
+   stretches, and About runs across the bottom. */
 @media (min-width: 1400px) {
-  .settings-page { max-width: 1400px; columns: 2; column-gap: 16px; }
-  .settings-page > * { break-inside: avoid; }
-}
-/* Very wide screens: three columns across more of the window */
-@media (min-width: 1700px) {
   .page-settings main { max-width: 1800px; }
-  .settings-page { max-width: none; columns: 3; }
+  .settings-page { max-width: none; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+  .settings-page .card { margin: 0; }
+  .settings-col { display: flex; flex-direction: column; gap: 16px; }
+  .settings-col > .card:last-child { flex: 1; }
+  /* Two columns: printer, defaults and look beside AI icons, then backups beside About */
+}
+@media (min-width: 1700px) {
+  .settings-page { grid-template-columns: repeat(3, 1fr); }
+  .settings-page > .about { grid-column: 1 / -1; }
+  .about-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 24px; }
+  .about-cols > div + div { margin-top: 0; }
+  .about-cols > div > :first-child { margin-top: 0; }
 }
 .settings-page .toggle { margin-top: 16px; }
 
@@ -1123,7 +1131,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* --- Automatic backups ---------------------------------------------------------------------- */
 .settings-part + .settings-part, .settings-part + .settings-part { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 .settings-part h3, .about h3 { font-size: 0.95rem; margin: 0 0 6px; }
-.about h3 { margin-top: 14px; }
 .settings-part > p { margin-top: 0; }
 .defaults-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
 .defaults-grid .field { margin-top: 0; }
