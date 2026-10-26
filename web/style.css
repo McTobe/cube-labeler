@@ -828,17 +828,39 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* Three columns with dividers on a wide screen, like the icon editor */
 @media (min-width: 1500px) {
   .bin-grid.three { grid-template-columns: 0.9fr 1fr 1.1fr; gap: 0; }
+  /* Parts: the fields in one column, the pictures get the room of two */
+  .bin-grid.three.parts { grid-template-columns: 1fr 1.6fr; }
   .bin-grid.three > .bin-col { padding: 2px 20px; min-width: 0; }
   .bin-grid.three > .bin-col:first-child { padding-left: 0; }
   .bin-grid.three > .bin-col:last-child { padding-right: 0; }
   .bin-grid.three > .bin-col + .bin-col { border-left: 1px solid var(--border); }
-  /* The columns reach the bottom of the card: the first group at the top, the last at the bottom */
+  /* The columns fill the card: fields grow with the window, and the pills and icons become
+     grids whose rows stretch to use the full height */
   .label-preview-col .bin-card { display: flex; flex-direction: column; }
   .label-preview-col .bin-card > .card-head { flex: none; }
-  .label-preview-col .bin-card .bin-grid.three { flex: 1 0 auto; }
-  .bin-grid.three > .bin-col { justify-content: space-between; }
-  .bin-grid.three .quick-chips { gap: 5px; }
-  .bin-grid.three .quick-chips button { padding: 2px 8px; }
+  .label-preview-col .bin-card .bin-grid.three { flex: 1 1 0; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .label-preview-col .bin-card .bin-grid.three > .bin-col { min-height: 0; }
+  .bin-grid.three .bin-group { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .bin-grid.three .bin-group .field, .bin-grid.three .bin-group .quick-chips { margin-top: 0; }
+  .bin-grid.three .bin-group:has(.quick-chips, .icon-tiles) { flex: 1 1 auto; }
+  .bin-grid.three .bin-group > .field:has(.icon-tiles) { flex: 1 1 0; min-height: 0; }
+  .bin-grid.three input[type="text"] { height: clamp(40px, 5.2vh, 58px); font-size: clamp(1rem, 1.5vh, 1.2rem); }
+  .bin-grid.three .segmented label { padding-top: clamp(6px, 1.1vh, 14px); padding-bottom: clamp(6px, 1.1vh, 14px); }
+  .bin-grid.three .quick-chips {
+    flex: 1 1 0; min-height: 0; display: grid; gap: 6px;
+    grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: minmax(30px, 1fr);
+  }
+  .bin-grid.three .quick-chips button {
+    min-height: 0; padding: 2px 4px; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: clamp(0.85rem, 1.3vh, 1rem);
+  }
+  /* At most six pictures a row, so they grow into a full grid; a short window scrolls them */
+  .bin-grid.three .icon-tiles {
+    flex: 1 1 0; min-height: 0; overflow-y: auto;
+    grid-template-columns: repeat(auto-fill, minmax(max(64px, calc(100% / 6 - 6px)), 1fr)); grid-auto-rows: minmax(62px, 1fr);
+  }
+  .bin-grid.three .icon-choice { justify-content: center; }
+  .bin-grid.three .icon-choice img, .bin-grid.three .icon-choice .none-mark { width: clamp(30px, 3.6vh, 44px); height: clamp(30px, 3.6vh, 44px); }
 }
 .bin-kind { margin: 12px 0 14px; }
 .drawer-card .hint { margin: 4px 0 10px; }

@@ -10,7 +10,7 @@ import { Field, Section, Segmented, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say } from '../app.js';
 
-const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8'];
+const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8', 'M10'];
 const QUICK_LENGTHS = ['4', '6', '8', '10', '12', '16', '20', '25', '30', '35', '40', '50'];
 const BINS = [['single', 'One'], ['dual', 'Two'], ['quad', 'Four']];
 // The bin label length Reset goes back to until the user saves their own
@@ -137,9 +137,10 @@ function IconTiles({ cfg, tiles, field }) {
   <//>`;
 }
 
-// Chips that fill in a common value; typing still works
-function Chips({ label, values, current, onPick }) {
-  return html`<div class="quick-chips" role="group" aria-label=${label}>
+// Chips that fill in a common value; typing still works. On a wide screen they are a grid of
+// cols columns whose rows stretch to fill the column.
+function Chips({ label, values, current, onPick, cols = 4 }) {
+  return html`<div class="quick-chips" role="group" aria-label=${label} style=${`--cols: ${cols}`}>
     ${values.map((v) => html`<button class=${current === v ? 'on' : ''} onClick=${() => onPick(v)}>${v}</button>`)}
   </div>`;
 }
@@ -193,7 +194,7 @@ function FastenerForm({ cfg, names }) {
         </div>
         <div class="bin-group">
           <${Text} label="Name" value=${cfg.category} placeholder="SCREWS" onChange=${(category) => updateBin({ category })} />
-          <${Chips} label="Common names" values=${names.slice(0, 4)} current=${cfg.category}
+          <${Chips} label="Common names" cols=${2} values=${names.slice(0, 4)} current=${cfg.category}
             onPick=${(category) => updateBin({ category })} />
         </div>
       </div>
@@ -204,7 +205,7 @@ function FastenerForm({ cfg, names }) {
         </div>
         <div class="bin-group">
           <${Field} label=${mode === 'single' ? 'Length and note' : 'Lengths'}>${lengths}<//>
-          ${mode !== 'assortment' && html`<${Chips} label="Common lengths" values=${QUICK_LENGTHS} onPick=${(v) => pickLength(cfg, v)} />`}
+          ${mode !== 'assortment' && html`<${Chips} label="Common lengths" cols=${6} values=${QUICK_LENGTHS} onPick=${(v) => pickLength(cfg, v)} />`}
         </div>
       </div>
       <div class="bin-col">
@@ -222,15 +223,13 @@ function FastenerForm({ cfg, names }) {
 
 function PartForm({ cfg, names }) {
   return html`
-    <div class="bin-grid three">
+    <div class="bin-grid three parts">
       <div class="bin-col">
         <div class="bin-group">
           <${Text} label="Name" value=${cfg.category_banner} placeholder="BEARINGS" onChange=${(category_banner) => updateBin({ category_banner })} />
-          <${Chips} label="Common names" values=${names.slice(0, 4)} current=${cfg.category_banner}
+          <${Chips} label="Common names" cols=${2} values=${names.slice(0, 4)} current=${cfg.category_banner}
             onPick=${(category_banner) => updateBin({ category_banner })} />
         </div>
-      </div>
-      <div class="bin-col">
         <div class="bin-group">
           <${Text} label="Part number" value=${cfg.spec_primary} placeholder="608ZZ" onChange=${(spec_primary) => updateBin({ spec_primary })} />
           <${Text} label="Note" value=${cfg.spec_secondary} placeholder="Optional, e.g. 0.2–4.0 mm²" onChange=${(spec_secondary) => updateBin({ spec_secondary })} />
