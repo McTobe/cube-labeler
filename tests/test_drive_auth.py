@@ -1,13 +1,15 @@
 """Tests for web/drive_auth.py, the helper that keeps the web app signed in to Google Drive."""
 
+import importlib.util
 import os
-import sys
 import unittest
 import urllib.parse
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web"))
-
-import drive_auth  # noqa: E402
+# Loaded by its path, so web/ stays off sys.path: other tests expect the root build.py first
+_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "drive_auth.py")
+_SPEC = importlib.util.spec_from_file_location("drive_auth", _PATH)
+drive_auth = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(drive_auth)
 
 URL = "https://print.example.com"
 
