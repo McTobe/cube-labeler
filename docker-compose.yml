@@ -10,6 +10,11 @@ services:
   cube-labeler-web:
     image: ghcr.io/mctobe/cube-labeler-web:latest
     build: .
+    environment:
+      # Keeps people signed in to Google Drive (docs/google-sign-in.md). Put the values in
+      # a .env file next to this one (Dockge has a box for it); empty means hourly sign-in.
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
     ports:
       - "8080:80"
     restart: unless-stopped

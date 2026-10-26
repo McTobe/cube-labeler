@@ -13,7 +13,7 @@ import { TemplatesPage } from './pages/templates.js';
 import { app, start, pageChanged, queueLabelCount } from './app.js';
 import { useStore } from './state.js';
 import { startAutoBackup, autoBackup } from './autobackup.js';
-import { drive } from './gdrive.js';
+import { drive, driveReady } from './gdrive.js';
 import { APP_VERSION } from './version.js';
 
 // Marks the page while a phone keyboard is up for a text field, so the page can make room for
@@ -47,17 +47,17 @@ function currentPage() {
   return PAGES.find((p) => p.id === id) || PAGES[0];
 }
 
-// Google Drive sync at a glance: green when syncing works, amber when Google wants the
-// hourly click, red after an error, grey when it is off. Clicking it opens the sync box.
+// Google Drive sync at a glance: green when syncing works, amber when Google wants a click
+// (every hour, or once more when the server keeps people signed in), red after an error, grey when it is off. Clicking it opens the sync box.
 function SyncChip() {
   const d = useStore(drive);
   const auto = useStore(autoBackup);
   const [open, setOpen] = useState(false);
   let state = 'off';
   let title = 'Sync is off. Click to set up Google Drive sync, so your icons, templates and settings are on every device.';
-  if (d.on && !d.token) {
+  if (d.on && !driveReady()) {
     state = 'paused';
-    title = 'Sync is paused: Google asks you to continue once an hour.';
+    title = d.helper ? 'Sync is paused: Google asks you to sign in again.' : 'Sync is paused: Google asks you to continue once an hour.';
   } else if (d.on && auto.driveError) {
     state = 'error';
     title = `Sync failed: ${auto.driveError}`;

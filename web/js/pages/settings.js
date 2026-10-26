@@ -177,7 +177,7 @@ function DrivePicker({ open, onClose, onPick }) {
     setError('');
     try { setFiles(await listDriveBackups()); } catch (err) { setError(errorMessage(err)); }
   };
-  useEffect(() => { setFiles(null); if (open && driveReady()) load(); }, [open, !!d.token]);
+  useEffect(() => { setFiles(null); if (open && driveReady()) load(); }, [open, driveReady()]);
   const signIn = async () => {
     setError('');
     try { await continueDriveBackup(); } catch (err) { setError(errorMessage(err)); }
@@ -220,15 +220,17 @@ export function SyncPanel() {
       <div class="button-row"><button class="primary" disabled=${!ready} onClick=${() => run(async () => { await signInToDrive(); await startDriveBackup(); })}>Sign in with Google</button></div>`;
   } else {
     const who = d.email ? html`<strong>${d.email}</strong>` : 'Google Drive';
+    const on = driveReady();
     state = html`
-      ${d.token
+      ${on
         ? html`<p class="auto-on"><span class="dot on"></span><span>On, synced with ${who}.</span></p>`
-        : html`<p class="auto-on"><span class="dot"></span><span>Paused: Google asks you to continue once an hour.</span></p>`}
+        : html`<p class="auto-on"><span class="dot"></span><span>${d.helper
+          ? 'Paused: Google asks you to sign in again.' : 'Paused: Google asks you to continue once an hour.'}</span></p>`}
       ${lastLine}
       ${auto.driveError && html`<p class="status-line error">${auto.driveError}</p>`}
       <div class="button-row">
-        ${!d.token && html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue with Google</button>`}
-        ${d.token && html`<button class="secondary" disabled=${!ready || auto.busy} onClick=${syncNow}>Sync now</button>`}
+        ${!on && html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue with Google</button>`}
+        ${on && html`<button class="secondary" disabled=${!ready || auto.busy} onClick=${syncNow}>Sync now</button>`}
         <button class="secondary" disabled=${auto.busy} onClick=${() => run(signOutOfDrive)}>Sign out</button>
       </div>`;
   }
@@ -393,6 +395,7 @@ export function SettingsPage() {
         <span>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT</span>
         <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">GitHub</a>
         <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">Buy me a coffee${'\u00a0'}♥</a>
+        <a href="privacy.html" target="_blank" rel="noopener">Privacy</a>
         <button class="link-button" title="Something looks off after an update? Reloads the app; your labels, icons and settings stay."
           onClick=${() => window.freshCopy()}>Load a fresh copy</button>
         <${StorageUse} />
