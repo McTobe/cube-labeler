@@ -137,7 +137,7 @@ function TextCard() {
   return html`<section class="card text-card">
     <div class="card-head">
       <label class="card-title" for="label-text">Label text</label>
-      <button class="link-button" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
+      <button class="secondary" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
     </div>
     <div class="format-tools">
       ${picker && html`<div class="fmt-picker" role="group" aria-label=${picker === 'size' ? 'Line size' : 'Line alignment'}>
@@ -149,25 +149,32 @@ function TextCard() {
         })}
       </div>`}
       <div class="format-bar" role="toolbar" aria-label="Text style">
-        <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('bold')}><b>B</b></button>
-        <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('italic')}><i>I</i></button>
-        <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('underline')}><u>U</u></button>
-        <button class="fmt" title="White text on black" aria-label="Inverted" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('invert')}><span class="inv-mark">A</span><span class="fmt-text wide-text">Inverted</span></button>
-        <span class="format-sep" aria-hidden="true"></span>
-        <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title="Size of this line" aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
-          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
-          <span class="size-mark">A<small>a</small></span><span class="fmt-text">${wide ? LINE_SIZES.find(([v]) => v === lineStyle[0])[1] : SIZE_MARKS[lineStyle[0]]}</span></button>
-        <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
-          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
-          <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${18} /></button>
-        <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text wide-text">Column</span></button>
-        <button class="fmt" title="How styling works" aria-label="How styling works" onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+        <span class="fmt-group">
+          <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('bold')}><b>B</b></button>
+          <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('italic')}><i>I</i></button>
+          <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('underline')}><u>U</u></button>
+          <button class="fmt" title="White text on black" aria-label="Inverted" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('invert')}><span class="inv-mark">A</span></button>
+        </span>
+        <span class="fmt-group">
+          <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title="Size of this line" aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
+            disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
+            <span class="size-mark">A<small>a</small></span><span class="fmt-text">${wide ? LINE_SIZES.find(([v]) => v === lineStyle[0])[1] : SIZE_MARKS[lineStyle[0]]}</span></button>
+          <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
+            disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
+            <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${18} /></button>
+        </span>
+        <span class="fmt-group">
+          <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text wide-text">Column</span></button>
+        </span>
+        <button class="fmt help" title="How styling works" aria-label="How styling works" onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
       </div>
     </div>
     <textarea id="label-text" ref=${ref} rows="3" value=${label.text} spellcheck="false"
       placeholder="Type your label"
       onInput=${(e) => { updateLabel({ text: e.currentTarget.value }); syncLineStyle(); }}
       onKeyDown=${onKeyDown} onKeyUp=${syncLineStyle} onClick=${syncLineStyle} onFocus=${syncLineStyle}></textarea>
+    <p class="hint marker-tips">Or type: <code>**bold**</code> <code>*italic*</code> <code>__underline__</code>
+      <code>==inverted==</code> <code># big</code> <code>---</code> new column</p>
     <${Sheet} open=${helpOpen} title="Styling label text" onClose=${() => setHelpOpen(false)}>
       <${StylingHelp} />
     <//>
