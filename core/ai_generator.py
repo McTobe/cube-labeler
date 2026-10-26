@@ -22,7 +22,7 @@ from typing import Dict, List, Optional, Tuple
 from PIL import Image, ImageFilter, ImageOps
 
 from core.config import DEFAULT_GEMINI_IMAGE_MODEL, config_manager
-from core.icon_editor import DRAWING, SILHOUETTE
+from core.icon_editor import DRAWING
 
 # System instruction prompt ensuring output is strictly thermal-print ready
 THERMAL_WIREFRAME_SYSTEM_PROMPT = (
@@ -49,13 +49,14 @@ class Preset:
     mode: str
 
 
-# Ready-made redraws; the first matches the built-in icon set
+# Ready-made redraws; the first matches the built-in icon set. All open in Drawing: the AI's
+# filled shapes already print well, and Silhouette would fill gaps the AI left on purpose.
 PRESETS: List[Preset] = [
     Preset(
         "Filled silhouette (like the built-in icons)",
         "Draw it as a FILLED BLACK SILHOUETTE in a clean side or three-quarter view: solid black shapes, "
         "with the few identifying features cut out as bold white gaps.",
-        SILHOUETTE,
+        DRAWING,
     ),
     Preset(
         "Bold line drawing",
@@ -65,13 +66,13 @@ PRESETS: List[Preset] = [
     Preset(
         "Flat symbol",
         "Draw it as a FLAT GEOMETRIC SYMBOL seen straight on, like a sign or a schematic symbol: simple solid shapes.",
-        SILHOUETTE,
+        DRAWING,
     ),
     Preset(
         "Clean up, keep the shape",
         "Keep the item's own outline, view and proportions exactly as in the picture. Only clean it up: "
         "fill it solid black, drop the background, shading and small details, and make thin parts bold.",
-        SILHOUETTE,
+        DRAWING,
     ),
 ]
 CUSTOM = "Custom"

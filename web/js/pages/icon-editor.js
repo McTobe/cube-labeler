@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Icon } from '../icons.js';
-import { Field, Segmented, Select, Sheet, Slider, Toggle } from '../ui.js';
+import { Field, Segmented, Sheet } from '../ui.js';
 import { useStore } from '../state.js';
 import { app } from '../app.js';
 import { prepareIconOriginal, editIcon } from '../app.js';
@@ -27,10 +27,9 @@ const MODE_HINTS = {
   silhouette: 'Like Drawing, with every enclosed gap filled for a solid shape, like the built-in icons.',
   outline: 'Traces the edges of a photo. Best for photos of a part on a plain background.',
 };
-const THICKNESS = [[-1, 'Thinner'], [0, 'Normal'], [1, 'Bold'], [2, 'Bolder'], [3, 'Heavy']];
-const TOOLS = [['look', 'Look'], ['pencil', 'Pencil'], ['eraser', 'Eraser']];
+const WEIGHTS = { '-1': 'Light', 0: 'Normal', 1: 'Bold', 2: 'Bolder', 3: 'Heavy' };
 const TOOL_HINTS = {
-  look: 'Pick Pencil or Eraser to fix single dots.',
+  look: 'Pick Draw or Erase to fix single dots.',
   pencil: 'Tap or drag to add ink.',
   eraser: 'Tap or drag to remove ink.',
 };
@@ -39,10 +38,16 @@ const FROM_ICON = { threshold: 128, remove_specks: false };
 
 const blobUrl = (png) => (png ? URL.createObjectURL(new Blob([png], { type: 'image/png' })) : null);
 
-// "m3_hex-nut.png" gives "M3 hex nut"
+// Names cameras, browsers and AI services give their files, which say nothing about the icon
+const NAMELESS = /^(img|image|photo|pic|picture|screenshot|scan|dsc|pxl|download|pasted|gemini|chatgpt|dall|untitled)\b/i;
+
+// "m3_hex-nut.png" gives "M3 hex nut"; "IMG_2041.jpg" or a random "NtXJBc.png" gives nothing
 export function suggestedName(fileName) {
   const stem = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-  return stem ? stem[0].toUpperCase() + stem.slice(1) : '';
+  if (!stem || NAMELESS.test(stem) || !/[a-z]{2}/i.test(stem)) return '';
+  // One word with three or more capitals, some mid-word, like "NtXJBc": a random id
+  if (!stem.includes(' ') && /[a-z][A-Z]/.test(stem) && /[A-Z].*[A-Z].*[A-Z]/.test(stem)) return '';
+  return stem[0].toUpperCase() + stem.slice(1);
 }
 
 // An object URL for a PNG that is let go when the PNG changes or the component goes
@@ -204,16 +209,20 @@ function AiBox({ picture, onPicture, onRestore, canRestore }) {
     }
   };
   return html`<div class="ai-box">
-    <h4>Redraw it with ${service.name}</h4>
-    <${Select} label="Style" value=${chosen} onChange=${setPreset}
-      options=${[...state.presets.map((p) => [p.label, p.label]), [state.custom, 'Custom: your own words']]} />
-    ${isCustom && html`<input type="text" value=${custom} placeholder="e.g. front view, keep the two screw holes"
-      onInput=${(e) => setCustom(e.currentTarget.value)} onKeyDown=${(e) => { if (e.key === 'Enter') run(); }} />`}
-    ${hasKey
-      ? html`<button class="primary" disabled=${busy || !picture} onClick=${run}>${busy ? 'Redrawing…' : 'Redraw my picture'}</button>`
+    <div class="ai-head">
+      <h4><${Icon} name="sparkle" size=${18} /> AI redraw (${service.name})</h4>
+      ${canRestore && !busy && html`<button class="link-button" onClick=${() => onRestore(true)}>Use my picture</button>`}
+    </div>
+    ${hasKey ? html`
+      <select aria-label="Style" value=${chosen} disabled=${busy} onChange=${(e) => setPreset(e.currentTarget.value)}>
+        ${[...state.presets.map((p) => [p.label, p.label]), [state.custom, 'Custom: your own words']].map(([v, t]) => html`<option value=${v}>${t}</option>`)}
+      </select>
+      ${isCustom && html`<input type="text" value=${custom} placeholder="e.g. front view, keep the two screw holes"
+        onInput=${(e) => setCustom(e.currentTarget.value)} onKeyDown=${(e) => { if (e.key === 'Enter') run(); }} />`}
+      <button class="secondary" disabled=${busy || !picture} onClick=${run}>
+        <${Icon} name="sparkle" size=${16} /> ${busy ? 'Redrawing…' : 'Redraw my picture'}</button>`
       : html`<p class="hint">Needs your own ${service.name} API key: add it under <a href="#/settings" onClick=${() => onRestore(null)}>Settings</a>.
         ${service.id === 'gemini' ? ' Or make the picture at gemini.google.com and open or paste it here.' : ''}</p>`}
-    ${canRestore && !busy && html`<button class="link-button" onClick=${() => onRestore(true)}>Use my own picture again</button>`}
     ${message.text && html`<p class=${`status-line${message.error ? ' error' : ''}`} role="status">${message.text}</p>`}
   </div>`;
 }
@@ -371,18 +380,26 @@ function EditorBody({ start, onDone, dirtyRef }) {
     onDone(icon);
   };
 
+  const pickTool = (id) => setTool(tool === id ? 'look' : id);
+  const weight = shown.thickness || 0;
   return html`<div class="icon-editor">
-    <section class="editor-picture">
+    <section class="editor-col editor-picture">
       <div class="editor-head">
-        <h3>Picture</h3>
+        <h3>1. Picture</h3>
         <span class="editor-tools">
           ${shown.crop && html`<button class="link-button" onClick=${() => changeEdit({ crop: null })}>Show all</button>`}
-          <button class="link-button" onClick=${() => fileRef.current.click()}>Another picture</button>
+          <button class="secondary small" onClick=${() => fileRef.current.click()}>Change picture</button>
         </span>
         <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
       </div>
       <${CropView} png=${result && result.view_png} crop=${shown.crop} onCrop=${(crop) => changeEdit({ crop })} />
-      <p class="hint">Drag on the picture to crop it. You can also paste a picture.</p>
+      <p class="hint">Drag on the picture to crop it, or paste another picture.</p>
+      <div class="turn-row">
+        <button class="secondary" title="Turn left" onClick=${() => turn(-1)}><${Icon} name="rotate-left" size=${18} /> L</button>
+        <button class="secondary" title="Turn right" onClick=${() => turn(1)}><${Icon} name="rotate-right" size=${18} /> R</button>
+        <button class=${`secondary${shown.flip ? ' on' : ''}`} aria-pressed=${!!shown.flip}
+          onClick=${() => changeEdit({ flip: !shown.flip, crop: null })}><${Icon} name="mirror" size=${18} /> Mirror</button>
+      </div>
       <${AiBox} picture=${beforeAi || state.original} canRestore=${!!beforeAi}
         onPicture=${async (png, mode) => {
           if (!beforeAi) setBeforeAi(state.original);
@@ -397,37 +414,54 @@ function EditorBody({ start, onDone, dirtyRef }) {
         }} />
     </section>
 
-    <section class="editor-settings">
-      <${Segmented} label="Read the picture as" options=${MODES} value=${shown.mode} onChange=${(mode) => changeEdit({ mode })} />
+    <section class="editor-col editor-settings">
+      <div class="editor-head"><h3>2. Conversion</h3></div>
+      <${Segmented} ariaLabel="Read the picture as" options=${MODES} value=${shown.mode} onChange=${(mode) => changeEdit({ mode })} />
       <p class="hint mode-hint">${MODE_HINTS[shown.mode]}</p>
-      <${Toggle} label="Automatic darkness cutoff" checked=${auto}
-        onChange=${(on) => changeEdit({ threshold: on ? null : (result ? result.threshold : 128) })} />
-      <${Slider} label="Darkness cutoff" min=${1} max=${254} value=${auto && result ? result.threshold : (shown.threshold ?? 128)}
-        disabled=${auto} display=${auto ? `Automatic (${result ? result.threshold : '…'})` : String(shown.threshold)}
-        onChange=${(threshold) => changeEdit({ threshold })} />
-      <${Toggle} label="Swap black and white" checked=${!!shown.invert} onChange=${(invert) => changeEdit({ invert })} />
-      <${Segmented} label="Line thickness" options=${THICKNESS} value=${shown.thickness || 0} onChange=${(thickness) => changeEdit({ thickness })} />
-      <${Toggle} label="Remove specks" checked=${!!shown.remove_specks} onChange=${(remove_specks) => changeEdit({ remove_specks })} />
-      <${Toggle} label="Fill enclosed gaps" checked=${!!shown.fill_holes} onChange=${(fill_holes) => changeEdit({ fill_holes })} />
-      <div class="button-row">
-        <button class="secondary" aria-label="Turn left" onClick=${() => turn(-1)}><${Icon} name="rotate-left" size=${18} /></button>
-        <button class="secondary" aria-label="Turn right" onClick=${() => turn(1)}><${Icon} name="rotate-right" size=${18} /></button>
-        <button class="secondary" onClick=${() => changeEdit({ flip: !shown.flip, crop: null })}>Mirror</button>
-        <button class="secondary" onClick=${() => update({ edit: null })}>Reset</button>
+      <div class="setting">
+        <div class="setting-head">
+          <label for="ie-cutoff">Darkness threshold</label>
+          <span class="setting-value">${auto && result ? result.threshold : (shown.threshold ?? 128)}</span>
+          <button class=${`chip${auto ? ' on' : ''}`} aria-pressed=${auto}
+            onClick=${() => changeEdit({ threshold: auto ? (result ? result.threshold : 128) : null })}>Auto</button>
+        </div>
+        <input id="ie-cutoff" type="range" min="1" max="254" value=${auto && result ? result.threshold : (shown.threshold ?? 128)}
+          onInput=${(e) => changeEdit({ threshold: +e.currentTarget.value })} />
       </div>
+      <div class="setting">
+        <div class="setting-head">
+          <label for="ie-weight">Line weight</label>
+          <span class="setting-value">${WEIGHTS[weight]}</span>
+        </div>
+        <input id="ie-weight" type="range" min="-1" max="3" step="1" value=${weight} list="ie-weights"
+          onInput=${(e) => changeEdit({ thickness: +e.currentTarget.value })} />
+        <datalist id="ie-weights">${Object.keys(WEIGHTS).map((w) => html`<option value=${w}></option>`)}</datalist>
+        <div class="range-ends hint"><span>Light</span><span>Heavy</span></div>
+      </div>
+      <div class="setting">
+        <div class="setting-head"><span class="setting-label">Enhancements</span></div>
+        <div class="chip-row">
+          <button class=${`chip${shown.invert ? ' on' : ''}`} aria-pressed=${!!shown.invert} title="Swap black and white"
+            onClick=${() => changeEdit({ invert: !shown.invert })}><${Icon} name="invert" size=${16} /> Invert</button>
+          <button class=${`chip${shown.remove_specks ? ' on' : ''}`} aria-pressed=${!!shown.remove_specks} title="Remove single specks"
+            onClick=${() => changeEdit({ remove_specks: !shown.remove_specks })}><${Icon} name="sparkle" size=${16} /> Despeckle</button>
+          <button class=${`chip${shown.fill_holes ? ' on' : ''}`} aria-pressed=${!!shown.fill_holes} title="Fill enclosed gaps"
+            disabled=${shown.mode === 'silhouette'}
+            onClick=${() => changeEdit({ fill_holes: !shown.fill_holes })}><${Icon} name="fill" size=${16} /> Fill gaps</button>
+        </div>
+      </div>
+      <button class="link-button reset-link" onClick=${() => update({ edit: null })}><${Icon} name="undo" size=${16} /> Reset to defaults</button>
     </section>
 
-    <section class="editor-result">
-      <div class="editor-head">
-        <h3>Icon</h3>
-        <span class="editor-tools">
-          <button class="link-button" disabled=${!undo.length} onClick=${undoTouch}>Undo</button>
-          <button class="link-button" onClick=${clearTouch}>Clear touch-ups</button>
-        </span>
-      </div>
-      <div class="chip-group tool-pick" role="radiogroup" aria-label="Tool">
-        ${TOOLS.map(([id, label]) => html`<button role="radio" aria-checked=${tool === id} class=${tool === id ? 'on' : ''}
-          onClick=${() => setTool(id)}>${label}</button>`)}
+    <section class="editor-col editor-result">
+      <div class="editor-head"><h3>3. Preview and touch-up</h3></div>
+      <div class="chip-row tool-row" role="toolbar" aria-label="Touch-up">
+        <button class=${`chip${tool === 'pencil' ? ' on' : ''}`} aria-pressed=${tool === 'pencil'} onClick=${() => pickTool('pencil')}>
+          <${Icon} name="edit" size=${16} /> Draw</button>
+        <button class=${`chip${tool === 'eraser' ? ' on' : ''}`} aria-pressed=${tool === 'eraser'} onClick=${() => pickTool('eraser')}>
+          <${Icon} name="eraser" size=${16} /> Erase</button>
+        <button class="chip" disabled=${!undo.length} onClick=${undoTouch}><${Icon} name="undo" size=${16} /> Undo</button>
+        <button class="chip" disabled=${!state.touch.some(Boolean)} onClick=${clearTouch}><${Icon} name="close" size=${16} /> Clear</button>
       </div>
       <div class="result-row">
         <${TouchCanvas} basePng=${result && result.base_png} touch=${state.touch} tool=${tool}
@@ -435,25 +469,29 @@ function EditorBody({ start, onDone, dirtyRef }) {
         <${PrintDots} png=${result && result.print_png} />
       </div>
       <p class="hint">${TOOL_HINTS[tool]}</p>
-      ${result && !result.has_ink && html`<p class="status-line error">No ink left. Try another darkness cutoff or Swap black and white.</p>`}
+      ${result && !result.has_ink && html`<p class="status-line error">No ink left. Try another darkness threshold or Invert.</p>`}
 
-      <${Field} label="Name">
-        <input type="text" value=${state.title} placeholder="e.g. WAGO 221, M3 hex screw"
-          onInput=${(e) => update({ title: e.currentTarget.value })} />
-      <//>
-      <${Field} label="Category">
-        <select value=${state.category} onChange=${(e) => update({ category: e.currentTarget.value })}>
-          ${[USER_CATEGORY, ...categories].map((c) => html`<option value=${c}>${c}</option>`)}
-        </select>
-      <//>
-      <${Field} label="Search words" hint="Separate with commas">
-        <input type="text" value=${state.keywords} onInput=${(e) => update({ keywords: e.currentTarget.value })} />
-      <//>
+      <div class="editor-details">
+        <${Field} label="Name">
+          <input type="text" value=${state.title} placeholder="e.g. WAGO 221, M3 hex screw"
+            onInput=${(e) => update({ title: e.currentTarget.value })} />
+        <//>
+        <label class="inline-field">
+          <span class="field-label">Category</span>
+          <select value=${state.category} onChange=${(e) => update({ category: e.currentTarget.value })}>
+            ${[USER_CATEGORY, ...categories].map((c) => html`<option value=${c}>${c}</option>`)}
+          </select>
+        </label>
+        <${Field} label="Search words">
+          <input type="text" value=${state.keywords} placeholder="e.g. connector, lever (with commas)"
+            onInput=${(e) => update({ keywords: e.currentTarget.value })} />
+        <//>
+      </div>
     </section>
 
     <footer class="editor-actions">
       <p class=${`status-line${error ? ' error' : ''}`}>${error || state.note}</p>
-      <button class="secondary" onClick=${() => onDone(null)}>Cancel</button>
+      <button class="link-button cancel" onClick=${() => onDone(null)}>Cancel</button>
       <button class="primary" disabled=${!canSave} onClick=${save}>Save icon</button>
     </footer>
   </div>`;
@@ -463,7 +501,7 @@ function PrintDots({ png }) {
   const url = usePngUrl(png);
   return html`<figure class="print-dots">
     <span class="dots-art">${url && html`<img src=${url} alt="" />`}</span>
-    <figcaption>How it prints on a 12 mm bin label</figcaption>
+    <figcaption><strong>Print scale</strong><br />on a 12 mm label</figcaption>
   </figure>`;
 }
 

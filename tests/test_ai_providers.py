@@ -22,7 +22,7 @@ if BASE_DIR not in sys.path:
 
 from core import ai_generator as ag
 from core.config import ConfigManager
-from core.icon_editor import DRAWING, SILHOUETTE
+from core.icon_editor import DRAWING
 
 
 def png_b64(colour="black") -> str:
@@ -62,7 +62,7 @@ class TestPresets(unittest.TestCase):
     def test_labels_and_modes(self):
         self.assertEqual(ag.PRESET_LABELS[0], ag.DEFAULT_PRESET)
         self.assertEqual(ag.PRESET_LABELS[-1], ag.CUSTOM)
-        self.assertEqual(ag.preset_mode(ag.DEFAULT_PRESET), SILHOUETTE)
+        self.assertEqual(ag.preset_mode(ag.DEFAULT_PRESET), DRAWING)
         self.assertEqual(ag.preset_mode("Bold line drawing"), DRAWING)
         self.assertEqual(ag.preset_mode(ag.CUSTOM), DRAWING)
 
