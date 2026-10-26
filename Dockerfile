@@ -22,4 +22,5 @@ FROM nginx:1.27-alpine
 COPY web/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/web/dist /usr/share/nginx/html
 EXPOSE 80
-HEALTHCHECK CMD wget -q -O /dev/null http://localhost/ || exit 1
+# 127.0.0.1, not localhost: busybox wget may try ::1 first, and nginx only listens on IPv4 here
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD wget -q -O /dev/null http://127.0.0.1/ || exit 1
