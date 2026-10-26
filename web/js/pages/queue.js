@@ -31,7 +31,8 @@ function useRowDrag(listRef, count) {
     const handle = e.currentTarget;
     handle.setPointerCapture(e.pointerId);
     const startY = e.clientY;
-    let state = { from, over: from, dy: 0, step: rows[from].height + 8 };
+    const gap = rows.length > 1 ? rows[1].top - rows[0].bottom : 0;
+    let state = { from, over: from, dy: 0, step: rows[from].height + gap };
     setDrag(state);
     const move = (ev) => {
       const dy = ev.clientY - startY;
@@ -61,6 +62,15 @@ function useRowDrag(listRef, count) {
     return 0;
   };
   return { drag, start, offset };
+}
+
+// How many labels, how much tape and how long, and what printing them together saves
+function summary(count, render) {
+  const m = render && render.count === count ? render.metrics : null;
+  const parts = [count === 1 ? '1 label' : `${count} labels`];
+  if (m) parts.push(`${Math.round(m.total_used_length_mm)} mm of tape`, `about ${Math.max(1, Math.round(m.print_duration_sec))} s`);
+  const saving = count > 1 ? `Printing them together saves ${25 * (count - 1)} mm of tape.` : 'Add another label to start saving tape.';
+  return html`${parts.join(' · ')}<br />${saving}`;
 }
 
 export function QueuePage() {
@@ -134,23 +144,29 @@ export function QueuePage() {
         <p>Labels in the queue print as one strip, saving about 25 mm of tape per extra label.</p>
         <p><a class="link-button" href="#/label">Design a label</a></p>
       </section>` : html`
-        <p class="queue-summary hint">${count === 1 ? 'Add another label to start saving tape.' : `${count} labels in one strip save ${25 * (count - 1)} mm of tape.`}</p>
-        <ol class=${`queue-list${drag ? ' dragging' : ''}`} ref=${listRef}>
-          ${queue.map((item, i) => {
-            const title = itemTitle(item);
-            const copies = copiesOf(item);
-            const classes = ['card', 'queue-item'];
-            if (active === i && !drag) classes.push('active');
-            if (picked === i) classes.push('picked');
-            if (drag && drag.from === i) classes.push('lifted');
-            return html`<li class=${classes.join(' ')} key=${item.id}
-              style=${offset(i) ? { transform: `translateY(${offset(i)}px)` } : null}
-              onMouseEnter=${() => setActive(i)} onMouseLeave=${() => setActive(null)}>
-              <span class="drag-handle" title="Drag to move" onPointerDown=${(e) => start(e, i)}><${Icon} name="grip" size=${18} /></span>
-              <span class="queue-thumb">${thumbs[item.id] ? html`<img src=${thumbs[item.id]} alt="" />` : ''}</span>
-              <span class="queue-body">
-                <span class="queue-title" title=${title}>${title}</span>
-                <span class="hint queue-detail">${itemDetail(item)}</span>
+        <section class="card queue-card">
+          <div class="card-head">
+            <h2 class="card-title">Queue</h2>
+            <button class="secondary" disabled=${p.busy} onClick=${clearQueue}>Clear</button>
+          </div>
+          <p class="hint queue-summary">${summary(count, queueRender)}</p>
+          <ol class=${`queue-list${drag ? ' dragging' : ''}`} ref=${listRef}>
+            ${queue.map((item, i) => {
+              const title = itemTitle(item);
+              const copies = copiesOf(item);
+              const classes = ['queue-item'];
+              if (active === i && !drag) classes.push('active');
+              if (picked === i) classes.push('picked');
+              if (drag && drag.from === i) classes.push('lifted');
+              return html`<li class=${classes.join(' ')} key=${item.id}
+                style=${offset(i) ? { transform: `translateY(${offset(i)}px)` } : null}
+                onMouseEnter=${() => setActive(i)} onMouseLeave=${() => setActive(null)}>
+                <span class="drag-handle" title="Drag to move" onPointerDown=${(e) => start(e, i)}><${Icon} name="grip" size=${18} /></span>
+                <span class="queue-thumb">${thumbs[item.id] ? html`<img src=${thumbs[item.id]} alt="" />` : ''}</span>
+                <span class="queue-body">
+                  <span class="queue-title" title=${title}>${title}</span>
+                  <span class="hint queue-detail">${itemDetail(item)}</span>
+                </span>
                 <span class="queue-controls">
                   <span class="copies" role="group" aria-label=${`Copies of ${title}`}>
                     <button class="icon-button" aria-label="One copy less" onClick=${() => setQueueCopies(i, copies - 1)}><${Icon} name="minus" size=${16} /></button>
@@ -164,10 +180,10 @@ export function QueuePage() {
                     <button class="icon-button danger" aria-label="Remove" onClick=${() => removeQueueItem(i)}><${Icon} name="close" size=${18} /></button>
                   </span>
                 </span>
-              </span>
-            </li>`;
-          })}
-        </ol>`}
+              </li>`;
+            })}
+          </ol>
+        </section>`}
     </div>
   </div>`;
 }

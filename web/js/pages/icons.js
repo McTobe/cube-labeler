@@ -206,7 +206,8 @@ export function IconsPage() {
   const [selected, setSelected] = useState(null);
   const [editing, setEditing] = useState(null);
   const fileRef = useRef(null);
-  const icon = selected ? iconByKey(selected) : null;
+  // On a wide screen the panel never stands empty: until an icon is picked it shows the first one
+  const icon = (selected && iconByKey(selected)) || (wide ? listIcons(browser.view, browser.query)[0] || null : null);
   const onFile = async (e) => {
     const file = e.currentTarget.files[0];
     e.currentTarget.value = '';
@@ -231,7 +232,7 @@ export function IconsPage() {
     ${status.text && html`<p class=${`status-line${status.error ? ' error' : ''}`} role="status">${status.text}</p>`}
     ${wide
       ? html`<div class="library-layout card">
-          <${IconBrowser} ...${browser} wide selectedKey=${selected} onPick=${(i) => setSelected(i.key)} />
+          <${IconBrowser} ...${browser} wide selectedKey=${icon ? icon.key : null} onPick=${(i) => setSelected(i.key)} />
           <${DetailsPanel} icon=${icon} ...${details} />
         </div>`
       : html`<div class="card"><${IconBrowser} ...${browser} onPick=${(i) => setSelected(i.key)} /></div>
@@ -254,11 +255,11 @@ export function IconPickerSheet({ open, target, onClose }) {
     await putIconOn(icon, target);
     onClose();
   };
-  const icon = selected ? iconByKey(selected) : null;
+  const icon = (selected && iconByKey(selected)) || (wide ? listIcons(browser.view, browser.query)[0] || null : null);
   return html`<${Sheet} open=${open} wide=${wide} title=${target === 'bin' ? 'Pick an icon for the bin label' : 'Pick an icon'} onClose=${onClose}>
     ${wide
       ? html`<div class="library-layout picker">
-          <${IconBrowser} ...${browser} wide autoFocus selectedKey=${selected} onPick=${(i) => setSelected(i.key)} onUse=${use} />
+          <${IconBrowser} ...${browser} wide autoFocus selectedKey=${icon ? icon.key : null} onPick=${(i) => setSelected(i.key)} onUse=${use} />
           <${DetailsPanel} icon=${icon} onClose=${onClose} onUse=${use} />
         </div>`
       : html`<div class="picker-body"><${IconBrowser} ...${browser} onPick=${use} /></div>`}
