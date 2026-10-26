@@ -762,24 +762,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* --- Other pages --------------------------------------------------------------------------- */
 
 .settings-page { max-width: 680px; }
-.about-cols > div + div { margin-top: 14px; }
-/* Wide screens: a bento grid. The columns end on one line because the last card in each
-   stretches, and About runs across the bottom. */
-@media (min-width: 1400px) {
+/* Wide screens: a bento grid. Three columns end on one line because the last card in each
+   stretches; a slim about line sits under them. */
+@media (min-width: 1600px) {
   .page-settings main { max-width: 1800px; }
-  .settings-page { max-width: none; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+  .settings-page { max-width: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: stretch; }
   .settings-page .card { margin: 0; }
   .settings-col { display: flex; flex-direction: column; gap: 16px; }
   .settings-col > .card:last-child { flex: 1; }
-  /* Two columns: printer, defaults and look beside AI icons, then backups beside About */
-}
-@media (min-width: 1700px) {
-  .settings-page { grid-template-columns: repeat(3, 1fr); }
   .settings-page > .about { grid-column: 1 / -1; }
-  .about-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 24px; }
-  .about-cols > div + div { margin-top: 0; }
-  .about-cols > div > :first-child { margin-top: 0; }
 }
+.about { padding: 4px 4px 0; }
+.about p { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 0; margin: 0 0 6px; color: var(--muted); font-size: 0.88rem; }
+.about p > * + *::before { content: '·'; display: inline-block; margin: 0 10px; color: var(--muted); }
+.about .link-button { font-size: inherit; padding: 0; min-height: 0; }
+.about a { color: var(--accent); text-decoration: none; }
+.settings-page .card-title + .hint { margin-bottom: 14px; }
+.about a:hover { text-decoration: underline; }
 .settings-page .toggle { margin-top: 16px; }
 
 
@@ -1138,7 +1137,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .unit-input input { flex: 1; min-width: 0; }
 .unit-input span { color: var(--muted); }
 .advanced { margin-top: 12px; }
-.printer-panel .button-row .forget { margin-left: auto; color: var(--muted); }
+.printer-links { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin-top: 10px; }
+.printer-links .help { margin: 0; }
+.printer-links .forget { color: var(--muted); padding: 0; min-height: 0; }
 .auto-on { display: flex; align-items: baseline; gap: 8px; }
 .auto-on .dot { width: 9px; height: 9px; border-radius: 50%; background: #e0a100; flex: none; }
 .auto-on .dot.on { background: #2fb36d; }

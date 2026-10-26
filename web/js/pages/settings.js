@@ -20,7 +20,7 @@ function StorageUse() {
   }, []);
   if (!estimate || !estimate.usage) return null;
   const mb = estimate.usage / 1e6;
-  return html`<p class="hint">This app uses ${mb < 1 ? 'less than 1' : Math.round(mb)} MB on this device${mb > 5 ? ', most of it for Python' : ''}.</p>`;
+  return html`<span>${mb < 1 ? 'Less than 1' : Math.round(mb)} MB used on this device</span>`;
 }
 
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -144,6 +144,8 @@ function BackupCard() {
   const ready = phase === 'ready';
   return html`<section class="card backups-card">
     <h2 class="card-title">Backups and sync</h2>
+    <p class="hint">Your labels, icons, templates, settings and added fonts are kept in this browser on this device.
+      Nothing goes to the Cube Labeler server. Save them to a file, a folder or your own Google Drive.</p>
     <div class="settings-part">
       <h3>Google Drive sync</h3>
       <${SyncPanel} />
@@ -349,49 +351,42 @@ function LabelDefaultsCard() {
 
 export function SettingsPage() {
   const { settings } = useStore(app);
-  // Three columns that end on one line (the last card in each stretches), with About as a
-  // strip across the bottom; on narrower screens the same cards in two columns or one
+  // Three columns that end on one line (the last card in each stretches), with a slim
+  // about line under them; on narrower screens the same cards in one column
   return html`<div class="settings-page">
     <div class="settings-col">
-    <section class="card">
-      <h2 class="card-title">Printer</h2>
-      <${PrinterPanel} />
-      <${Toggle} label="Set the tape width from the printer" checked=${settings.match_printer_tape}
-        onChange=${(match_printer_tape) => updateSettings({ match_printer_tape })} />
-    </section>
-
-    <${LabelDefaultsCard} />
-
-    <section class="card">
-      <h2 class="card-title">Appearance</h2>
-      <${Segmented} label="Theme" value=${settings.theme}
-        options=${[['system', 'Like the device'], ['light', 'Light'], ['dark', 'Dark']]}
-        onChange=${(theme) => updateSettings({ theme })} />
-    </section>
+      <section class="card">
+        <h2 class="card-title">Printer</h2>
+        <${PrinterPanel} />
+        <${Toggle} label="Set the tape width from the printer" checked=${settings.match_printer_tape}
+          onChange=${(match_printer_tape) => updateSettings({ match_printer_tape })} />
+      </section>
+      <${LabelDefaultsCard} />
     </div>
 
-    <div class="settings-col"><${AiCard} /></div>
+    <div class="settings-col">
+      <${AiCard} />
+      <section class="card">
+        <h2 class="card-title">Appearance</h2>
+        <${Segmented} label="Theme" value=${settings.theme}
+          options=${[['system', 'Like the device'], ['light', 'Light'], ['dark', 'Dark']]}
+          onChange=${(theme) => updateSettings({ theme })} />
+      </section>
+    </div>
 
     <div class="settings-col"><${BackupCard} /></div>
 
-    <section class="card about">
-      <h2 class="card-title">About</h2>
-      <div class="about-cols">
-      <div>
-      <p>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT. <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">On GitHub</a></p>
-      <p>Cube Labeler is free. If it saves you time, you can <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">buy me a coffee on Ko-fi${'\u00a0'}♥</a></p>
-      </div>
-      <div>
-      <h3>Your data</h3>
-      <p class="hint">Your labels, icons, templates, settings and added fonts are kept in this browser on this device. Nothing is sent to the Cube Labeler server; with Google Drive sync on, a backup of them also goes to your own Drive.</p>
-      <${StorageUse} />
-      </div>
-      <div>
-      <p class="hint">Something looks off after an update? <button class="link-button" onClick=${() => window.freshCopy()}>Load a fresh copy</button> of the app. Your labels, icons and settings stay.</p>
+    <footer class="about">
+      <p>
+        <span>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT</span>
+        <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">Buy me a coffee${'\u00a0'}♥</a>
+        <button class="link-button" title="Something looks off after an update? Reloads the app; your labels, icons and settings stay."
+          onClick=${() => window.freshCopy()}>Load a fresh copy</button>
+        <${StorageUse} />
+      </p>
       <p class="hint">Labels are drawn by the same Python code as the desktop app, running in this browser with Pyodide.
         Arimo font under the SIL Open Font License.</p>
-      </div>
-      </div>
-    </section>
+    </footer>
   </div>`;
 }

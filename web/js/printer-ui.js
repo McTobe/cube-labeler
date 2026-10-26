@@ -61,14 +61,16 @@ export function PrinterPanel() {
         ${p.transport ? 'Pick another printer' : 'Connect printer'}</button>
       ${p.transport && html`<button class="secondary" disabled=${p.busy || !ready} onClick=${feed}>
         <${Icon} name="feed" size=${18} /> Feed ${FEED_LENGTH_MM} mm</button>`}
-      ${p.transport && html`<button class="link-button forget" disabled=${p.busy} onClick=${forgetPrinter}>Forget this printer</button>`}
     </div>
 
+    <div class="printer-links">
+    ${p.transport && html`<button class="link-button forget" disabled=${p.busy} onClick=${forgetPrinter}>Forget this printer</button>`}
     <details class="help">
       <summary>Printer not in the list?</summary>
       <p>On Android, Chrome needs the <b>Nearby devices</b> permission (Settings › Apps › Chrome › Permissions).
         After allowing it, force stop Chrome and open it again; until then the list says "No compatible devices found".</p>
       <p>The printer has to be switched on and paired in the phone's or computer's Bluetooth settings.</p>
     </details>
+    </div>
   </div>`;
 }
