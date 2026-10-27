@@ -3,9 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Segmented, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, updateSettings, labelDefaults, BIN_FONT } from '../app.js';
-import { FACTORY_LABEL_MM } from './bin.js';
-import { FontPicker } from '../font-picker.js';
+import { app, boot, updateSettings, labelDefaults } from '../app.js';
 import { HISTORY_SIZES, historySizeChanged } from '../history.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
 import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
@@ -318,21 +316,14 @@ function AiCard() {
   </section>`;
 }
 
-// The defaults new and reset labels start from, and the bin label font; they go with backups and sync
+// The tape new text labels start on and how much print history to keep; they go with backups
+// and sync. Fonts and the bin label length are set where the labels are made, on the Label page.
 function LabelDefaultsCard() {
-  const { settings, fonts, tapeWidths } = useStore(app);
-  const [binText, setBinText] = useState(null);
+  const { settings, tapeWidths } = useStore(app);
   const defaults = labelDefaults();
-  const onBin = (e) => {
-    const text = e.currentTarget.value;
-    setBinText(text);
-    const mm = Number(text.replace(',', '.'));
-    if (!text.trim()) updateSettings({ bin_label_mm: null });
-    else if (mm >= 10 && mm <= 499) updateSettings({ bin_label_mm: mm });
-  };
   return html`<section class="card">
     <h2 class="card-title">Label defaults</h2>
-    <p class="hint">What Reset goes back to on the Label page, the bin label font and the print history. These go with your backups and sync.</p>
+    <p class="hint">The tape new text labels start on and how many printed labels the history keeps. These go with your backups and sync.</p>
     <div class="defaults-rows">
       <label class="default-row">
         <span><span class="field-label">Text label tape</span><span class="hint">New text labels start on this tape width.</span></span>
@@ -340,25 +331,6 @@ function LabelDefaultsCard() {
           ${tapeWidths.map((w) => html`<option value=${w}>${w} mm</option>`)}
         </select>
       </label>
-      <div class="default-row">
-        <span><span class="field-label">Text label font</span><span class="hint">The font Reset picks for the text.</span></span>
-        <${FontPicker} value=${defaults.font_name} fonts=${fonts} ariaLabel="Text label font"
-          onChange=${(default_font) => updateSettings({ default_font })} />
-      </div>
-      <label class="default-row">
-        <span><span class="field-label">Bin label length</span><span class="hint">Empty means the factory ${FACTORY_LABEL_MM} mm.</span></span>
-        <span class="unit-input">
-          <input type="text" inputmode="decimal" value=${binText ?? String(settings.bin_label_mm || '')}
-            placeholder=${String(FACTORY_LABEL_MM)} onInput=${onBin} onBlur=${() => setBinText(null)} />
-          <span>mm</span>
-        </span>
-      </label>
-      <div class="default-row">
-        <span><span class="field-label">Bin label font</span><span class="hint">For new bin labels. Queued ones keep theirs.</span></span>
-        <${FontPicker} value=${fonts.includes(settings.bin_font) ? settings.bin_font : BIN_FONT} fonts=${fonts}
-          standard=${BIN_FONT} ariaLabel="Bin label font"
-          onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
-      </div>
       <label class="default-row">
         <span><span class="field-label">Print history</span><span class="hint">The newest printed labels kept. Pinned ones always stay.</span></span>
         <select value=${HISTORY_SIZES.includes(settings.history_keep) ? settings.history_keep : 50}
