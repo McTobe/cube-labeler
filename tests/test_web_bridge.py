@@ -126,6 +126,8 @@ class TestWebBinLabelsAndQueue(unittest.TestCase):
         fastener = cube_web.bin_defaults("en")["fastener"]
         result = cube_web.render_label({"bin": fastener, "tape_width_mm": 6.0})
         fields = {k: v for k, v in fastener.items() if k != "kind"}
+        # The web version draws bin labels in its own fonts (Arimo, as it has no Arial)
+        fields["font_name"], fields["name_font_name"] = cube_web._bin_fonts(None)
         _, _, raster, _ = LabelRenderer().render(
             LabelConfig(inventory_config=FastenerLabelConfig(**fields), tape_width_mm=12.0)
         )
