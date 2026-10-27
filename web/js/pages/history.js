@@ -8,7 +8,7 @@ import { Menu, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
 import { binSummary } from './bin.js';
-import { app, boot, printer, connectPrinter, itemTitle, textLines, openItem, printItem, queueItem, renderItem, say, BIN_FONT } from '../app.js';
+import { app, boot, printer, connectPrinter, hasBarcode, itemTitle, textLines, openItem, printItem, queueItem, renderItem, say, BIN_FONT } from '../app.js';
 import { history, historySize, entryItem, loadHistory, setPinned, removeEntry, clearHistory } from '../history.js';
 
 const FILTERS = [['all', 'All'], ['text', 'Text'], ['bin', 'Bin'], ['pinned', 'Pinned']];
@@ -28,14 +28,14 @@ function dayName(iso) {
 
 function searchText(entry) {
   if (entry.mode === 'bin') return `${itemTitle(entry)} ${binSummary(entry.bin)}`.toLowerCase();
-  return `${textLines(entry.label).join(' ')} ${entry.label.qr_data || ''}`.toLowerCase();
+  return `${textLines(entry.label).join(' ')} ${entry.label.qr_data || ''} ${entry.label.barcode_data || ''}`.toLowerCase();
 }
 
 function describe(entry, render) {
   const length = render && render.metrics ? `, ${Math.round(render.metrics.print_length_mm)} mm long` : '';
   if (entry.mode === 'bin') return `Bin label, ${entry.tape_width_mm} mm tape${length}, ${(entry.font && entry.font.bin_font) || BIN_FONT}`;
   const l = entry.label;
-  const extras = [l.qr_enabled && l.qr_data && 'QR code', l.image && 'picture'].filter(Boolean);
+  const extras = [l.qr_enabled && l.qr_data && 'QR code', hasBarcode(l) && 'barcode', l.image && 'picture'].filter(Boolean);
   return `Text label, ${entry.tape_width_mm} mm tape${length}, ${l.font_name}${extras.length ? ` with ${extras.join(' and ')}` : ''}`;
 }
 
