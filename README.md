@@ -1,6 +1,4 @@
-<img src="assets/icon.png" alt="" width="96" align="right">
-
-# Cube Labeler
+# <img src="assets/icon.png" alt="" width="48" align="absmiddle"> Cube Labeler
 
 [![Tests](https://github.com/McTobe/cube-labeler/actions/workflows/tests.yml/badge.svg)](https://github.com/McTobe/cube-labeler/actions/workflows/tests.yml)
 [![Latest release](https://img.shields.io/github/v/release/McTobe/cube-labeler)](https://github.com/McTobe/cube-labeler/releases/latest)
