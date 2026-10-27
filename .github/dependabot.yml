@@ -1,9 +1,13 @@
-# Keeps the GitHub Actions used by the workflows up to date. Python and npm
-# packages are pinned on purpose (constraints.txt, web/package-lock.json) and
-# are updated by hand.
+# Keeps the GitHub Actions used by the workflows up to date, in one pull request
+# a month. Python and npm packages are pinned on purpose (constraints.txt,
+# web/package-lock.json) and are updated by hand.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      actions:
+        patterns:
+          - "*"
