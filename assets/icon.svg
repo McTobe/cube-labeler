@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- Cube Labeler app icon. assets/icon.png and assets/icon.ico are rendered from it with tools/build_app_icon.py. -->
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d7cf0"/><stop offset="1" stop-color="#2556c4"/></linearGradient></defs>
+  <rect width="256" height="256" rx="60" fill="url(#bg)"/>
+  <!-- The Cube seen from the front left: back, tape door and front, as three rounded bands -->
+  <rect x="64" y="58" width="124" height="142" rx="38" fill="#b7bfcb"/>
+  <rect x="82" y="56" width="124" height="146" rx="40" fill="#d6dce5"/>
+  <rect x="100" y="54" width="122" height="150" rx="42" fill="#f8fafc"/>
+  <circle cx="84" cy="86" r="7" fill="#2eb85c"/>
+  <rect x="78" y="124" width="22" height="18" rx="6" fill="#202531"/>
+  <!-- the printed label coming out of the tape slot, outlined so it stands out from the body -->
+  <rect x="22" y="118" width="64" height="30" rx="5" fill="#ffffff" stroke="#1f2430" stroke-opacity="0.25" stroke-width="2"/>
+  <rect x="32" y="127" width="30" height="5" rx="2.5" fill="#2b303c"/>
+  <rect x="32" y="136" width="19" height="5" rx="2.5" fill="#2b303c"/>
+</svg>

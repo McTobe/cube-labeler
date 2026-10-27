@@ -14,7 +14,7 @@ FROM --platform=$BUILDPLATFORM python:3.12-slim AS build
 WORKDIR /src
 COPY constraints.txt .
 RUN pip install --no-cache-dir pillow -c constraints.txt
-COPY assets/icon.ico assets/icon.ico
+COPY assets/icon.png assets/icon.png
 COPY assets/icons/ assets/icons/
 COPY core/ core/
 COPY ui/__init__.py ui/templates.py ui/
