@@ -79,8 +79,11 @@ phone on your Wi-Fi without hosting it anywhere:
 
 Every release tag (`v2.1.2` and so on) makes GitHub Actions build a Docker image and publish
 it as `ghcr.io/mctobe/cube-labeler-web` (for amd64 and arm64), tagged `2.1.2`, `2.1`, `latest`
-and `next` (`next` also follows pre-release tags such as `v2.2.0-beta.1`; `latest` doesn't). You can also run the "Publish Web Image" workflow by hand from the Actions tab; that
-image only gets a commit tag such as `sha-4c256cc`, so `latest` always means the newest release. The image serves
+and `next`. Every push to `main` (including merged pull requests) also builds an image tagged
+`next` and a commit tag such as `sha-4c256cc`, so `next` is the newest code on `main` (and
+pre-release tags such as `v2.2.0-beta.1`), while `latest` is always the newest finished
+release. You can also run the "Publish Web Image" workflow by hand from the Actions tab; that
+image only gets a commit tag. The image serves
 the site with nginx on port 80. Web Serial needs HTTPS, so put it behind a reverse proxy that
 handles TLS, such as Nginx Proxy Manager.
 
