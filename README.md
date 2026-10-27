@@ -8,7 +8,7 @@
 
 An app for designing and printing labels on the **Brother P-touch Cube (PT-P300BT)** over Bluetooth. It shows an exact preview of the printed tape, prints several labels as one strip to save tape, has a dedicated editor for storage bin labels and comes with a library of 140 printable icons that you can add your own to.
 
-Since 2.0 the main way to use it is the [web version](#web-version): open it in Chrome or Edge on Android, Windows, macOS or Linux and print straight from the browser, with nothing to install. It can back up your icons, templates and settings to your own Google Drive. There is also a Windows desktop app, a single portable `.exe` with a command-line mode for printing from scripts.
+Since 2.0 the main way to use it is the [web version](#web-version): open **<https://print.tobezone.com>** in Chrome or Edge on Android, Windows, macOS or Linux and print straight from the browser, with nothing to install. It can back up your icons, templates and settings to your own Google Drive. There is also a Windows desktop app, a single portable `.exe` with a command-line mode for printing from scripts.
 
 ![Text label editor with styled text, a column divider and a rounded frame](docs/images/text-label.png)
 
