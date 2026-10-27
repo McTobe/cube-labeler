@@ -1,6 +1,4 @@
-<img src="assets/icon.png" alt="" width="96" align="right">
-
-# Cube Labeler
+# <img src="assets/icon.png" alt="" width="48" align="absmiddle"> Cube Labeler
 
 [![Tests](https://github.com/McTobe/cube-labeler/actions/workflows/tests.yml/badge.svg)](https://github.com/McTobe/cube-labeler/actions/workflows/tests.yml)
 [![Latest release](https://img.shields.io/github/v/release/McTobe/cube-labeler)](https://github.com/McTobe/cube-labeler/releases/latest)
@@ -10,9 +8,9 @@
 
 An app for designing and printing labels on the **Brother P-touch Cube (PT-P300BT)** over Bluetooth. It shows an exact preview of the printed tape, prints several labels as one strip to save tape, has a dedicated editor for storage bin labels and comes with a library of 140 printable icons that you can add your own to.
 
-Since 2.0 the main way to use it is the [web version](#web-version): open it in Chrome or Edge on Android, Windows, macOS or Linux and print straight from the browser, with nothing to install. It can back up your icons, templates and settings to your own Google Drive. There is also a Windows desktop app, a single portable `.exe` with a command-line mode for printing from scripts.
+Since 2.0 the main way to use it is the [web version](#web-version): open **<https://print.tobezone.com>** in Chrome or Edge on Android, Windows, macOS or Linux and print straight from the browser, with nothing to install. It can back up your icons, templates and settings to your own Google Drive. There is also a Windows desktop app, a single portable `.exe` with a command-line mode for printing from scripts.
 
-![Text label editor with styled text, a column divider and a rounded frame](docs/images/text-label.png)
+![The web version's text label editor with styled text, a column divider and a rounded frame](docs/images/text-label.png)
 
 ## Features
 
@@ -31,7 +29,7 @@ Since 2.0 the main way to use it is the [web version](#web-version): open it in 
 
 ## Screenshots
 
-These show the desktop app. The web version has the same pages, laid out as tabs on a phone and a sidebar on a wide screen.
+These show the web version on a wide screen. On a phone the same pages sit behind tabs at the bottom. The desktop app has the same features in its own window.
 
 | | |
 |---|---|
@@ -39,8 +37,8 @@ These show the desktop app. The web version has the same pages, laid out as tabs
 | **Bin label** with size, two lengths and drive icon | **Queue**: three labels print as one strip and save 50 mm of tape |
 | ![Icons page with favourites and icon details](docs/images/icons-page.png) | ![Icon editor turning a picture into a printable icon](docs/images/icon-editor.png) |
 | **Icons** page: browse, search, favourite and manage icons | **Icon editor**: turn any picture into a printable icon |
-| ![Templates page with My templates preview cards](docs/images/templates.png) | ![Settings with the AI service, backups and simulation](docs/images/settings.png) |
-| **Templates**: your own templates as preview cards, plus starting points | **Settings**: AI service and key, backups and simulation |
+| ![Templates page with My templates preview cards](docs/images/templates.png) | ![Settings with the printer, label defaults and the AI service](docs/images/settings.png) |
+| **Templates**: your own templates as preview cards, plus starting points | **Settings**: printer, label defaults, AI service, backups and Google Drive sync |
 
 ## Supported hardware
 
