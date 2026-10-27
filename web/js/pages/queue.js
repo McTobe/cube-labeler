@@ -20,9 +20,12 @@ function itemDetail(item) {
   // The font tells otherwise equal labels apart
   if (item.mode === 'bin') return `${binSummary(item.bin)} · ${item.font?.bin_font || BIN_FONT}`;
   const l = item.label;
+  if (l.layout === 'ports') {
+    return `${l.port_count} ports, ${Number(l.port_pitch_mm).toFixed(1)} mm apart · ${l.tape_width_mm} mm tape · ${l.font_name}`;
+  }
   // The lines after the title tell labels with the same first line apart
   const more = textLines(l).slice(1).join(' · ');
-  return `${more ? `${more} · ` : ''}${l.tape_width_mm} mm tape${l.fixed_width_mm ? `, ${l.fixed_width_mm} mm long` : ''}${l.qr_enabled && l.qr_data ? ', QR code' : ''}${hasBarcode(l) ? ', barcode' : ''} · ${l.font_name}`;
+  return `${l.layout === 'flag' ? `Cable flag, ${l.flag_cable_mm} mm cable · ` : ''}${more ? `${more} · ` : ''}${l.tape_width_mm} mm tape${l.fixed_width_mm ? `, ${l.fixed_width_mm} mm long` : ''}${l.qr_enabled && l.qr_data ? ', QR code' : ''}${hasBarcode(l) ? ', barcode' : ''} · ${l.font_name}`;
 }
 
 // Dragging a row by its handle: where it started, where it would land and how far it moved

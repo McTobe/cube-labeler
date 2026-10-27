@@ -5,7 +5,7 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { Field, Menu, Sheet, downloadBlob } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, say, openItem, itemTitle, currentItem } from '../app.js';
+import { app, boot, say, openItem, itemTitle, currentItem, editorMode } from '../app.js';
 import { errorMessage } from '../../printer.js';
 import {
   templates, loadTemplates, findTemplate, saveCurrentAsTemplate, deleteTemplate, thumbnail, templateFile,
@@ -19,6 +19,8 @@ function Thumb({ thumbKey, item }) {
   return html`<span class="template-thumb">${thumbs[thumbKey] ? html`<img src=${thumbs[thumbKey]} alt="" />` : null}</span>`;
 }
 
+const KIND_NAMES = { text: 'Text label', bin: 'Bin label', ports: 'Port strip', flag: 'Cable flag' };
+
 function MyTemplate({ entry }) {
   const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -28,7 +30,7 @@ function MyTemplate({ entry }) {
     <button class="template-open" onClick=${use} title=${`Open ${entry.name}`}>
       <${Thumb} thumbKey=${`mine:${entry.name.toLowerCase()}`} item=${entry.item} />
       <span class="template-name">${entry.name}</span>
-      <span class="hint">${entry.item.mode === 'bin' ? 'Bin label' : 'Text label'}</span>
+      <span class="hint">${KIND_NAMES[editorMode(entry.item)]}</span>
     </button>
     <span class="menu-anchor">
       <button class="icon-button" aria-label=${`More for ${entry.name}`} onClick=${() => setMenu(true)}><${Icon} name="more" /></button>
@@ -61,7 +63,7 @@ function SaveSheet({ open, onClose }) {
   };
   return html`<${Sheet} open=${open} title="Save as a template" onClose=${onClose}>
     <form onSubmit=${save}>
-      <p class="hint">Saves the ${mode === 'bin' ? 'bin label' : 'label'} you are editing, with all its settings${mode !== 'bin' && label.image ? ' and its picture' : ''}.</p>
+      <p class="hint">Saves the ${mode === 'bin' ? 'bin label' : 'label'} you are editing, with all its settings${(mode === 'text' || mode === 'flag') && label.image ? ' and its picture' : ''}.</p>
       <${Field} label="Name" hint=${taken ? `This replaces your template ${taken.name}.` : ''}>
         <input type="text" value=${name} maxLength="80" onInput=${(e) => setName(e.currentTarget.value)} />
       <//>

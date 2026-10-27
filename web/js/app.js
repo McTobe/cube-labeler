@@ -47,6 +47,32 @@ export const DEFAULT_LABEL = {
   tape_fg_color: '#000000',
   show_guides: false,
   show_rulers: false,
+  layout: 'text',  // 'text', or 'flag' for a cable flag; the port strip has its own label (DEFAULT_PORTS)
+  flag_cable_mm: 6,  // a cable flag wraps once round a cable this thick
+  flag_side_mm: null,  // length of each side of a cable flag, or null to fit the text
+  flag_fold_marks: true,
+};
+
+// Port spacings: [id, name, mm from one port to the next]. Patch panels are about 19 mm,
+// switches closer; Custom takes the user's own measurement.
+export const PORT_SPACINGS = [['panel', 'Panel', 19.0], ['switch', 'Switch', 14.0], ['custom', 'Custom', null]];
+export const PORT_COUNTS = [6, 8, 12, 24];
+
+// A port strip is a text label with its own settings, kept apart from the text label
+export const DEFAULT_PORTS = {
+  ...DEFAULT_LABEL,
+  layout: 'ports',
+  text: '',
+  font_name: 'Arimo Bold',
+  text_height_mm: 5,
+  port_count: 12,
+  port_spacing: 'panel',
+  port_pitch_mm: 19.0,
+  port_first: 1,
+  port_prefix: '',
+  port_use_names: false,
+  port_names: '',
+  port_divider_every: 0,
 };
 
 export const DEFAULT_SETTINGS = {
@@ -76,8 +102,9 @@ export const BIN_TAPE_MM = 12;
 export const boot = createStore({ phase: 'loading', text: 'Starting...', error: null });
 
 export const app = createStore({
-  mode: 'text',  // what the Label page edits: 'text' or 'bin'
+  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports' or 'flag' (a cable flag of the text label)
   label: DEFAULT_LABEL,
+  ports: DEFAULT_PORTS,  // the port strip being edited
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
   languages: [['en', 'English']],
@@ -135,7 +162,7 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue, device] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device, ports] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
@@ -143,6 +170,7 @@ export async function start() {
     storage.load('bin', null),
     storage.load('queue', []),
     storage.load('deviceId', null),
+    storage.load('ports', {}),
   ]);
   // The tape counter counts each device's prints apart, so syncing never counts one twice
   deviceId = device || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -151,6 +179,7 @@ export async function start() {
     settings: { ...DEFAULT_SETTINGS, ...settings },
     // The printable-area guides no longer have a switch, so a label saved with them on drops them
     label: { ...DEFAULT_LABEL, ...label, show_guides: false },
+    ports: { ...DEFAULT_PORTS, ...ports, layout: 'ports' },
     mode,
     bin,
     queue: mergeCopies(queue),
@@ -237,6 +266,11 @@ export function updateLabel(change) {
   changed('label');
 }
 
+export function updatePorts(change) {
+  app.set({ ports: { ...app.get().ports, ...change } });
+  changed('ports');
+}
+
 // change applies to the bin label being edited (fastener or part); {kind} switches between them
 export function updateBin(change) {
   const bin = app.get().bin;
@@ -305,8 +339,25 @@ export function itemOptions(item) {
 }
 
 export function currentItem() {
-  const { mode, label, bin } = app.get();
-  return mode === 'bin' && bin ? { mode, bin: bin[bin.kind] } : { mode: 'text', label };
+  const { mode, label, bin, ports } = app.get();
+  if (mode === 'bin' && bin) return { mode, bin: bin[bin.kind] };
+  if (mode === 'ports') return { mode: 'text', label: ports };
+  return { mode: 'text', label: { ...label, layout: mode === 'flag' ? 'flag' : 'text' } };
+}
+
+// The kind of label on the Label page that edits a queued or saved label
+export function editorMode(item) {
+  if (item.mode === 'bin') return 'bin';
+  return item.label.layout === 'ports' ? 'ports' : item.label.layout === 'flag' ? 'flag' : 'text';
+}
+
+// What goes over each port of a port strip, as the Python core draws it
+export function portTexts(label) {
+  if (label.port_use_names) {
+    const names = label.port_names.split('\n');
+    return Array.from({ length: label.port_count }, (_, i) => (names[i] || '').trim());
+  }
+  return Array.from({ length: label.port_count }, (_, i) => `${label.port_prefix.trim()}${label.port_first + i}`);
 }
 
 export function itemTapeWidth(item) {
@@ -321,6 +372,10 @@ export function textLines(label) {
 }
 
 export function itemTitle(item) {
+  if (item.mode === 'text' && item.label.layout === 'ports') {
+    const named = portTexts(item.label).filter((t) => t);
+    return named.length ? `Ports ${named[0]}${named.length > 1 ? ` to ${named[named.length - 1]}` : ''}` : 'Port strip';
+  }
   if (item.mode === 'bin') {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
@@ -331,10 +386,12 @@ export function itemTitle(item) {
 // A text size preset that is too tall for the text (say 7 mm with two lines) was drawn fitted,
 // so the label switches to Fit to match
 function fitTooTallPreset(item, metrics) {
-  const { label } = app.get();
-  if (item.mode !== 'text' || !metrics.text_height_fell_back || label.text_height_mm !== item.label.text_height_mm) return;
-  updateLabel({ text_height_mm: null });
-  say(`${item.label.text_height_mm} mm is too tall for this text on the tape, so the size is back on Fit.`);
+  if (item.mode !== 'text' || !metrics.text_height_fell_back) return;
+  const ports = item.label.layout === 'ports';
+  const label = ports ? app.get().ports : app.get().label;
+  if (label.text_height_mm !== item.label.text_height_mm) return;
+  (ports ? updatePorts : updateLabel)({ text_height_mm: null });
+  say(`${item.label.text_height_mm} mm is too big for this text ${ports ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
 }
 
 // Renders the current label. Calls made while one runs fold into a single follow-up render.
@@ -353,7 +410,7 @@ export async function renderNow() {
         // The rulers are only for this preview, so a bin label takes the text label's choice
         // here and not in its queue item
         const options = itemOptions(item);
-        if (item.mode === 'bin') options.show_rulers = app.get().label.show_rulers;
+        if (item.mode === 'bin' || item.label.layout === 'ports') options.show_rulers = app.get().label.show_rulers;
         const result = await py.render_label(options);
         const old = app.get().render;
         if (old) { URL.revokeObjectURL(old.previewUrl); URL.revokeObjectURL(old.dotsUrl); }
@@ -714,7 +771,12 @@ export function addToQueue() {
 export function queueItem(label) {
   const item = { id: nextQueueId++, ...structuredClone({ mode: label.mode, label: label.label, bin: label.bin, font: label.font }) };
   for (const key of ['label', 'bin', 'font']) if (item[key] === undefined) delete item[key];
-  if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !hasBarcode(item.label) && !item.label.image) {
+  if (item.mode === 'text' && item.label.layout === 'ports') {
+    if (!portTexts(item.label).some((t) => t)) {
+      say('Give at least one port a name first.', true);
+      return false;
+    }
+  } else if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !hasBarcode(item.label) && !item.label.image) {
     say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
   }
@@ -788,8 +850,12 @@ export function openItem(item) {
     storage.save('bin', app.get().bin);
     // A queued label opens in the font it was added with
     if (item.font) updateSettings({ bin_font: item.font.bin_font ?? null, bin_bold_name: item.font.bin_bold_name });
+  } else if (editorMode(item) === 'ports') {
+    app.set({ mode: 'ports', ports: { ...DEFAULT_PORTS, ...item.label } });
+    storage.save('ports', app.get().ports);
   } else {
-    app.set({ mode: 'text', label: { ...DEFAULT_LABEL, ...item.label } });
+    // A cable flag is the text label drawn twice, so it opens as the text label in Cable flag
+    app.set({ mode: editorMode(item), label: { ...DEFAULT_LABEL, ...item.label, layout: 'text' } });
     storage.save('label', app.get().label);
   }
   storage.save('mode', app.get().mode);

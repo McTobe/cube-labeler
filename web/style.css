@@ -713,10 +713,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .format-bar { flex-wrap: wrap; overflow: visible; margin-left: 0; margin-right: 0; padding: 0; }
   /* The text and bin cards share one fixed height (what the fastener editor needs), so the preview keeps its size when
      switching kinds of label; on a short or narrow window the card scrolls, never the column */
-  .label-preview-col .text-card, .label-preview-col .bin-card {
+  .label-preview-col .text-card, .label-preview-col .bin-card, .label-preview-col .port-card {
     margin: 0; flex: none; height: clamp(280px, 100vh - 500px, 416px); overflow-y: auto;
   }
-  .label-preview-col .text-card { display: flex; flex-direction: column; }
+  .label-preview-col .text-card, .label-preview-col .port-card { display: flex; flex-direction: column; }
+  .label-preview-col .port-names { flex: 1; min-height: calc(4 * 1.5em + 22px); resize: none; }
   /* The text box takes the room down to the marker tips, at least about four lines */
   .label-preview-col .text-card textarea { flex: 1; min-height: calc(4 * 1.5em + 22px); resize: none; }
   .label-preview-col .length-grid.quad { grid-template-columns: repeat(4, 1fr); }
@@ -831,10 +832,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
-/* The kinds of label as tiles; more kinds wrap onto more rows */
+/* The kinds of label as tiles, two to a row; more kinds add rows */
 .mode-switch {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 4px;
   padding: 4px;
   margin-bottom: 12px;
@@ -855,6 +856,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   color: var(--muted);
 }
 .mode-switch button.on { background: var(--accent-soft); color: var(--accent); }
+
+/* The port strip's card: what goes over each port */
+.port-card .segmented { margin-bottom: 0; }
+.port-card .hint { margin: 8px 0 14px; }
+.port-card .field { margin: 0; }
+.port-names { width: 100%; font-family: inherit; }
 
 .length-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .length-grid.one { grid-template-columns: 1fr 2fr; }
