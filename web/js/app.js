@@ -191,10 +191,7 @@ export async function updateSettings(change) {
   app.set({ settings });
   storage.save('settings', settings);
   if ('theme' in change) applyTheme(settings.theme);
-  if ('bin_font' in change || 'bin_bold_name' in change) {
-    queueRenderStale = true;
-    if (app.get().mode === 'bin') renderNow();
-  }
+  if (('bin_font' in change || 'bin_bold_name' in change) && app.get().mode === 'bin') renderNow();
 }
 
 // --- Editing and rendering -----------------------------------------------------------------
@@ -259,15 +256,20 @@ export function renderOptions(label) {
   return options;
 }
 
-function binOptions(cfg) {
-  const { icon, ...rest } = cfg;
+// The bin label font from Settings, which a queued bin label keeps as it was when added
+function binFont() {
   const { bin_font, bin_bold_name } = app.get().settings;
-  return { bin: { ...rest, icon_data: icon ? icon.data : null }, bin_font, bin_bold_name: bin_bold_name !== false };
+  return { bin_font, bin_bold_name: bin_bold_name !== false };
+}
+
+function binOptions(cfg, font = binFont()) {
+  const { icon, ...rest } = cfg;
+  return { bin: { ...rest, icon_data: icon ? icon.data : null }, ...font };
 }
 
 // A queue item or the label being edited, as render options for Python
 export function itemOptions(item) {
-  return item.mode === 'bin' ? binOptions(item.bin) : renderOptions(item.label);
+  return item.mode === 'bin' ? binOptions(item.bin, item.font) : renderOptions(item.label);
 }
 
 export function currentItem() {
@@ -552,7 +554,8 @@ let nextQueueId = Date.now();
 let undoTimer = null;
 const UNDO_SECONDS = 8;
 
-const sameLabel = (a, b) => a.mode === b.mode && JSON.stringify(a.mode === 'bin' ? a.bin : a.label) === JSON.stringify(b.mode === 'bin' ? b.bin : b.label);
+const labelKey = (item) => JSON.stringify(item.mode === 'bin' ? [item.bin, item.font] : item.label);
+const sameLabel = (a, b) => a.mode === b.mode && labelKey(a) === labelKey(b);
 export const copiesOf = (item) => Math.max(1, item.copies || 1);
 // Every printed label, copies included
 export const queueLabelCount = (queue) => queue.reduce((sum, item) => sum + copiesOf(item), 0);
@@ -590,6 +593,7 @@ async function makeThumb(item) {
 
 export function addToQueue() {
   const item = { id: nextQueueId++, ...structuredClone(currentItem()) };
+  if (item.mode === 'bin') item.font = binFont();
   if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !item.label.image) {
     say('Add some text, a QR code or a picture first.', true);
     return false;
@@ -662,6 +666,8 @@ export function openItem(item) {
     const bin = app.get().bin;
     app.set({ mode: 'bin', bin: { ...bin, kind: item.bin.kind, [item.bin.kind]: item.bin } });
     storage.save('bin', app.get().bin);
+    // A queued label opens in the font it was added with
+    if (item.font) updateSettings({ bin_font: item.font.bin_font ?? null, bin_bold_name: item.font.bin_bold_name });
   } else {
     app.set({ mode: 'text', label: { ...DEFAULT_LABEL, ...item.label } });
     storage.save('label', app.get().label);

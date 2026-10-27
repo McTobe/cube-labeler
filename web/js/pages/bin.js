@@ -346,7 +346,7 @@ export function BinOptions() {
       <//>
       <${Toggle} label="Bold name" checked=${settings.bin_bold_name !== false}
         onChange=${(bin_bold_name) => updateSettings({ bin_bold_name })} />
-      <p class="hint">For all bin labels, also the ones in the queue. Bold name prints the name, like ${bin.kind === 'fastener' ? 'SCREWS' : 'BEARINGS'}, in the font's bold. These go with your backups and sync.</p>
+      <p class="hint">For new bin labels; ones already in the queue keep the font they were added with. Bold name prints the name, like ${bin.kind === 'fastener' ? 'SCREWS' : 'BEARINGS'}, in the font's bold. These go with your backups and sync.</p>
     <//>
     ${bin.kind === 'fastener' && html`<${Section} id="bin-drive" title="Drive icon" summary=${cfg.simple_drive_icon ? 'Simple' : 'Library picture'}>
       <${Toggle} label="Simple drive icon" checked=${cfg.simple_drive_icon} disabled=${!builtInDrive}

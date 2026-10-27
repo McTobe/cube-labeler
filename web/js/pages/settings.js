@@ -348,7 +348,7 @@ function LabelDefaultsCard() {
         </span>
       </label>
       <label class="default-row">
-        <span><span class="field-label">Bin label font</span><span class="hint">All text on bin labels.</span></span>
+        <span><span class="field-label">Bin label font</span><span class="hint">For new bin labels. Queued ones keep theirs.</span></span>
         <${FontPicker} value=${fonts.includes(settings.bin_font) ? settings.bin_font : BIN_FONT} fonts=${fonts}
           standard=${BIN_FONT} ariaLabel="Bin label font"
           onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />

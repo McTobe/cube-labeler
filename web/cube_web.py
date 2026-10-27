@@ -11,7 +11,7 @@ import hashlib
 import io
 import os
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from core import protocol
 from core.specs import TAPE_SPECS
@@ -161,16 +161,14 @@ def bold_font(name: str, names: List[str]) -> str:
     return family + " Bold" if family + " Bold" in names else name
 
 
-def _use_bin_font(name: Any, bold_name: Any = True) -> None:
+def _bin_fonts(name: Any, bold_name: Any = True) -> Tuple[str, str]:
     """
-    Draws bin labels in the font from Settings, or the default one if it isn't here (anymore),
-    with the name (SCREWS, BEARINGS) in that font's bold unless bold_name is off.
+    The fonts for a bin label: the font from Settings, or the default one if it isn't here
+    (anymore), and for the name (SCREWS, BEARINGS) that font's bold unless bold_name is off.
     """
-    from core import inventory_renderer
     names = font_names()
     font = name if name in names else WEB_BIN_FONT
-    inventory_renderer.BIN_FONT = font
-    inventory_renderer.BIN_NAME_FONT = bold_font(font, names) if bold_name is not False else None
+    return font, bold_font(font, names) if bold_name is not False else font
 
 
 def _label_config(options: Any):
@@ -189,8 +187,9 @@ def _label_config(options: Any):
     if raw.get("image_data") is not None:
         opts["image_path"] = _image_path(raw["image_data"])
     if raw.get("bin") is not None:
-        _use_bin_font(raw.get("bin_font"), raw.get("bin_bold_name", True))
-        opts["inventory_config"] = _bin_config(raw["bin"])
+        inv = _bin_config(raw["bin"])
+        inv.font_name, inv.name_font_name = _bin_fonts(raw.get("bin_font"), raw.get("bin_bold_name", True))
+        opts["inventory_config"] = inv
         opts["tape_width_mm"] = INVENTORY_TAPE_WIDTH_MM
     return LabelConfig(**opts)
 

@@ -282,25 +282,29 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
 
     def test_bin_font_from_settings(self):
         from unittest import mock
-        from core import inventory_renderer
         part = cube_web.bin_defaults("en")["component"]
-        try:
-            names = ["Arimo", "Arimo Bold", "Arimo Medium", "Inter", "Inter Bold", "[Custom] Mine"]
-            with mock.patch.object(cube_web, "font_names", return_value=names):
-                cube_web._label_config({"bin": part, "bin_font": "Inter"})
-                self.assertEqual(inventory_renderer.BIN_FONT, "Inter")
-                self.assertEqual(inventory_renderer.BIN_NAME_FONT, "Inter Bold")
-                cube_web._label_config({"bin": part, "bin_font": "Inter", "bin_bold_name": False})
-                self.assertIsNone(inventory_renderer.BIN_NAME_FONT)
-                cube_web._label_config({"bin": part, "bin_font": "[Custom] Mine"})
-                self.assertEqual(inventory_renderer.BIN_NAME_FONT, "[Custom] Mine")
-                cube_web._label_config({"bin": part, "bin_font": "Removed Font"})
-                self.assertEqual(inventory_renderer.BIN_FONT, cube_web.WEB_BIN_FONT)
-                cube_web._label_config({"bin": part})
-                self.assertEqual(inventory_renderer.BIN_FONT, "Arimo Medium")
-                self.assertEqual(inventory_renderer.BIN_NAME_FONT, "Arimo Bold")
-        finally:
-            inventory_renderer.BIN_FONT, inventory_renderer.BIN_NAME_FONT = "Arial Bold", None
+        names = ["Arimo", "Arimo Bold", "Arimo Medium", "Inter", "Inter Bold", "[Custom] Mine"]
+
+        def fonts(**options):
+            inv = cube_web._label_config({"bin": part, **options}).inventory_config
+            return inv.font_name, inv.name_font_name
+
+        with mock.patch.object(cube_web, "font_names", return_value=names):
+            self.assertEqual(fonts(bin_font="Inter"), ("Inter", "Inter Bold"))
+            self.assertEqual(fonts(bin_font="Inter", bin_bold_name=False), ("Inter", "Inter"))
+            self.assertEqual(fonts(bin_font="[Custom] Mine"), ("[Custom] Mine", "[Custom] Mine"))
+            self.assertEqual(fonts(bin_font="Removed Font"), ("Arimo Medium", "Arimo Bold"))
+            self.assertEqual(fonts(), ("Arimo Medium", "Arimo Bold"))
+
+    def test_queued_bin_labels_keep_their_own_fonts(self):
+        part = cube_web.bin_defaults("en")["component"]
+        names = cube_web.font_names()
+        if len(names) < 2:
+            self.skipTest("needs two fonts")
+        first, second = ({"bin": part, "bin_font": name} for name in names[:2])
+        strip = lambda labels: cube_web.render_queue(labels)["raster"]
+        self.assertNotEqual(strip([first, second]), strip([second, second]))
+        self.assertNotEqual(strip([first, second]), strip([first, first]))
 
     def test_font_file_for_the_font_menus(self):
         name = cube_web.font_names()[0]
