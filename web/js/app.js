@@ -30,6 +30,7 @@ export const DEFAULT_LABEL = {
   fixed_width_mm: null,
   font_scale: 100,
   text_height_mm: null,  // letter height in mm, or null to fit the tape
+  text_size_custom: false,  // text_height_mm was typed in, so it stays even when too tall
   line_spacing: 1.2,
   h_padding: 8,
   stroke_width: 0,
@@ -54,6 +55,12 @@ export const DEFAULT_SETTINGS = {
 };
 
 export const BIN_FONT = 'Arimo Medium';
+
+// Text size presets: letter heights in mm, like the sizes on a label maker
+export const TEXT_SIZES = [3, 5, 7];
+// A size typed in by hand, which stays even when it is too tall (a preset goes back to Fit)
+export const customTextSize = (label) => label.text_height_mm != null
+  && (label.text_size_custom || !TEXT_SIZES.includes(label.text_height_mm));
 
 export const MAX_TAPE_MM = 499;
 export const BIN_TAPE_MM = 12;
@@ -253,6 +260,7 @@ export function renderOptions(label) {
   // The web app fits text to the tape unless text_height_mm sets a letter height, so a label
   // saved by the desktop app with a fixed size in points fits too
   options.auto_fit_font = true;
+  options.text_height_fallback = !customTextSize(label);
   if (!options.text.trim() && !options.qr_enabled && !image) options.text = ' ';
   return options;
 }
@@ -297,6 +305,15 @@ export function itemTitle(item) {
   return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : item.label.image ? 'Picture' : 'Label');
 }
 
+// A text size preset that is too tall for the text (say 7 mm with two lines) was drawn fitted,
+// so the label switches to Fit to match
+function fitTooTallPreset(item, metrics) {
+  const { label } = app.get();
+  if (item.mode !== 'text' || !metrics.text_height_fell_back || label.text_height_mm !== item.label.text_height_mm) return;
+  updateLabel({ text_height_mm: null });
+  say(`${item.label.text_height_mm} mm is too tall for this text on the tape, so the size is back on Fit.`);
+}
+
 // Renders the current label. Calls made while one runs fold into a single follow-up render.
 export async function renderNow() {
   clearTimeout(renderTimer);
@@ -329,6 +346,7 @@ export async function renderNow() {
           },
           renderError: null,
         });
+        fitTooTallPreset(item, result.metrics);
       } catch (err) {
         app.set({ renderError: `Couldn't draw the label: ${errorMessage(err)}` });
       }
