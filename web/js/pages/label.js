@@ -1,5 +1,6 @@
-// The label editor: text with its styling toolbar, then the label's options in folding cards.
-// The preview and the print button stay in view while editing.
+// The label editor: text with its styling toolbar next to the extras (QR code, picture) in
+// tabs, then the label's settings in folding cards. The preview and the print button stay in
+// view while editing.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { IconPickerSheet } from './icons.js';
@@ -50,10 +51,8 @@ export function LabelPage() {
     <div class="label-edit-col">
       <${ModePicker} mode=${mode} />
       ${mode === 'bin' ? html`${!wide && html`<${BinCard} />`}<${BinOptions} />` : html`
-        ${!wide && html`<${TextCard} />`}
+        ${!wide && html`<${TextCard} /><section class="card insert-card"><${InsertTabs} /></section>`}
         <${FontSection} />
-        <${QrSection} />
-        <${PictureSection} />
         <${TapeSection} />
         <${AdvancedSection} />`}
     </div>
@@ -135,7 +134,8 @@ function TextCard() {
     }
   };
 
-  return html`<section class="card text-card">
+  // On a wide screen the card splits in two: the text, and the extras in tabs beside it
+  return html`<section class="card text-card"><div class="text-split"><div class="text-col">
     <div class="card-head">
       <label class="card-title" for="label-text">Label text</label>
       <button class="secondary" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
@@ -179,7 +179,7 @@ function TextCard() {
     <${Sheet} open=${helpOpen} title="Styling label text" onClose=${() => setHelpOpen(false)}>
       <${StylingHelp} />
     <//>
-  </section>`;
+  </div>${wide && html`<div class="insert-col"><${InsertTabs} /></div>`}</div></section>`;
 }
 
 // On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
@@ -295,27 +295,64 @@ function WifiForm({ onDone }) {
   </form>`;
 }
 
-function QrSection() {
+// --- Extras next to the text ---------------------------------------------------------------
+
+// The things that can go next to the text, as tabs; a dot marks the ones on the label.
+// More kinds (a barcode, say) are added here.
+const INSERTS = [
+  { id: 'qr', name: 'QR code', icon: 'qr', on: (label) => label.qr_enabled, Panel: QrPanel },
+  { id: 'picture', name: 'Picture', icon: 'image', on: (label) => !!label.image, Panel: PicturePanel },
+];
+let lastInsert = INSERTS[0].id;
+
+function InsertTabs() {
   const { label } = useStore(app);
-  const [wifiOpen, setWifiOpen] = useState(false);
-  return html`<${Section} id="qr" title="QR code" defaultOpen=${false} summary=${label.qr_enabled ? 'On' : 'Off'}>
-    <${Toggle} label="Add a QR code" checked=${label.qr_enabled} onChange=${(qr_enabled) => updateLabel({ qr_enabled })} />
-    <${Field} label="Content: a link, text, or Wi-Fi details">
-      <input type="text" value=${label.qr_data} placeholder="https://example.com"
-        onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: label.qr_enabled || e.currentTarget.value !== '' })} />
-    <//>
-    <button class="secondary" onClick=${() => setWifiOpen(true)}>Make a Wi-Fi QR code</button>
-    <${Segmented} label="Position" options=${SIDES} value=${label.qr_position}
-      onChange=${(qr_position) => updateLabel({ qr_position })} />
-    <${Slider} label="Size" min=${0.6} max=${1.1} step=${0.05} value=${label.qr_scale} format=${pct}
-      onChange=${(qr_scale) => updateLabel({ qr_scale })} />
-    <${Sheet} open=${wifiOpen} title="Wi-Fi QR code" onClose=${() => setWifiOpen(false)}>
-      <${WifiForm} onDone=${() => setWifiOpen(false)} />
-    <//>
-  <//>`;
+  const [tab, setTab] = useState(lastInsert);
+  const pick = (id) => { lastInsert = id; setTab(id); };
+  const current = INSERTS.find((t) => t.id === tab) || INSERTS[0];
+  return html`<div class="insert-tabs">
+    <div class="insert-tab-bar" role="tablist" aria-label="Add to the label">
+      ${INSERTS.map((t) => html`<button role="tab" id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
+        aria-controls="insert-panel" class=${t.id === current.id ? 'on' : ''} onClick=${() => pick(t.id)}>
+        <${Icon} name=${t.icon} size=${18} /> ${t.name}${t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
+    </div>
+    <div class="insert-panel" id="insert-panel" role="tabpanel" aria-labelledby=${`insert-tab-${current.id}`}>
+      <${current.Panel} />
+    </div>
+  </div>`;
 }
 
-function PictureSection() {
+// What goes in at the top, then where it sits and how big at the bottom, the same in every tab
+function Placement({ position, scale, min, max, field }) {
+  return html`<div class="insert-group">
+    <${Segmented} label="Position" options=${SIDES} value=${position}
+      onChange=${(v) => updateLabel({ [`${field}_position`]: v })} />
+    <${Slider} label="Size" min=${min} max=${max} step=${0.05} value=${scale} format=${pct}
+      onChange=${(v) => updateLabel({ [`${field}_scale`]: v })} />
+  </div>`;
+}
+
+function QrPanel() {
+  const { label } = useStore(app);
+  const [wifiOpen, setWifiOpen] = useState(false);
+  return html`<div class="insert-group">
+      <${Toggle} label="Add a QR code" checked=${label.qr_enabled} onChange=${(qr_enabled) => updateLabel({ qr_enabled })} />
+      <div class="row icon-row">
+        <${Field} label="Content: a link or text">
+          <input type="text" value=${label.qr_data} placeholder="https://example.com"
+            onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: label.qr_enabled || e.currentTarget.value !== '' })} />
+        <//>
+        <button class="secondary" title="Make a code that joins a Wi-Fi network" onClick=${() => setWifiOpen(true)}>
+          <${Icon} name="wifi" size=${18} /> Wi-Fi</button>
+      </div>
+    </div>
+    <${Placement} field="qr" position=${label.qr_position} scale=${label.qr_scale} min=${0.6} max=${1.1} />
+    <${Sheet} open=${wifiOpen} title="Wi-Fi QR code" onClose=${() => setWifiOpen(false)}>
+      <${WifiForm} onDone=${() => setWifiOpen(false)} />
+    <//>`;
+}
+
+function PicturePanel() {
   const { label } = useStore(app);
   const { phase } = useStore(boot);
   const fileRef = useRef(null);
@@ -335,7 +372,7 @@ function PictureSection() {
     if (file) await setImage(file);
   };
 
-  return html`<${Section} id="picture" title="Picture" defaultOpen=${false} summary=${label.image ? label.image.name : 'None'}>
+  return html`<div class="insert-group">
     <div class="picture-row">
       ${thumb ? html`<img class="picture-thumb" src=${thumb} alt="" />` : html`<span class="picture-thumb empty"><${Icon} name="image" /></span>`}
       <span class="picture-name">${label.image ? label.image.name : 'No picture'}</span>
@@ -347,11 +384,8 @@ function PictureSection() {
     </div>
     <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${onFile} />
     <${IconPickerSheet} open=${picking} target="text" onClose=${() => setPicking(false)} />
-    <${Segmented} label="Position" options=${SIDES} value=${label.image_position}
-      onChange=${(image_position) => updateLabel({ image_position })} />
-    <${Slider} label="Size" min=${0.3} max=${1.5} step=${0.05} value=${label.image_scale} format=${pct}
-      onChange=${(image_scale) => updateLabel({ image_scale })} />
-  <//>`;
+  </div>
+  <${Placement} field="image" position=${label.image_position} scale=${label.image_scale} min=${0.3} max=${1.5} />`;
 }
 
 function TapeSection() {
@@ -373,7 +407,7 @@ function TapeSection() {
   return html`<${Section} id="tape" title="Tape and length" summary=${`${label.tape_width_mm} mm${label.fixed_width_mm ? `, ${label.fixed_width_mm} mm long` : ''}`}>
     <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${label.tape_width_mm}
       onChange=${(tape_width_mm) => updateLabel({ tape_width_mm: Number(tape_width_mm) })} />
-    <${Field} label="Length in mm" hint="Leave empty to fit the content.">
+    <${Field} label="Length in mm" hint="Empty fits the content. A length is exact: content that doesn't fit is cut off.">
       <input type="text" inputmode="decimal" value=${lengthText} placeholder="Automatic" onInput=${onLength} />
     <//>
     <${Select} label="Tape colour in the preview" value=${`${label.tape_bg_color}/${label.tape_fg_color}`}
