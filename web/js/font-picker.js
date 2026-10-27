@@ -3,7 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { Icon } from './icons.js';
-import { fontFace } from './app.js';
+import { Field } from './ui.js';
+import { useStore } from './state.js';
+import { boot, addFont, fontFace } from './app.js';
 
 function useFace(name) {
   const [family, setFamily] = useState(null);
@@ -90,4 +92,23 @@ export function FontPicker({ id, value, fonts, onChange, standard = null, ariaLa
           standard=${standard} onPick=${pick} />`)}
       </div>`}
   </span>`;
+}
+
+// A labelled font menu with an Add font button next to it; an added font is chosen right away
+export function FontField({ label, value, fonts, onChange, standard = null }) {
+  const { phase } = useStore(boot);
+  const fileRef = useRef(null);
+  const onFile = async (e) => {
+    const file = e.currentTarget.files[0];
+    e.currentTarget.value = '';
+    const name = file && await addFont(file);
+    if (name) onChange(name);
+  };
+  return html`<div class="row">
+    <${Field} label=${label}>
+      <${FontPicker} value=${value} fonts=${fonts} onChange=${onChange} standard=${standard} ariaLabel=${label} />
+    <//>
+    <button class="secondary add-font" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Add font</button>
+    <input ref=${fileRef} type="file" accept=".ttf,.otf,.ttc" hidden onChange=${onFile} />
+  </div>`;
 }

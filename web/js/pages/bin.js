@@ -7,7 +7,7 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { IconPickerSheet } from './icons.js';
 import { Field, Section, Segmented, Toggle } from '../ui.js';
-import { FontPicker } from '../font-picker.js';
+import { FontField } from '../font-picker.js';
 import { useStore } from '../state.js';
 import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say, BIN_FONT } from '../app.js';
 
@@ -340,10 +340,8 @@ export function BinOptions() {
       <p class="hint">${settings.bin_label_mm ? `Your default is ${settings.bin_label_mm} mm. It goes with your backups and sync.` : `Make a length your default and Reset goes back to it on every device.`}</p>
     <//>
     <${Section} id="bin-font" title="Font" summary=${font}>
-      <${Field} label="Bin label font">
-        <${FontPicker} value=${font} fonts=${fonts} standard=${BIN_FONT} ariaLabel="Bin label font"
-          onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
-      <//>
+      <${FontField} label="Bin label font" value=${font} fonts=${fonts} standard=${BIN_FONT}
+        onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
       <${Toggle} label="Bold name" checked=${settings.bin_bold_name !== false}
         onChange=${(bin_bold_name) => updateSettings({ bin_bold_name })} />
       <p class="hint">For new bin labels; ones already in the queue keep the font they were added with. Bold name prints the name, like ${bin.kind === 'fastener' ? 'SCREWS' : 'BEARINGS'}, in the font's bold. These go with your backups and sync.</p>

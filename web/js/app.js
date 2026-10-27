@@ -363,6 +363,7 @@ export function fontFace(name) {
   return fontFaces.get(name);
 }
 
+// Adds a font file the user picked; returns its name, for the caller to choose it
 export async function addFont(file) {
   const data = new Uint8Array(await file.arrayBuffer());
   const name = await py.add_font(file.name, data);
@@ -375,7 +376,6 @@ export async function addFont(file) {
   fonts.push({ filename: file.name, data });
   await storage.save('fonts', fonts);
   app.set({ fonts: await py.font_names() });
-  updateLabel({ font_name: name });
   say(`Added ${name}.`);
   return name;
 }
