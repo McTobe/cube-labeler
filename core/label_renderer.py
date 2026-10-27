@@ -37,6 +37,8 @@ class LabelMetrics:
     tape_saved_mm: float = 0.0
     label_count: int = 1
     warning: Optional[str] = None
+    max_text_height_mm: Optional[float] = None  # Tallest capital letter the text fits the tape at
+    text_height_fell_back: bool = False  # The text_height_mm preset didn't fit, so the text was fitted
 
 
 @dataclass
@@ -49,6 +51,7 @@ class LabelConfig:
     fixed_font_size: int = 40
     font_scale: float = 100.0  # Percentage (10-200)
     text_height_mm: Optional[float] = None  # Height of a capital letter; None sizes the text as above
+    text_height_fallback: bool = False  # Fit the text instead when text_height_mm is too tall for the tape
     line_spacing: float = 1.2
     alignment: str = "center"  # "left", "center", "right"; a line can override it (see core/rich_text.py)
     stroke_width: int = 0
@@ -178,6 +181,8 @@ class LabelRenderer:
         """Renders raw content onto grayscale base canvas without trailing cut lines."""
         is_inventory = getattr(config, "inventory_config", None) is not None
         self._last_text_overflow = False
+        self._max_text_height_mm = None
+        self._text_height_fell_back = False
         # Hardware inventory layouts are designed for 64 printable dots, so they always use 12 mm tape
         spec = self._get_tape_spec(INVENTORY_TAPE_WIDTH_MM if is_inventory else config.tape_width_mm)
         printable_h = spec["printable_height"]
@@ -207,14 +212,22 @@ class LabelRenderer:
             doc, config.font_name, config.stroke_width, config.line_spacing, config.alignment
         )
 
-        # 2. Determine font size. A letter height in mm is exact, so Text scale leaves it alone.
-        if config.text_height_mm:
-            effective_size = layout.size_for_cap_height(config.text_height_mm / self.DOT_PITCH_MM)
+        # 2. Determine font size. A letter height in mm is exact, so Text scale leaves it alone,
+        # unless it is a preset that is too tall for this text and tape: then the text fits instead.
+        fit_size = layout.fit_size(inner_h)
+        self._max_text_height_mm = layout.cap_height(fit_size) * self.DOT_PITCH_MM
+        text_height_mm = config.text_height_mm
+        if text_height_mm:
+            effective_size = layout.size_for_cap_height(text_height_mm / self.DOT_PITCH_MM)
+            if config.text_height_fallback and effective_size > fit_size:
+                self._text_height_fell_back = True
+                text_height_mm = None
+                effective_size = fit_size
         elif config.auto_fit_font:
-            effective_size = layout.fit_size(inner_h)
+            effective_size = fit_size
         else:
             effective_size = max(config.fixed_font_size, 6)
-        if not config.text_height_mm and abs(config.font_scale - 100.0) > 0.5:
+        if not text_height_mm and abs(config.font_scale - 100.0) > 0.5:
             effective_size = max(int(round(effective_size * (config.font_scale / 100.0))), 6)
 
         has_text = doc.has_text
@@ -376,7 +389,7 @@ class LabelRenderer:
         warning = None
         if total_used_mm > self.MAX_TOTAL_LENGTH_MM:
             warning = "Label exceeds maximum print length (49.9 cm / 19.6 in)"
-        elif getattr(self, "_last_text_overflow", False) and config.text_height_mm:
+        elif getattr(self, "_last_text_overflow", False) and config.text_height_mm and not self._text_height_fell_back:
             warning = (f"Text at {config.text_height_mm:g} mm is taller than this tape prints and will be "
                        "clipped. Pick a smaller size or fewer lines.")
         elif getattr(self, "_last_text_overflow", False) and not config.auto_fit_font:
@@ -394,6 +407,8 @@ class LabelRenderer:
             tape_saved_mm=0.0,
             label_count=1,
             warning=warning,
+            max_text_height_mm=None if self._max_text_height_mm is None else round(self._max_text_height_mm, 2),
+            text_height_fell_back=self._text_height_fell_back,
         )
 
         return preview_img, padded_128, raster_bytes, metrics

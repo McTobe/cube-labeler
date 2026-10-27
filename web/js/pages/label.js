@@ -11,7 +11,7 @@ import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
-  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount,
+  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, customTextSize,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -21,8 +21,7 @@ const SIZE_MARKS = { large: 'L', medium: 'M', normal: 'N', small: 'S' };
 // Toolbar buttons don't take the focus, so the phone keyboard and the selection stay put
 const keepFocus = (e) => e.preventDefault();
 const ALIGNS = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
-// Letter heights in mm, like the sizes on a label maker. 12 mm tape prints at most about 9 mm.
-const TEXT_SIZES = [3, 5, 7];
+// 12 mm tape prints letters at most about 9 mm tall
 const MAX_TEXT_MM = 9;
 const FRAMES = [['none', 'None'], ['box', 'Box'], ['rounded', 'Rounded']];
 const SIDES = [['left', 'Left of text'], ['right', 'Right of text']];
@@ -253,43 +252,44 @@ function FontSection() {
 }
 
 // Fit fills the tape; a size in mm is the height of a capital letter, the same on every label.
-// The size menu above the text still makes a line bigger or smaller than that.
+// The size menu above the text still makes a line bigger or smaller than that. Presets too tall
+// for the text are left out (one that stops fitting goes back to Fit, see renderNow); a custom
+// size stays as typed and warns instead.
 function TextSizeField() {
-  const { label } = useStore(app);
+  const { label, render } = useStore(app);
   const mm = label.text_height_mm;
-  const preset = mm == null ? 'fit' : TEXT_SIZES.includes(mm) ? String(mm) : 'custom';
-  const [custom, setCustom] = useState(preset === 'custom');
-  const [customText, setCustomText] = useState(preset === 'custom' ? String(mm) : '');
+  const custom = customTextSize(label);
+  const chosen = mm == null ? 'fit' : custom ? 'custom' : String(mm);
+  const [customText, setCustomText] = useState(custom ? String(mm) : '');
   const inputRef = useRef(null);
-  const chosen = custom ? 'custom' : preset;
+  const metrics = render && render.item.mode === 'text' ? render.metrics : null;
+  const max = metrics && metrics.max_text_height_mm;
+  const fits = (v) => max == null || v <= max || String(v) === chosen;
 
   useEffect(() => {
-    if (preset === 'custom') { setCustom(true); setCustomText(String(mm)); }
-    else if (!custom) setCustomText('');
-  }, [mm]);
+    if (custom && Number(customText.replace(',', '.')) !== mm) setCustomText(String(mm));
+  }, [mm, custom]);
 
   const choose = (v) => {
     if (v === 'custom') {
-      setCustom(true);
       const value = Number(customText.replace(',', '.'));
-      updateLabel({ text_height_mm: value > 0 ? Math.min(value, MAX_TEXT_MM) : mm ?? 4 });
-      if (!customText) setCustomText(String(mm ?? 4));
+      const start = value > 0 ? value : mm ?? 4;
+      updateLabel({ text_height_mm: Math.min(start, MAX_TEXT_MM), text_size_custom: true });
+      setCustomText(String(Math.min(start, MAX_TEXT_MM)));
       requestAnimationFrame(() => inputRef.current && inputRef.current.select());
       return;
     }
-    setCustom(false);
-    updateLabel({ text_height_mm: v === 'fit' ? null : Number(v) });
+    updateLabel({ text_height_mm: v === 'fit' ? null : Number(v), text_size_custom: false });
   };
 
   const onCustom = (e) => {
     const text = e.currentTarget.value;
     setCustomText(text);
     const value = Number(text.replace(',', '.'));
-    if (text.trim() !== '' && value > 0) updateLabel({ text_height_mm: Math.min(value, MAX_TEXT_MM) });
+    if (text.trim() !== '' && value > 0) updateLabel({ text_height_mm: Math.min(value, MAX_TEXT_MM), text_size_custom: true });
   };
 
-  const options = [['fit', 'Fit'], ...TEXT_SIZES.map((v) => [String(v), `${v} mm`]), ['custom', 'Custom']];
-  const hint = html`<p class="hint">Fit fills the tape height. A size in mm is the height of a capital letter, the same on every label.</p>`;
+  const options = [['fit', 'Fit'], ...TEXT_SIZES.filter(fits).map((v) => [String(v), `${v} mm`]), ['custom', 'Custom']];
   // The Custom segment turns into a small mm box, so nothing below it moves
   return html`<${Field} label="Text size">
     <div class="segmented" role="radiogroup" aria-label="Text size">
@@ -301,7 +301,9 @@ function TextSizeField() {
           : html`<span>${t}</span>`}
       </label>`)}
     </div>
-  <//>${hint}`;
+  <//><p class="hint">${max != null && TEXT_SIZES.some((v) => !fits(v))
+    ? `Sizes over ${Math.floor(max * 10) / 10} mm don't fit this text on the tape, so they're left out.`
+    : 'Fit fills the tape height. A size in mm is the height of a capital letter, the same on every label.'}</p>`;
 }
 
 function wifiCode({ ssid, password, security, hidden }) {

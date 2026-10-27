@@ -217,6 +217,11 @@ class TextLayout:
         _, top, _, bottom = font.getbbox("H", anchor="ls")
         return max(int(round(probe * dots / max(bottom - top, 1))), 4)
 
+    def cap_height(self, base: int) -> int:
+        """How tall the capital letters of a normal line are at this base size, in dots."""
+        _, top, _, bottom = font_manager.load_font(self.font_name, base).getbbox("H", anchor="ls")
+        return bottom - top
+
     # --- Drawing
 
     def _render_run(self, run: Run, size: int, top: int, bottom: int) -> Tuple[Image.Image, int, int]:

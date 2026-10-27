@@ -44,6 +44,19 @@ class TestLabelSpacing(unittest.TestCase):
         self.assertIn("7 mm", metrics.warning)
         self.assertIsNone(self.renderer.render(LabelConfig(text="H", text_height_mm=7))[3].warning)
 
+    def test_a_preset_too_tall_for_the_text_fits_it_instead(self):
+        two_lines = LabelConfig(text="Shelf A\nM3 screws", text_height_mm=7, text_height_fallback=True)
+        metrics = self.renderer.render(two_lines)[3]
+        self.assertTrue(metrics.text_height_fell_back)
+        self.assertIsNone(metrics.warning)
+        self.assertLess(metrics.max_text_height_mm, 7)
+        fitted = self.renderer.render(LabelConfig(text="Shelf A\nM3 screws"))[3]
+        self.assertEqual(metrics.effective_font_size, fitted.effective_font_size)
+        # One line fits 7 mm on 12 mm tape, so the preset stays
+        one_line = self.renderer.render(LabelConfig(text="M3 screws", text_height_mm=7, text_height_fallback=True))[3]
+        self.assertFalse(one_line.text_height_fell_back)
+        self.assertGreater(one_line.max_text_height_mm, 7)
+
     def test_leading_spaces_still_indent(self):
         cfg = LabelConfig(text="Shelf A\n    Box 1", alignment="left", auto_fit_font=False, fixed_font_size=20)
         canvas = self.renderer._render_base_canvas(cfg)[0]
