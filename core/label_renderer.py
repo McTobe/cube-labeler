@@ -48,6 +48,7 @@ class LabelConfig:
     auto_fit_font: bool = True
     fixed_font_size: int = 40
     font_scale: float = 100.0  # Percentage (10-200)
+    text_height_mm: Optional[float] = None  # Height of a capital letter; None sizes the text as above
     line_spacing: float = 1.2
     alignment: str = "center"  # "left", "center", "right"; a line can override it (see core/rich_text.py)
     stroke_width: int = 0
@@ -206,12 +207,14 @@ class LabelRenderer:
             doc, config.font_name, config.stroke_width, config.line_spacing, config.alignment
         )
 
-        # 2. Determine font size
-        if config.auto_fit_font:
+        # 2. Determine font size. A letter height in mm is exact, so Text scale leaves it alone.
+        if config.text_height_mm:
+            effective_size = layout.size_for_cap_height(config.text_height_mm / self.DOT_PITCH_MM)
+        elif config.auto_fit_font:
             effective_size = layout.fit_size(inner_h)
         else:
             effective_size = max(config.fixed_font_size, 6)
-        if abs(config.font_scale - 100.0) > 0.5:
+        if not config.text_height_mm and abs(config.font_scale - 100.0) > 0.5:
             effective_size = max(int(round(effective_size * (config.font_scale / 100.0))), 6)
 
         has_text = doc.has_text
@@ -373,6 +376,9 @@ class LabelRenderer:
         warning = None
         if total_used_mm > self.MAX_TOTAL_LENGTH_MM:
             warning = "Label exceeds maximum print length (49.9 cm / 19.6 in)"
+        elif getattr(self, "_last_text_overflow", False) and config.text_height_mm:
+            warning = (f"Text at {config.text_height_mm:g} mm is taller than this tape prints and will be "
+                       "clipped. Pick a smaller size or fewer lines.")
         elif getattr(self, "_last_text_overflow", False) and not config.auto_fit_font:
             warning = "Text is taller than the printable area and will be clipped. Reduce the font size."
 

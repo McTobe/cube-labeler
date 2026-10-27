@@ -32,6 +32,18 @@ class TestLabelSpacing(unittest.TestCase):
             left, _, right, _ = _ink_bbox(canvas)
             self.assertLessEqual(abs(left - (canvas.width - right)), 1, text)
 
+    def test_text_height_in_mm_is_the_capital_letter_height(self):
+        # The same size on any tape and with any length of text, and Text scale leaves it alone
+        for tape, text in ((12.0, "HELLO"), (9.0, "H"), (6.0, "HI")):
+            cfg = LabelConfig(text=text, tape_width_mm=tape, text_height_mm=4, font_scale=150)
+            _, top, _, bottom = _ink_bbox(self.renderer._render_base_canvas(cfg)[0])
+            self.assertAlmostEqual((bottom - top) * DOT_PITCH_MM, 4, delta=0.2, msg=text)
+
+    def test_text_too_tall_for_the_tape_warns(self):
+        metrics = self.renderer.render(LabelConfig(text="H\nH", text_height_mm=7))[3]
+        self.assertIn("7 mm", metrics.warning)
+        self.assertIsNone(self.renderer.render(LabelConfig(text="H", text_height_mm=7))[3].warning)
+
     def test_leading_spaces_still_indent(self):
         cfg = LabelConfig(text="Shelf A\n    Box 1", alignment="left", auto_fit_font=False, fixed_font_size=20)
         canvas = self.renderer._render_base_canvas(cfg)[0]

@@ -210,6 +210,13 @@ class TextLayout:
                 high = mid - 1
         return best
 
+    def size_for_cap_height(self, dots: float) -> int:
+        """Base size whose capital letters are `dots` tall, as a letter height on a label maker."""
+        probe = 200
+        font = font_manager.load_font(self.font_name, probe)
+        _, top, _, bottom = font.getbbox("H", anchor="ls")
+        return max(int(round(probe * dots / max(bottom - top, 1))), 4)
+
     # --- Drawing
 
     def _render_run(self, run: Run, size: int, top: int, bottom: int) -> Tuple[Image.Image, int, int]:
