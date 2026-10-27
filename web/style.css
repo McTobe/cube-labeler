@@ -1270,6 +1270,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* Font menus: each font shown in its own face (js/font-picker.js) */
 .font-picker { display: block; min-width: 0; }
+.font-picker-stack { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.font-picker-button:disabled { opacity: 0.6; cursor: default; }
 .font-picker-button {
   display: flex;
   align-items: center;
