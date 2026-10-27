@@ -60,7 +60,6 @@ Since 2.0 the web version is the main way to use Cube Labeler. It runs the same 
 - **Try it locally:** double-click `run_web.bat` (or run `python web/serve.py`). It opens the page and prints the address to open on your phone.
 - **Host your own:** every release publishes a Docker image (`ghcr.io/mctobe/cube-labeler-web`) that serves the site on port 80, behind a reverse proxy that adds HTTPS. See [docker-compose.yml](docker-compose.yml) and, for Google Drive sync without signing in every hour, [docs/google-sign-in.md](docs/google-sign-in.md).
 
-<img src="docs/images/web.png" alt="The web version in Chrome on a phone, showing a styled label" width="300">
 
 See [web/README.md](web/README.md) for browser setup (Android needs the *Nearby devices* permission for Chrome) and hosting.
 
