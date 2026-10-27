@@ -1322,7 +1322,3 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .font-list .font-sample { font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .font-list .font-note { flex: none; font-size: 0.8rem; color: var(--muted); }
 
-/* Text size: the Custom segment turns into a small mm field */
-.segmented .size-input { display: inline-flex; align-items: center; gap: 4px; }
-.segmented .size-input input { position: static; opacity: 1; pointer-events: auto; width: 3.2em; min-height: 0; height: 1.6em; padding: 0 4px; text-align: center; font: inherit; border-radius: 6px; }
-.segmented label.size-custom:has(input:focus-visible) { outline: none; }

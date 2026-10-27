@@ -30,7 +30,6 @@ export const DEFAULT_LABEL = {
   fixed_width_mm: null,
   font_scale: 100,
   text_height_mm: null,  // letter height in mm, or null to fit the tape
-  text_size_custom: false,  // text_height_mm was typed in, so it stays even when too tall
   line_spacing: 1.2,
   h_padding: 8,
   stroke_width: 0,
@@ -58,9 +57,6 @@ export const BIN_FONT = 'Arimo Medium';
 
 // Text size presets: letter heights in mm, like the sizes on a label maker
 export const TEXT_SIZES = [3, 5, 7];
-// A size typed in by hand, which stays even when it is too tall (a preset goes back to Fit)
-export const customTextSize = (label) => label.text_height_mm != null
-  && (label.text_size_custom || !TEXT_SIZES.includes(label.text_height_mm));
 
 export const MAX_TAPE_MM = 499;
 export const BIN_TAPE_MM = 12;
@@ -260,7 +256,10 @@ export function renderOptions(label) {
   // The web app fits text to the tape unless text_height_mm sets a letter height, so a label
   // saved by the desktop app with a fixed size in points fits too
   options.auto_fit_font = true;
-  options.text_height_fallback = !customTextSize(label);
+  // Only the presets are sizes; a too tall one is fitted instead (a label saved with an old
+  // custom size fits too)
+  if (!TEXT_SIZES.includes(options.text_height_mm)) options.text_height_mm = null;
+  options.text_height_fallback = true;
   if (!options.text.trim() && !options.qr_enabled && !image) options.text = ' ';
   return options;
 }
