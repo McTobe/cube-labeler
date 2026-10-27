@@ -11,7 +11,7 @@ import { Preview } from '../preview.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
-  app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
+  app, boot, printer, updateLabel, resetLabelSettings, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES,
 } from '../app.js';
 
@@ -236,11 +236,23 @@ function StylingHelp() {
 // --- Options -------------------------------------------------------------------------------
 
 function FontSection() {
-  const { label, fonts } = useStore(app);
+  const { label, fonts, settings } = useStore(app);
   const names = fonts.length ? fonts : [label.font_name];
+  // The font Reset picks, which the user can make their own (it goes with backups and sync)
+  const standard = labelDefaults().font_name;
+  const makeDefault = () => {
+    updateSettings({ default_font: label.font_name === DEFAULT_LABEL.font_name ? null : label.font_name });
+    say(`Reset now picks ${label.font_name}.`);
+  };
 
   return html`<${Section} id="font" title="Font and layout" summary=${label.text_height_mm ? `${label.font_name}, ${label.text_height_mm} mm` : label.font_name}>
     <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => updateLabel({ font_name })} />
+    ${label.font_name !== standard && fonts.includes(label.font_name) && html`<div class="button-row">
+      <button class="secondary" onClick=${makeDefault}>Make ${label.font_name} my default</button>
+    </div>`}
+    <p class="hint">${settings.default_font && fonts.includes(settings.default_font)
+      ? `Reset goes back to your default, ${standard}. It goes with your backups and sync.`
+      : `Reset goes back to ${standard}. Make a font your default and Reset picks it on every device.`}</p>
     <${TextSizeField} />
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
