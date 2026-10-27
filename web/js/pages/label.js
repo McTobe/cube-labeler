@@ -407,7 +407,7 @@ function TapeSection() {
   return html`<${Section} id="tape" title="Tape and length" summary=${`${label.tape_width_mm} mm${label.fixed_width_mm ? `, ${label.fixed_width_mm} mm long` : ''}`}>
     <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${label.tape_width_mm}
       onChange=${(tape_width_mm) => updateLabel({ tape_width_mm: Number(tape_width_mm) })} />
-    <${Field} label="Length in mm" hint="Leave empty to fit the content.">
+    <${Field} label="Length in mm" hint="Empty fits the content. A length is exact: content that doesn't fit is cut off.">
       <input type="text" inputmode="decimal" value=${lengthText} placeholder="Automatic" onInput=${onLength} />
     <//>
     <${Select} label="Tape colour in the preview" value=${`${label.tape_bg_color}/${label.tape_fg_color}`}

@@ -183,6 +183,7 @@ class LabelRenderer:
         self._last_text_overflow = False
         self._max_text_height_mm = None
         self._text_height_fell_back = False
+        self._cut_off_mm = 0.0
         # Hardware inventory layouts are designed for 64 printable dots, so they always use 12 mm tape
         spec = self._get_tape_spec(INVENTORY_TAPE_WIDTH_MM if is_inventory else config.tape_width_mm)
         printable_h = spec["printable_height"]
@@ -279,10 +280,17 @@ class LabelRenderer:
 
         total_content_w += config.end_margin
 
+        # A set length is exact: a shorter one cuts off the end of the content, as the user chose
+        cut_dots = 0
         if config.fixed_width_mm:
             target_dots = int(round(config.fixed_width_mm / self.DOT_PITCH_MM))
-            if target_dots > total_content_w:
-                total_content_w = target_dots
+            # The blank tape either side up to the cut lines is part of the label's length
+            if config.cut_line:
+                target_dots -= 2 * (BATCH_GAP_DOTS // 2)
+            target_dots = max(target_dots, 10)
+            cut_dots = max(total_content_w - target_dots, 0)
+            self._cut_off_mm = cut_dots * self.DOT_PITCH_MM
+            total_content_w = target_dots
 
         # 6. Create working canvas
         img_canvas = Image.new("RGB", (max(total_content_w, 10), canvas_h), "white")
@@ -304,6 +312,11 @@ class LabelRenderer:
             y_pos = print_border + (printable_h - el.height) // 2
             img_canvas.paste(el, (cur_x, y_pos))
             cur_x += el.width + gap
+
+        # What runs past the end stops where the side padding and frame begin
+        if cut_dots:
+            edge = img_canvas.width - config.end_margin - config.h_padding - frame_inset_x
+            draw.rectangle([max(edge, 0), 0, img_canvas.width, canvas_h], fill="white")
 
         if frame_inset:
             box = [
@@ -391,6 +404,9 @@ class LabelRenderer:
         warning = None
         if total_used_mm > self.MAX_TOTAL_LENGTH_MM:
             warning = "Label exceeds maximum print length (49.9 cm / 19.6 in)"
+        elif self._cut_off_mm >= 0.5:
+            warning = (f"The content needs {config.fixed_width_mm + self._cut_off_mm:.0f} mm, so the end is cut off "
+                       f"at {config.fixed_width_mm:g} mm.")
         elif getattr(self, "_last_text_overflow", False) and config.text_height_mm and not self._text_height_fell_back:
             warning = (f"Text at {config.text_height_mm:g} mm is taller than this tape prints and will be "
                        "clipped. Pick a smaller size or fewer lines.")

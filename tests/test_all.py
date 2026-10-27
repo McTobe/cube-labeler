@@ -206,6 +206,18 @@ class TestLabelRenderer(unittest.TestCase):
         self.assertIsNotNone(prev)
         self.assertGreaterEqual(metrics.print_length_mm, 59.0)
 
+    def test_fixed_length_is_exact(self):
+        # A length shorter than the content is kept, and the end is cut off with a note
+        long_text = LabelConfig(text="A long label that needs more than 20 mm", fixed_width_mm=20.0)
+        _, _, _, natural = self.renderer.render(LabelConfig(text=long_text.text))
+        self.assertGreater(natural.print_length_mm, 30.0)
+        _, _, _, metrics = self.renderer.render(long_text)
+        self.assertAlmostEqual(metrics.print_length_mm, 20.0, delta=0.2)
+        self.assertIn("cut off", metrics.warning)
+        _, _, _, roomy = self.renderer.render(LabelConfig(text="Hi", fixed_width_mm=40.0))
+        self.assertAlmostEqual(roomy.print_length_mm, 40.0, delta=0.2)
+        self.assertIsNone(roomy.warning)
+
     def test_image_merge(self):
         import tempfile
         from PIL import Image as PILImage
