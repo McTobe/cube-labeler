@@ -334,11 +334,11 @@ function LabelDefaultsCard() {
           ${tapeWidths.map((w) => html`<option value=${w}>${w} mm</option>`)}
         </select>
       </label>
-      <label class="default-row">
+      <div class="default-row">
         <span><span class="field-label">Text label font</span><span class="hint">The font Reset picks for the text.</span></span>
         <${FontPicker} value=${defaults.font_name} fonts=${fonts} ariaLabel="Text label font"
           onChange=${(default_font) => updateSettings({ default_font })} />
-      </label>
+      </div>
       <label class="default-row">
         <span><span class="field-label">Bin label length</span><span class="hint">Empty means the factory ${FACTORY_LABEL_MM} mm.</span></span>
         <span class="unit-input">
@@ -347,12 +347,12 @@ function LabelDefaultsCard() {
           <span>mm</span>
         </span>
       </label>
-      <label class="default-row">
+      <div class="default-row">
         <span><span class="field-label">Bin label font</span><span class="hint">For new bin labels. Queued ones keep theirs.</span></span>
         <${FontPicker} value=${fonts.includes(settings.bin_font) ? settings.bin_font : BIN_FONT} fonts=${fonts}
           standard=${BIN_FONT} ariaLabel="Bin label font"
           onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
-      </label>
+      </div>
     </div>
   </section>`;
 }
