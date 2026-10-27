@@ -8,7 +8,7 @@
 
 A desktop app for designing and printing labels on the **Brother P-touch Cube (PT-P300BT)** over Bluetooth. It shows an exact preview of the printed tape, prints several labels as one strip to save tape, has a dedicated editor for storage bin labels and comes with a library of 140 printable icons that you can add your own to.
 
-Cube Labeler runs on Windows as a single portable `.exe`, with no Python install needed. It also has a command-line mode for printing from scripts, and a [web version](#web-version-preview) that prints from Chrome on Android and other systems.
+Cube Labeler runs on Windows as a single portable `.exe`, with no Python install needed. It also has a command-line mode for printing from scripts, and a [web version](#web-version) that prints from Chrome on Android and other systems.
 
 ![Text label editor with styled text, a column divider and a rounded frame](docs/images/text-label.png)
 
@@ -55,12 +55,12 @@ Other Brother models are not tested. The printing code and the CLI also run on m
 
 Windows SmartScreen may warn you the first time because the file is not code-signed. Choose **More info**, then **Run anyway**.
 
-### Web version (preview)
+### Web version
 
-`web/` holds a browser version that runs the same Python label code in the browser and prints over Bluetooth from Chrome or Edge on Android, Windows, macOS and Linux (iPhone and iPad can't, as Safari has no Web Serial). It does text labels with the same text styling, frames and QR codes; bin labels, icons, the queue and templates are still to come.
+Since 2.0 the web version is the main way to use Cube Labeler. It runs the same Python label code in the browser and prints over Bluetooth from Chrome or Edge on Android, Windows, macOS and Linux (iPhone and iPad can't, as Safari has no Web Serial). It has the same features as the desktop app, and can back up to Google Drive.
 
 - **Try it on your PC and phone:** double-click `run_web.bat` (or run `python web/serve.py`). It opens the page and prints the address to open on your phone.
-- **Host it:** GitHub Actions publishes a Docker image (`ghcr.io/mctobe/cube-labeler-web`) that serves the site on port 80, behind a reverse proxy that adds HTTPS.
+- **Host it:** GitHub Actions publishes a Docker image (`ghcr.io/mctobe/cube-labeler-web`) that serves the site on port 80, behind a reverse proxy that adds HTTPS. See [docker-compose.yml](docker-compose.yml) and, for Google Drive sync without signing in every hour, [docs/google-sign-in.md](docs/google-sign-in.md).
 
 <img src="docs/images/web.png" alt="The web version in Chrome on a phone, showing a styled label" width="300">
 
@@ -172,7 +172,7 @@ Cube Labeler is free and open source. If it saves you time, you can [buy me a co
 
 ## Contributing
 
-Bug reports and ideas are welcome in [Issues](https://github.com/McTobe/cube-labeler/issues). For a pull request, keep changes focused, add or update tests where it makes sense, and check that `python -m unittest discover tests` passes.
+Bug reports and ideas are welcome in [Issues](https://github.com/McTobe/cube-labeler/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) for how to set up, test and open a pull request, and [SECURITY.md](SECURITY.md) for reporting security problems privately.
 
 ## Credits
 

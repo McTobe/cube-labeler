@@ -1,0 +1,11 @@
+name: Idea or feature request
+description: Suggest something new or a better way to do something
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: Describe the idea and what you'd use it for. A sketch or mock-up is welcome.
+    validations:
+      required: true
