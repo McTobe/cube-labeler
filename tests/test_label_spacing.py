@@ -57,6 +57,11 @@ class TestLabelSpacing(unittest.TestCase):
         self.assertFalse(one_line.text_height_fell_back)
         self.assertGreater(one_line.max_text_height_mm, 7)
 
+    def test_an_empty_label_leaves_every_preset(self):
+        metrics = self.renderer.render(LabelConfig(text=" ", text_height_mm=7, text_height_fallback=True))[3]
+        self.assertIsNone(metrics.max_text_height_mm)
+        self.assertFalse(metrics.text_height_fell_back)
+
     def test_leading_spaces_still_indent(self):
         cfg = LabelConfig(text="Shelf A\n    Box 1", alignment="left", auto_fit_font=False, fixed_font_size=20)
         canvas = self.renderer._render_base_canvas(cfg)[0]

@@ -215,11 +215,13 @@ class LabelRenderer:
         # 2. Determine font size. A letter height in mm is exact, so Text scale leaves it alone,
         # unless it is a preset that is too tall for this text and tape: then the text fits instead.
         fit_size = layout.fit_size(inner_h)
-        self._max_text_height_mm = layout.cap_height(fit_size) * self.DOT_PITCH_MM
+        # Without text there is nothing to be too tall (the layout then measures a stand-in "Ag")
+        if doc.has_text:
+            self._max_text_height_mm = layout.cap_height(fit_size) * self.DOT_PITCH_MM
         text_height_mm = config.text_height_mm
         if text_height_mm:
             effective_size = layout.size_for_cap_height(text_height_mm / self.DOT_PITCH_MM)
-            if config.text_height_fallback and effective_size > fit_size:
+            if config.text_height_fallback and doc.has_text and effective_size > fit_size:
                 self._text_height_fell_back = True
                 text_height_mm = None
                 effective_size = fit_size
