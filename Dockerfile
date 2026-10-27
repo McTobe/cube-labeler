@@ -19,7 +19,10 @@ COPY assets/icons/ assets/icons/
 COPY core/ core/
 COPY ui/__init__.py ui/templates.py ui/
 COPY web/ web/
-RUN python web/build.py
+# web-image.yml sets these for images built from main, so the app shows a "next" badge
+ARG CUBE_BUILD_CHANNEL=""
+ARG CUBE_BUILD_COMMIT=""
+RUN CUBE_BUILD_CHANNEL="$CUBE_BUILD_CHANNEL" CUBE_BUILD_COMMIT="$CUBE_BUILD_COMMIT" python web/build.py
 
 FROM nginx:1.27-alpine
 # python3 runs the Google Drive sign-in helper; it uses only the standard library

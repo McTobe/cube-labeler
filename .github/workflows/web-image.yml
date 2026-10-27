@@ -68,5 +68,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Images from main show a "next" badge with the commit next to the version in the app
+          build-args: |
+            CUBE_BUILD_CHANNEL=${{ github.ref == 'refs/heads/main' && 'next' || '' }}
+            CUBE_BUILD_COMMIT=${{ github.ref == 'refs/heads/main' && github.sha || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -12,7 +12,7 @@ import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, dow
 import { ai, loadAi, setKey, setModel } from '../ai.js';
 import { errorMessage } from '../../printer.js';
 import { PrinterPanel } from '../printer-ui.js';
-import { APP_VERSION } from '../version.js';
+import { APP_VERSION, BUILD_CHANNEL, BUILD_COMMIT } from '../version.js';
 
 function StorageUse() {
   const [estimate, setEstimate] = useState(null);
@@ -398,7 +398,7 @@ export function SettingsPage() {
 
     <footer class="about">
       <p>
-        <span>Cube Labeler ${APP_VERSION} for the Brother PT-P300BT</span>
+        <span>Cube Labeler ${APP_VERSION}${BUILD_CHANNEL ? ` (${BUILD_CHANNEL} ${BUILD_COMMIT})` : ''} for the Brother PT-P300BT</span>
         <a href="https://github.com/McTobe/cube-labeler" target="_blank" rel="noopener" title="Cube Labeler is free software under the GNU AGPL v3">Source code</a>
         <a href="https://ko-fi.com/thetobek" target="_blank" rel="noopener">Buy me a coffee${'\u00a0'}♥</a>
         <a href="privacy.html" target="_blank" rel="noopener">Privacy</a>
