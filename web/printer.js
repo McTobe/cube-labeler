@@ -188,13 +188,15 @@ export async function queryStatus(transport, py) {
   });
 }
 
-// Prints one raster. Resolves to {confirmed: bool}; rejects with a readable error message.
+// Prints one raster. Resolves to {confirmed: bool, status}, where status is the printer's
+// status read just before printing (which tape it went on); rejects with a readable error message.
 export async function printRaster(transport, py, raster, options = {}, onStatus = () => {}) {
   const lines = await py.raster_lines(raster);
   return withPrinter(transport, py, async () => {
     onStatus('Checking printer status...');
     await transport.write(toBytes(await py.status_query()));
     const status = await readStatus(transport, py);
+    const before = toPlain(await py.describe_status(status));
 
     let job;
     try {
@@ -224,11 +226,11 @@ export async function printRaster(transport, py, raster, options = {}, onStatus 
       }
       if (state === 'completed') {
         onStatus('Print complete!');
-        return { confirmed: true };
+        return { confirmed: true, status: before };
       }
     }
     onStatus('Print sent, but the printer did not confirm completion.');
-    return { confirmed: false };
+    return { confirmed: false, status: before };
   });
 }
 

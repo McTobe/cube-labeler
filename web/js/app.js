@@ -8,6 +8,9 @@ import * as storage from './storage.js';
 import { loadLibrary } from './library.js';
 import { loadHistory, recordPrinted } from './history.js';
 import { SerialTransport, queryStatus, printRaster, feedTape, errorMessage } from '../printer.js';
+import {
+  tapeKey, newRoll, correctRoll, countPrint, rollLeft, formatTape, planParts, partItems,
+} from './tape.js';
 
 const RENDER_DELAY_MS = 120;
 const SAVE_DELAY_MS = 400;
@@ -57,6 +60,7 @@ export const DEFAULT_SETTINGS = {
   default_font: null,  // font a reset text label goes back to, instead of Arimo
   bin_font: null,  // font for all text on bin labels, instead of BIN_FONT
   bin_bold_name: true,  // the name on bin labels (SCREWS, BEARINGS) in the bold of that font
+  tape_rolls: {},  // the tape counter: one roll per kind of tape (see tape.js)
   history_keep: 50,  // printed labels the history keeps, besides the pinned ones: 20, 50 or 200
 };
 
@@ -82,6 +86,8 @@ export const app = createStore({
   queueRender: null,  // like render, for the whole queue
   previewDots: false,  // the label page's preview shows the printer's dots instead of the tape
   queuePrinted: 0,  // labels in the last printed queue, until the user keeps or clears it
+  queuePlan: null,  // {parts, long, needed, left} when the queue is too long for one print or the roll
+  queueRun: null,  // {parts, next, count, hidden} while a queue prints in parts
   thumbs: {},  // queue item id -> preview URL
   settings: DEFAULT_SETTINGS,
   tapeWidths: [12, 9, 6, 3.5],
@@ -101,6 +107,7 @@ export const printer = createStore({
 });
 
 let py = null;
+let deviceId = 'this-device';
 
 let saidAt = 0;
 let sayTimer = null;
@@ -128,14 +135,18 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
     storage.load('mode', 'text'),
     storage.load('bin', null),
     storage.load('queue', []),
+    storage.load('deviceId', null),
   ]);
+  // The tape counter counts each device's prints apart, so syncing never counts one twice
+  deviceId = device || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  if (!device) storage.save('deviceId', deviceId);
   app.set({
     settings: { ...DEFAULT_SETTINGS, ...settings },
     // The printable-area guides no longer have a switch, so a label saved with them on drops them
@@ -204,6 +215,7 @@ export async function updateSettings(change) {
   storage.save('settings', settings);
   if ('theme' in change) applyTheme(settings.theme);
   if (('bin_font' in change || 'bin_bold_name' in change) && app.get().mode === 'bin') renderNow();
+  if ('tape_rolls' in change) planQueueSoon();
 }
 
 // --- Editing and rendering -----------------------------------------------------------------
@@ -495,6 +507,7 @@ async function printerJob(job) {
 function showStatus(info) {
   const problems = info.errors.length ? info.errors.join(', ') : '';
   printer.set({ info, state: problems ? 'error' : 'ready', message: problems });
+  planQueueSoon();
 
   // Like the desktop app: the label follows the tape that is loaded
   const label = app.get().label;
@@ -538,6 +551,36 @@ export function forgetPrinter() {
   });
 }
 
+// --- Tape counter --------------------------------------------------------------------------
+
+// The roll counted for the tape in the printer (from the last status read), or null
+export function loadedRoll(info = printer.get().info) {
+  if (!info) return null;
+  return app.get().settings.tape_rolls[tapeKey(info)] || null;
+}
+
+function saveRoll(info, roll) {
+  updateSettings({ tape_rolls: { ...app.get().settings.tape_rolls, [tapeKey(info)]: roll } });
+}
+
+export function startRoll(info, lengthMm) {
+  saveRoll(info, newRoll(lengthMm));
+  say(`Counting a new ${formatTape(lengthMm)} roll.`);
+}
+
+export function correctCount(info, leftMm) {
+  saveRoll(info, correctRoll(loadedRoll(info), Math.min(leftMm, loadedRoll(info).length_mm)));
+  say(`Count corrected to ${formatTape(leftMm)} left.`);
+}
+
+// After a print: the status read before it says which tape it went on
+function countTape(info, mm) {
+  if (!info) return;
+  printer.set({ info });
+  const roll = loadedRoll(info);
+  if (roll) saveRoll(info, countPrint(roll, deviceId, mm));
+}
+
 function tooLong(metrics) {
   if (metrics.total_used_length_mm <= MAX_TAPE_MM) return false;
   say(`This needs ${Math.round(metrics.total_used_length_mm)} mm of tape, but the printer's limit is ${MAX_TAPE_MM} mm. Shorten it or split the queue.`, true);
@@ -552,6 +595,7 @@ export async function printLabel() {
     const result = await printRaster(printer.get().transport, py, current.raster, {
       required_tape_width_mm: current.tape_width_mm,
     }, (message) => say(message));
+    countTape(result.status, current.metrics.total_used_length_mm);
     if (result.confirmed) {
       printer.set({ state: 'ready', message: '' });
       say('Printed.');
@@ -577,6 +621,7 @@ export async function printItem(item) {
     const done = await printRaster(printer.get().transport, py, result.raster, {
       required_tape_width_mm: itemTapeWidth(item),
     }, (message) => say(message));
+    countTape(done.status, result.metrics.total_used_length_mm);
     if (done.confirmed) {
       printer.set({ state: 'ready', message: '' });
       say('Printed.');
@@ -601,7 +646,8 @@ export async function renderItem(item) {
 
 export function feed() {
   return printerJob(async () => {
-    await feedTape(printer.get().transport, py, FEED_LENGTH_MM, (message) => say(message));
+    const result = await feedTape(printer.get().transport, py, FEED_LENGTH_MM, (message) => say(message));
+    countTape(result.status, FEED_LENGTH_MM);
   });
 }
 
@@ -642,7 +688,7 @@ function mergeCopies(queue) {
 function saveQueue(queue, undo = null) {
   clearTimeout(undoTimer);
   if (undo) undoTimer = setTimeout(() => app.set({ queueUndo: null }), UNDO_SECONDS * 1000);
-  app.set({ queue, queuePrinted: 0, queueUndo: undo });
+  app.set({ queue, queuePrinted: 0, queueUndo: undo, queuePlan: null, queueRun: null });
   storage.save('queue', queue);
   queueRenderStale = true;
   if (queueShown) renderQueue();
@@ -777,6 +823,11 @@ export async function renderQueue() {
       const result = await py.render_queue(queue.map(itemOptions), queue.map(copiesOf));
       // Which list item each printed label on the strip belongs to
       const owners = queue.flatMap((item, i) => Array(copiesOf(item)).fill(i));
+      if (app.get().queue !== queue) return;  // changed meanwhile; a newer render follows
+      // A strip over the limit prints in parts (one label that long stays an error)
+      if (result.metrics.total_used_length_mm > MAX_TAPE_MM && owners.length > 1) {
+        result.metrics.warning = `Longer than the ${formatTape(MAX_TAPE_MM)} the printer prints at a time, so it prints in parts.`;
+      }
       app.set({
         queueRender: {
           previewUrl: URL.createObjectURL(new Blob([result.preview_png], { type: 'image/png' })),
@@ -788,6 +839,9 @@ export async function renderQueue() {
           count: queueLabelCount(queue),
           spans: result.spans.map(([from, to], n) => ({ from, to, item: owners[n] })),
           bins: queue.some((item) => item.mode === 'bin'),
+          queue,
+          owners,
+          lengths: null,  // from queue_lengths, once the queue needs splitting
           items: queue,
         },
       });
@@ -797,9 +851,89 @@ export async function renderQueue() {
     }
   }
   if (old) { URL.revokeObjectURL(old.previewUrl); URL.revokeObjectURL(old.dotsUrl); }
+  planQueue();
 }
 
-export async function printQueue() {
+// --- Printing a queue in parts -------------------------------------------------------------
+
+let plannedFor = null;
+
+// Works out whether the queue needs printing in parts: when it is longer than one print can
+// be, or longer than what is left on the roll. The plan follows the strip and the roll.
+async function planQueue() {
+  const strip = app.get().queueRender;
+  if (app.get().queueRun) return;
+  const info = printer.get().info;
+  const roll = info && Number(info.tape_width_mm) === strip?.tape_width_mm ? loadedRoll(info) : null;
+  const left = roll ? rollLeft(roll) : null;
+  const key = strip && `${strip.previewUrl}|${left}`;
+  if (key === plannedFor) return;
+  plannedFor = key;
+  const needed = strip ? strip.metrics.total_used_length_mm : 0;
+  const long = needed > MAX_TAPE_MM;
+  if (!strip || strip.count < 2 || !(long || (left !== null && needed > left))) {
+    if (app.get().queuePlan) app.set({ queuePlan: null });
+    return;
+  }
+  try {
+    if (!strip.lengths) strip.lengths = await py.queue_lengths(strip.queue.map(itemOptions));
+  } catch (err) {
+    console.warn('Queue lengths', err);
+    return;
+  }
+  if (plannedFor !== key) return;
+  const parts = planParts(strip.lengths, strip.owners, left, roll ? roll.length_mm : null);
+  app.set({ queuePlan: parts && parts.length > 1 || parts?.[0]?.newRoll ? { parts, long, needed, left } : null });
+}
+
+function planQueueSoon() {
+  if (queueShown && !queueRenderStale) planQueue();
+}
+
+// Starts printing in parts, or prints the next part
+export async function printQueue({ whole = false } = {}) {
+  if (queueRenderStale || !app.get().queueRender) await renderQueue();
+  const { queueRun, queuePlan, queueRender: strip } = app.get();
+  if (whole || (!queueRun && !queuePlan)) return printWholeQueue();
+  if (!strip || !printer.get().transport) return;
+  const run = queueRun || { parts: queuePlan.parts, next: 0, count: strip.count, queue: strip.queue, owners: strip.owners };
+  const part = run.parts[run.next];
+  await printerJob(async () => {
+    say(`Getting part ${run.next + 1} ready...`);
+    const items = partItems(run.queue, run.owners, part.from, part.to);
+    const rendered = await py.render_queue(items.map(itemOptions), items.map(copiesOf));
+    const result = await printRaster(printer.get().transport, py, rendered.raster, {
+      required_tape_width_mm: strip.tape_width_mm,
+    }, (message) => say(message));
+    countTape(result.status, rendered.metrics.total_used_length_mm);
+    if (result.confirmed) {
+      printer.set({ state: 'ready', message: '' });
+      recordPrinted(items);
+    }
+    const labels = part.to - part.from + 1;
+    if (run.next + 1 < run.parts.length) {
+      app.set({ queueRun: { ...run, next: run.next + 1, hidden: false } });
+      say(result.confirmed ? `Printed part ${run.next + 1} (${labels} labels).` : `Part ${run.next + 1} sent, but the printer did not confirm completion.`, !result.confirmed);
+    } else {
+      app.set({ queueRun: null, queuePlan: null, queuePrinted: run.count });
+      plannedFor = null;
+      say(result.confirmed ? `Printed the last part. All ${run.count} labels are done.` : 'The last part was sent, but the printer did not confirm completion.', !result.confirmed);
+    }
+  });
+}
+
+// "Later": the next part waits, out of the way
+export function hideQueueRun() {
+  if (app.get().queueRun) app.set({ queueRun: { ...app.get().queueRun, hidden: true } });
+}
+
+export function stopQueueRun() {
+  app.set({ queueRun: null });
+  plannedFor = null;
+  planQueue();
+}
+
+async function printWholeQueue() {
   if (queueRenderStale || !app.get().queueRender) await renderQueue();
   const strip = app.get().queueRender;
   if (!strip || !printer.get().transport || tooLong(strip.metrics)) return;
@@ -807,6 +941,7 @@ export async function printQueue() {
     const result = await printRaster(printer.get().transport, py, strip.raster, {
       required_tape_width_mm: strip.tape_width_mm,
     }, (message) => say(message));
+    countTape(result.status, strip.metrics.total_used_length_mm);
     if (result.confirmed) {
       printer.set({ state: 'ready', message: '' });
       say(`Printed ${strip.count} labels as one strip.`);

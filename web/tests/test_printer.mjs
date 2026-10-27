@@ -98,7 +98,10 @@ test('prints and waits for completion', async () => {
   const messages = [];
   const result = await printRaster(new SerialTransport(port), py, RASTER,
     { auto_cut: true, required_tape_width_mm: 12 }, (m) => messages.push(m));
-  assert.deepEqual(result, { confirmed: true });
+  assert.equal(result.confirmed, true);
+  // Which tape it printed on, for the tape counter
+  assert.equal(result.status.tape_width_mm, 12);
+  assert.equal(result.status.tape_color, 'White');
   const expected = [
     ...pyBytes(py.status_query()),
     ...pyBytes(py.print_job(statusBytes(), RASTER, { auto_cut: true })),
@@ -135,7 +138,8 @@ test('reports a missing confirmation', async () => {
   const port = new FakePrinterPort({ afterPrint: [] });
   const fastPy = new Proxy(py, { get: (t, k) => (k === 'completion_timeout' ? () => 0.2 : t[k]) });
   const result = await printRaster(new SerialTransport(port), fastPy, RASTER);
-  assert.deepEqual(result, { confirmed: false });
+  assert.equal(result.confirmed, false);
+  assert.equal(result.status.tape_width_mm, 12);
 });
 
 test('explains a printer that does not answer', async () => {
@@ -164,7 +168,7 @@ test('feeds tape with an uncompressed blank job, like the desktop app', async ()
   const port = new FakePrinterPort();
   const messages = [];
   const result = await feedTape(new SerialTransport(port), py, 25, (m) => messages.push(m));
-  assert.deepEqual(result, { confirmed: true });
+  assert.equal(result.confirmed, true);
   const blank = pyBytes(py.blank_raster(25));
   const expected = [
     ...pyBytes(py.status_query()),
@@ -182,7 +186,7 @@ test('works with a bridge whose calls return promises', async () => {
   const status = await queryStatus(new SerialTransport(new FakePrinterPort()), asyncPy);
   assert.equal(status.tape_width_mm, 12);
   const result = await printRaster(new SerialTransport(new FakePrinterPort()), asyncPy, RASTER);
-  assert.deepEqual(result, { confirmed: true });
+  assert.equal(result.confirmed, true);
 });
 
 test('errorMessage keeps the last line of a Python traceback', () => {

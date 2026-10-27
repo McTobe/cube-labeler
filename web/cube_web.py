@@ -240,6 +240,17 @@ def render_queue(labels: Any, copies: Any = None) -> Dict[str, Any]:
     return result
 
 
+def queue_lengths(labels: Any) -> Dict[str, Any]:
+    """
+    The widths of queued labels (one entry per queue item, copies not repeated), for working
+    out how much tape a part of the queue uses without drawing it. See
+    LabelRenderer.tape_lengths.
+    """
+    if hasattr(labels, "to_py"):
+        labels = labels.to_py()
+    return _get_renderer().tape_lengths([_label_config(label) for label in labels])
+
+
 def label_thumbnail(options: Any, height: int = 48) -> bytes:
     """A small preview PNG of one label, for lists."""
     from PIL import Image
