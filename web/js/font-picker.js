@@ -1,9 +1,9 @@
-// A font menu that shows every font in its own face. A native select can't do that on all
-// browsers, so this is a button with a list under it, used like one: arrow keys, Enter, Escape.
+// Font menus that show every font in its own face. A native select can't do that on all
+// browsers, so these are buttons with a list under them.
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { Icon } from './icons.js';
-import { Field } from './ui.js';
+import { Field, Segmented } from './ui.js';
 import { useStore } from './state.js';
 import { boot, addFont, fontFace } from './app.js';
 
@@ -20,27 +20,64 @@ function useFace(name) {
 
 const faceStyle = (family) => (family ? { fontFamily: `"${family}", system-ui, sans-serif` } : null);
 
-function FontOption({ name, selected, standard, onPick }) {
+// Font names are family plus style ("Arimo Medium", "Inter Bold Italic", plain "Arimo" for
+// Regular), so the menus list each family once and the style is picked beside it.
+const WEIGHTS = ['Thin', 'ExtraLight', 'Light', 'Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold', 'Black'];
+
+export function splitFont(name) {
+  let family = name;
+  const italic = family.endsWith(' Italic');
+  if (italic) family = family.slice(0, -7);
+  const weight = WEIGHTS.find((w) => family.endsWith(` ${w}`)) || 'Regular';
+  if (family.endsWith(` ${weight}`)) family = family.slice(0, -weight.length - 1);
+  const style = italic ? (weight === 'Regular' ? 'Italic' : `${weight} Italic`) : weight;
+  return { family, style };
+}
+
+const styleRank = (style) => WEIGHTS.indexOf(style.replace(/ ?Italic$/, '') || 'Regular') * 2 + (style.endsWith('Italic') ? 1 : 0);
+
+// family -> its fonts, lightest first: [{ name, style }]
+export function fontFamilies(fonts) {
+  const families = new Map();
+  for (const name of fonts) {
+    const { family, style } = splitFont(name);
+    if (!families.has(family)) families.set(family, []);
+    families.get(family).push({ name, style });
+  }
+  for (const styles of families.values()) styles.sort((a, b) => styleRank(a.style) - styleRank(b.style));
+  return families;
+}
+
+// The font a family switch lands on: the same style if the family has it, else its Regular
+function inFamily(styles, style) {
+  return (styles.find((s) => s.style === style) || styles.find((s) => s.style === 'Regular') || styles[0]).name;
+}
+
+function Face({ name, text }) {
   const family = useFace(name);
+  return html`<span class="font-sample" style=${faceStyle(family)}>${text}</span>`;
+}
+
+function Option({ option, selected, onPick }) {
   return html`<button type="button" role="option" aria-selected=${selected} class=${selected ? 'selected' : ''}
-    data-font=${name} onClick=${() => onPick(name)}>
-    <span class="font-sample" style=${faceStyle(family)}>${name}</span>
-    ${name === standard && html`<span class="font-note">standard</span>`}
+    data-font=${option.key} onClick=${() => onPick(option.key)}>
+    <${Face} name=${option.face} text=${option.text} />
+    ${option.note && html`<span class="font-note">${option.note}</span>`}
   </button>`;
 }
 
-// fonts: the font names; standard: one to mark as the app's own choice
-export function FontPicker({ id, value, fonts, onChange, standard = null, ariaLabel = 'Font' }) {
+// A button with a list under it, used like a select: arrow keys, Enter, Escape.
+// options: [{ key, text, face, note }], each shown in the font named by face.
+function Picker({ id, value, options, onChange, ariaLabel, disabled = false }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef(null);
   const listRef = useRef(null);
-  const family = useFace(value);
+  const current = options.find((o) => o.key === value) || { text: value, face: value };
   const close = (refocus = true) => {
     setOpen(false);
     if (refocus) buttonRef.current?.focus({ preventScroll: true });
   };
-  const pick = (name) => { close(); if (name !== value) onChange(name); };
-
+  const pick = (key) => { close(); if (key !== value) onChange(key); };
   // Placed in the window like the action menus: under the button when there is room, else above
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -82,22 +119,60 @@ export function FontPicker({ id, value, fonts, onChange, standard = null, ariaLa
 
   return html`<span class="font-picker">
     <button id=${id} ref=${buttonRef} type="button" class="font-picker-button" aria-haspopup="listbox"
-      aria-expanded=${open} aria-label=${`${ariaLabel}: ${value}`} onClick=${() => setOpen(!open)} onKeyDown=${onButtonKey}>
-      <span class="font-sample" style=${faceStyle(family)}>${value}</span>
+      aria-expanded=${open} aria-label=${`${ariaLabel}: ${current.text}`} disabled=${disabled}
+      onClick=${() => setOpen(!open)} onKeyDown=${onButtonKey}>
+      <${Face} name=${current.face} text=${current.text} />
       <${Icon} name="chevron" size=${18} />
     </button>
     ${open && html`<div class="menu-backdrop" onClick=${() => close(false)}></div>
       <div ref=${listRef} class="font-list" role="listbox" aria-label=${ariaLabel} onKeyDown=${onListKey}>
-        ${fonts.map((name) => html`<${FontOption} key=${name} name=${name} selected=${name === value}
-          standard=${standard} onPick=${pick} />`)}
+        ${options.map((option) => html`<${Option} key=${option.key} option=${option}
+          selected=${option.key === value} onPick=${pick} />`)}
       </div>`}
   </span>`;
 }
 
-// A labelled font menu with an Add font button next to it; an added font is chosen right away
+function useFamilies(value, fonts, standard) {
+  const families = fontFamilies(fonts.includes(value) ? fonts : [...fonts, value]);
+  const { family, style } = splitFont(value);
+  const standardFamily = standard && splitFont(standard).family;
+  const familyOptions = [...families].map(([name, styles]) => ({
+    key: name, text: name, face: inFamily(styles, 'Regular'), note: name === standardFamily ? 'standard' : null,
+  }));
+  const styles = families.get(family);
+  const styleOptions = styles.map((s) => ({ key: s.name, text: s.style, face: s.name, note: s.name === standard ? 'standard' : null }));
+  const pickFamily = (name, onChange) => onChange(inFamily(families.get(name), style));
+  return { family, familyOptions, styleOptions, pickFamily };
+}
+
+// A font menu with each family once, and the family's styles in a second, smaller menu.
+// For tight spots like the Settings rows. standard: a font to mark as the app's own choice.
+export function FontPicker({ value, fonts, onChange, standard = null, ariaLabel = 'Font' }) {
+  const { family, familyOptions, styleOptions, pickFamily } = useFamilies(value, fonts, standard);
+  return html`<span class="font-picker-stack">
+    <${Picker} value=${family} options=${familyOptions} ariaLabel=${ariaLabel} onChange=${(f) => pickFamily(f, onChange)} />
+    <${Picker} value=${value} options=${styleOptions} ariaLabel=${`${ariaLabel} weight`}
+      disabled=${styleOptions.length < 2} onChange=${onChange} />
+  </span>`;
+}
+
+// Up to four styles side by side; more than that (an added font family) in a menu
+function WeightField({ value, styleOptions, onChange }) {
+  if (styleOptions.length > 4) {
+    return html`<${Field} label="Weight">
+      <${Picker} value=${value} options=${styleOptions} ariaLabel="Weight" onChange=${onChange} />
+    <//>`;
+  }
+  return html`<${Segmented} label="Weight" value=${value} disabled=${styleOptions.length < 2} onChange=${onChange}
+    options=${styleOptions.map((o) => [o.key, html`<${Face} name=${o.face} text=${o.text} />`])} />`;
+}
+
+// A labelled font menu with an Add font button next to it and the family's weights under it.
+// An added font is chosen right away.
 export function FontField({ label, value, fonts, onChange, standard = null }) {
   const { phase } = useStore(boot);
   const fileRef = useRef(null);
+  const { family, familyOptions, styleOptions, pickFamily } = useFamilies(value, fonts, standard);
   const onFile = async (e) => {
     const file = e.currentTarget.files[0];
     e.currentTarget.value = '';
@@ -106,9 +181,10 @@ export function FontField({ label, value, fonts, onChange, standard = null }) {
   };
   return html`<div class="row">
     <${Field} label=${label}>
-      <${FontPicker} value=${value} fonts=${fonts} onChange=${onChange} standard=${standard} ariaLabel=${label} />
+      <${Picker} value=${family} options=${familyOptions} ariaLabel=${label} onChange=${(f) => pickFamily(f, onChange)} />
     <//>
     <button class="secondary add-font" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Add font</button>
     <input ref=${fileRef} type="file" accept=".ttf,.otf,.ttc" hidden onChange=${onFile} />
-  </div>`;
+  </div>
+  <${WeightField} value=${value} styleOptions=${styleOptions} onChange=${onChange} />`;
 }
