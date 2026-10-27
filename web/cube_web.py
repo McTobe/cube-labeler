@@ -504,6 +504,8 @@ WEB_FONT_SUBSTITUTES = {
     "Segoe UI": "Inter",
     "Verdana": "Inter",
     "Tahoma": "Inter",
+    "Comic Sans MS": "Comic Neue",
+    "Garamond": "EB Garamond",
 }
 
 

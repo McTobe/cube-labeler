@@ -152,7 +152,7 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 | `js/version.js` | The version number shown in Settings (`APP_VERSION`), bumped for each release. |
 | `serve.py` | Builds the site and serves it on this computer and the local network (`run_web.bat` runs it). |
 | `build.py` | Packs the page, the needed `core/` modules, `cube_web.py`, the fonts and the icons into `web/dist/`; the app icons are made from `assets/icon.png`. |
-| `fonts/` | Fonts under the SIL Open Font License: Arimo (Arial-compatible; SemiBold is the standard bin label font, set in Settings) plus Atkinson Hyperlegible, Barlow Condensed, Inter, JetBrains Mono, Lexend, Nunito and Zilla Slab, each with its licence file. Browsers can't hand system fonts to Python, so the app ships its own; **Add font** loads more. |
+| `fonts/` | Fonts under the SIL Open Font License: Arimo (Arial-compatible; SemiBold is the standard bin label font, set in Settings) plus everyday (Atkinson Hyperlegible, Barlow Condensed, Bebas Neue, Inter, JetBrains Mono, Lexend, Montserrat, Nunito, Open Sans, Oswald, Roboto), playful (Caveat, Comic Neue, Fredoka, Pacifico, Patrick Hand) and classic (Cinzel, EB Garamond, Great Vibes, Zilla Slab) fonts, each with its licence file. Browsers can't hand system fonts to Python, so the app ships its own; **Add font** loads more. |
 
 The printer bytes come from `core/protocol.py`, which the desktop driver (`core/printer.py`)
 uses too.

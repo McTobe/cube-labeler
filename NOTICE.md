@@ -30,8 +30,11 @@ project until its author adds a license.
 ## Third-party parts
 
 - Fonts in `web/fonts/`, all under the SIL Open Font License 1.1: Arimo (`OFL.txt`), and Atkinson
-  Hyperlegible, Barlow Condensed, Inter, JetBrains Mono, Lexend, Nunito and Zilla Slab (each with its
-  own `OFL-<name>.txt`). Arimo Medium and SemiBold and the static Inter, JetBrains Mono, Lexend and Nunito files
-  are made from the upstream variable fonts, and all but Arimo Regular and Bold are cut down to
-  Latin characters.
+  Hyperlegible, Barlow Condensed, Bebas Neue, Caveat, Cinzel, Comic Neue, EB Garamond, Fredoka, Great
+  Vibes, Inter, JetBrains Mono, Lexend, Montserrat, Nunito, Open Sans, Oswald, Pacifico, Patrick Hand,
+  Roboto and Zilla Slab (each with its own `OFL-<name>.txt`). The static Arimo Medium and SemiBold,
+  Caveat, Cinzel, EB Garamond, Fredoka, Inter, JetBrains Mono, Lexend, Montserrat, Nunito, Open Sans,
+  Oswald and Roboto files are made from the upstream variable fonts, and all but Arimo Regular and Bold
+  are cut down to Latin characters. None of these use a Reserved Font Name (Lexend reserves only
+  "RevReading Lexend"); fonts that reserve their name, such as Playfair Display, are left out.
 - Preact and htm (`web/vendor/`), under the MIT License (see `web/vendor/README.md`).

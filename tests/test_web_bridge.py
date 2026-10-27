@@ -281,6 +281,26 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
             self.assertIn(preset["label"]["font_name"], names, preset["key"])
         for preset in WEB_PRESETS.values():
             self.assertIn(preset["config"]["font_name"], names)
+        for family in ("Fredoka", "Comic Neue", "Caveat", "EB Garamond", "Cinzel", "Roboto",
+                       "Open Sans", "Montserrat", "Oswald"):
+            self.assertIn(family, names)
+            self.assertIn(family + " Bold", names)
+        for family in ("Patrick Hand", "Pacifico", "Great Vibes", "Bebas Neue"):
+            self.assertIn(family, names)
+        with mock.patch.object(cube_web, "font_names", return_value=names):
+            self.assertEqual(cube_web._web_font("Comic Sans MS Bold"), "Comic Neue Bold")
+            self.assertEqual(cube_web._web_font("Garamond"), "EB Garamond")
+
+    def test_every_shipped_font_has_its_licence(self):
+        fonts = os.path.join(BASE_DIR, "web", "fonts")
+        files = os.listdir(fonts)
+        for name in files:
+            if name.endswith(".ttf"):
+                family = name.split("-")[0]
+                licence = "OFL.txt" if family == "Arimo" else f"OFL-{family}.txt"
+                self.assertIn(licence, files, name)
+                with open(os.path.join(fonts, licence), encoding="utf-8") as f:
+                    self.assertIn("SIL OPEN FONT LICENSE Version 1.1", f.read(), licence)
 
     def test_bin_font_from_settings(self):
         from unittest import mock
