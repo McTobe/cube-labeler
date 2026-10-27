@@ -173,9 +173,12 @@ class TextLayout:
     def _line_box(self, line: Line, base: int) -> Tuple[int, int]:
         """Top (negative) and bottom of a line relative to its baseline."""
         size = self._size(line, base)
-        font = font_manager.load_font(self.font_name, size)
-        _, top, _, bottom = font.getbbox(self.ref_text, anchor="ls")
         runs = line.runs
+        # A bold or italic file can reach higher or lower than the regular one
+        fonts = [font_manager.load_font(self.font_name, size)]
+        fonts += [font_manager.load_styled_font(self.font_name, size, r.bold, r.italic)[0] for r in runs]
+        boxes = [font.getbbox(self.ref_text, anchor="ls") for font in fonts]
+        top, bottom = min(b[1] for b in boxes), max(b[3] for b in boxes)
         extra = self.stroke + (_bold_px(size) if any(r.bold for r in runs) else 0)
         top, bottom = top - extra, bottom + extra
         if any(r.underline for r in runs):
@@ -234,8 +237,13 @@ class TextLayout:
         slant_left = math.ceil(ITALIC_SLANT * bottom) if fake_italic else 0
         slant_right = math.ceil(ITALIC_SLANT * -top) if fake_italic else 0
         text_w = int(math.ceil(font.getlength(run.text))) + 2 * stroke
-        origin = pad + slant_left + stroke
-        width = origin + text_w + slant_right + pad
+        # Script fonts and swashes draw past the advance width (Pacifico's "L" starts left of
+        # the pen, its "l" ends right of the advance), so make room for the ink on both sides
+        ink_left, _, ink_right, _ = font.getbbox(run.text, anchor="ls")
+        over_left = max(0, -ink_left)
+        over_right = max(0, ink_right - (text_w - 2 * stroke))
+        origin = pad + slant_left + stroke + over_left
+        width = origin + text_w + over_right + slant_right + pad
 
         mask = Image.new("L", (max(width, 1), max(height, 1)), 255 if run.invert else 0)
         draw = ImageDraw.Draw(mask)

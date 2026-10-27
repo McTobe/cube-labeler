@@ -143,6 +143,19 @@ class TestRendering(unittest.TestCase):
                 self.assertGreaterEqual(bbox[1], border)
                 self.assertLessEqual(bbox[3], border + printable_h)
 
+    def test_script_fonts_keep_ink_outside_the_advance(self):
+        # Pacifico's "L" starts left of the pen and its "l" ends right of the advance
+        from PIL import Image, ImageDraw
+        pacifico = os.path.join(BASE_DIR, "web", "fonts", "Pacifico-Regular.ttf")
+        for text in ("Luleå", "Mjöl", "fjord"):
+            with self.subTest(text):
+                layout = rt.TextLayout(rt.parse(text), pacifico)
+                layout_font = FontManager().load_font(pacifico, 40)
+                ref = Image.new("L", (400, 160), 0)
+                ImageDraw.Draw(ref).text((80, 100), text, font=layout_font, fill=255, anchor="ls")
+                ink = lambda img: sum(1 for p in img.tobytes() if p > 127)
+                self.assertEqual(ink(layout.render(40)), ink(ref))
+
     def test_bold_is_wider(self):
         plain = self._text("Shelf", auto_fit_font=False, fixed_font_size=30)[0]
         bold = self._text("**Shelf**", auto_fit_font=False, fixed_font_size=30)[0]
