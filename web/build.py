@@ -118,9 +118,9 @@ def build_icon_library() -> None:
 def build_icons() -> None:
     from PIL import Image
 
-    with Image.open(os.path.join(PROJECT_ROOT, "assets", "icon.ico")) as ico:
-        ico.size = max(ico.ico.sizes())
-        icon = ico.convert("RGBA")
+    # assets/icon.png is rendered from assets/icon.svg (tools/build_app_icon.py)
+    with Image.open(os.path.join(PROJECT_ROOT, "assets", "icon.png")) as png:
+        icon = png.convert("RGBA")
     for size in (192, 512):
         icon.resize((size, size), Image.Resampling.LANCZOS).save(
             os.path.join(DIST_DIR, f"icon-{size}.png")

@@ -43,34 +43,9 @@ def ensure_icon():
     icon_path = os.path.join(assets_dir, "icon.ico")
 
     if not os.path.isfile(icon_path):
-        print("  Generating assets/icon.ico...")
-        from PIL import Image, ImageDraw
-
-        sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
-        images = []
-        for w, h in sizes:
-            img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(img)
-            s = w / 256.0
-
-            # Body
-            draw.rounded_rectangle([16 * s, 32 * s, 240 * s, 230 * s], radius=28 * s, fill="#1e293b", outline="#334155", width=int(max(1, 4 * s)))
-            # Cyan stripe
-            draw.rectangle([16 * s, 70 * s, 240 * s, 86 * s], fill="#0284c7")
-            # Slot
-            draw.rounded_rectangle([60 * s, 20 * s, 196 * s, 34 * s], radius=4 * s, fill="#0f172a", outline="#475569", width=int(max(1, 2 * s)))
-            # Tape
-            draw.rectangle([70 * s, 8 * s, 186 * s, 30 * s], fill="#ffffff", outline="#94a3b8", width=int(max(1, 2 * s)))
-            # LED
-            led = (50 * s, 54 * s)
-            r = 8 * s
-            draw.ellipse([led[0] - r, led[1] - r, led[0] + r, led[1] + r], fill="#22c55e", outline="#16a34a", width=int(max(1, 2 * s)))
-            # Tag
-            draw.rounded_rectangle([64 * s, 115 * s, 192 * s, 195 * s], radius=16 * s, fill="#38bdf8", outline="#e0f2fe", width=int(max(1, 3 * s)))
-            images.append(img)
-
-        images[0].save(icon_path, format="ICO", sizes=[(im.width, im.height) for im in images], append_images=images[1:])
-        print("  [OK] Icon generated successfully.")
+        # It is rendered from assets/icon.svg and kept in the repository
+        print("Error: assets/icon.ico is missing. Make it with: python tools/build_app_icon.py")
+        sys.exit(1)
     else:
         print("  [OK] Application icon present.")
 
