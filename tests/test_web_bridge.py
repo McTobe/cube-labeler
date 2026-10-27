@@ -411,6 +411,20 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         self.assertEqual(cube_web.open_backup(buf.getvalue())["fonts"][0]["filename"], "Roboto-Regular.ttf")
         self.assertNotEqual(cube_web.backup_digest(contents), cube_web.backup_digest(dict(contents, fonts=[])))
 
+    def test_print_history_goes_in_backups(self):
+        from core import backup
+        import json
+        history = json.dumps({"version": 1, "entries": [{"id": "a", "mode": "text", "label": {"text": "Garage keys"}}]})
+        contents = {"created": "", "icons": [], "settings": {}, "templates": [], "history": history}
+        data = cube_web.make_backup(contents)
+        self.assertEqual(cube_web.open_backup(data)["history"], history)
+        # The desktop app keeps it with its other files and never takes it for a template or font
+        read = backup.read_backup(io.BytesIO(data))
+        self.assertEqual(read.other_files, {"web_history.json": history.encode("utf-8")})
+        self.assertEqual(read.templates, {})
+        self.assertNotEqual(cube_web.backup_digest(contents), cube_web.backup_digest(dict(contents, history=None)))
+        self.assertIsNone(cube_web.open_backup(cube_web.make_backup(dict(contents, history=None)))["history"])
+
     def test_backup_digest_ignores_time_and_recent_icons(self):
         contents = {
             "created": "2026-10-24T20:00:00+02:00",

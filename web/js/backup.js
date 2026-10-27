@@ -5,12 +5,13 @@ import * as storage from './storage.js';
 import { app, updateSettings, makeBackup, openBackup, templateToDesktop, restoreFonts } from './app.js';
 import { library, iconsForBackup, planIcons, restoreIcons, restoreIconLists } from './library.js';
 import { templates, loadTemplates, findTemplate, putTemplate, freeTemplateName } from './templates.js';
+import { historyForBackup, readBackupHistory, restoreHistory, historySizeChanged, HISTORY_SIZES } from './history.js';
 import { downloadBlob } from './ui.js';
 import { mergeRolls } from './tape.js';
 
 // Settings of the web version go in a backup with this prefix; the desktop app keeps them unused
 const WEB_PREFIX = 'web_';
-const WEB_SETTINGS = ['theme', 'match_printer_tape', 'bin_label_mm', 'default_tape_mm', 'default_font', 'bin_font', 'bin_bold_name', 'tape_rolls'];
+const WEB_SETTINGS = ['theme', 'match_printer_tape', 'bin_label_mm', 'default_tape_mm', 'default_font', 'bin_font', 'bin_bold_name', 'history_keep', 'tape_rolls'];
 // AI settings shared with the desktop app (the keys never go in a backup)
 const AI_SERVICES = ['gemini', 'openai', 'openrouter'];
 
@@ -44,6 +45,7 @@ export async function collectBackup(created = localTime()) {
     settings: await backupSettings(),
     templates: await Promise.all(templates.get().mine.map(async (t) => ({ name: t.name, json: await templateToDesktop(t.item) }))),
     fonts: await storage.load('fonts', []),
+    history: await historyForBackup(),
   };
 }
 
@@ -67,12 +69,13 @@ export async function readBackup(file) {
   const iconPlan = planIcons(opened.icons);
   const templatePlan = { new: 0, conflicts: 0 };
   for (const t of opened.templates) templatePlan[findTemplate(t.name) ? 'conflicts' : 'new']++;
-  return { ...opened, iconPlan, templatePlan };
+  return { ...opened, history: readBackupHistory(opened.history), iconPlan, templatePlan };
 }
 
-// Restores the chosen parts ({icons, settings, templates, fonts}) of a read backup
-export async function restoreBackup(opened, parts, onConflict) {
-  const result = { icons: null, templates: null, settings: false, fonts: null };
+// Restores the chosen parts ({icons, settings, templates, fonts, history}) of a read backup.
+// historyGone: the history entries this device had at the last sync, for Drive sync
+export async function restoreBackup(opened, parts, onConflict, historyGone = null) {
+  const result = { icons: null, templates: null, settings: false, fonts: null, history: null };
   // Fonts first, so restored labels and templates find them
   if (parts.fonts && opened.fonts && opened.fonts.length) result.fonts = await restoreFonts(opened.fonts);
   if (parts.icons && opened.icons.length) result.icons = restoreIcons(opened.icons, onConflict);
@@ -119,10 +122,13 @@ export async function restoreBackup(opened, parts, onConflict) {
       const theirs = change.tape_rolls && typeof change.tape_rolls === 'object' ? change.tape_rolls : {};
       change.tape_rolls = mergeRolls(app.get().settings.tape_rolls, theirs);
     }
+    if ('history_keep' in change && !HISTORY_SIZES.includes(change.history_keep)) delete change.history_keep;
     await storage.save('desktopSettings', desktop);
     await updateSettings(change);
     restoreIconLists(s.icon_favourites, s.icon_recent);
     result.settings = true;
+    if ('history_keep' in change) historySizeChanged();
   }
+  if (parts.history && opened.history) result.history = await restoreHistory(opened.history, historyGone);
   return result;
 }

@@ -11,8 +11,8 @@ import { Preview } from '../preview.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
-  app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
-  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES,
+  app, boot, printer, updateLabel, resetLabelSettings, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
+  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -236,11 +236,23 @@ function StylingHelp() {
 // --- Options -------------------------------------------------------------------------------
 
 function FontSection() {
-  const { label, fonts } = useStore(app);
+  const { label, fonts, settings } = useStore(app);
   const names = fonts.length ? fonts : [label.font_name];
+  // The font Reset picks, which the user can make their own (it goes with backups and sync)
+  const standard = labelDefaults().font_name;
+  const makeDefault = () => {
+    updateSettings({ default_font: label.font_name === DEFAULT_LABEL.font_name ? null : label.font_name });
+    say(`Reset now picks ${label.font_name}.`);
+  };
 
   return html`<${Section} id="font" title="Font and layout" summary=${label.text_height_mm ? `${label.font_name}, ${label.text_height_mm} mm` : label.font_name}>
     <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => updateLabel({ font_name })} />
+    ${label.font_name !== standard && fonts.includes(label.font_name) && html`<div class="button-row">
+      <button class="secondary" onClick=${makeDefault}>Make ${label.font_name} my default</button>
+    </div>`}
+    <p class="hint">${settings.default_font && fonts.includes(settings.default_font)
+      ? `Reset goes back to your default, ${standard}. It goes with your backups and sync.`
+      : `Reset goes back to ${standard}. Make a font your default and Reset picks it on every device.`}</p>
     <${TextSizeField} />
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
@@ -298,9 +310,10 @@ function WifiForm({ onDone }) {
 // --- Extras next to the text ---------------------------------------------------------------
 
 // The things that can go next to the text, as tabs; a dot marks the ones on the label.
-// More kinds (a barcode, say) are added here.
+// More kinds are added here.
 const INSERTS = [
   { id: 'qr', name: 'QR code', icon: 'qr', on: (label) => label.qr_enabled, Panel: QrPanel },
+  { id: 'barcode', name: 'Barcode', icon: 'barcode', on: hasBarcode, Panel: BarcodePanel },
   { id: 'picture', name: 'Picture', icon: 'image', on: (label) => !!label.image, Panel: PicturePanel },
 ];
 let lastInsert = INSERTS[0].id;
@@ -313,8 +326,8 @@ function InsertTabs() {
   return html`<div class="insert-tabs">
     <div class="insert-tab-bar" role="tablist" aria-label="Add to the label">
       ${INSERTS.map((t) => html`<button role="tab" id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
-        aria-controls="insert-panel" class=${t.id === current.id ? 'on' : ''} onClick=${() => pick(t.id)}>
-        <${Icon} name=${t.icon} size=${18} /> ${t.name}${t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
+        aria-controls="insert-panel" aria-label=${t.name} title=${t.name} class=${t.id === current.id ? 'on' : ''} onClick=${() => pick(t.id)}>
+        <${Icon} name=${t.icon} size=${18} /><span class="tab-name">${t.name}</span>${t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
     </div>
     <div class="insert-panel" id="insert-panel" role="tabpanel" aria-labelledby=${`insert-tab-${current.id}`}>
       <${current.Panel} />
@@ -350,6 +363,23 @@ function QrPanel() {
     <${Sheet} open=${wifiOpen} title="Wi-Fi QR code" onClose=${() => setWifiOpen(false)}>
       <${WifiForm} onDone=${() => setWifiOpen(false)} />
     <//>`;
+}
+
+// Code 128, which holds plain letters, numbers and symbols; the bars keep a width scanners read,
+// so Size only changes their height
+function BarcodePanel() {
+  const { label } = useStore(app);
+  const data = label.barcode_data || '';
+  return html`<div class="insert-group">
+      <${Toggle} label="Add a barcode" checked=${!!label.barcode_enabled} onChange=${(barcode_enabled) => updateLabel({ barcode_enabled })} />
+      <${Field} label="Content: a number or code">
+        <input type="text" value=${data} placeholder="PN-10432" autocomplete="off" spellcheck="false"
+          onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: label.barcode_enabled || e.currentTarget.value !== '' })} />
+      <//>
+      <${Toggle} label="Number under the bars" checked=${label.barcode_show_text !== false}
+        onChange=${(barcode_show_text) => updateLabel({ barcode_show_text })} />
+    </div>
+    <${Placement} field="barcode" position=${label.barcode_position || 'left'} scale=${label.barcode_scale ?? 1} min=${0.6} max=${1} />`;
 }
 
 function PicturePanel() {

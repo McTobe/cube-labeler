@@ -6,6 +6,7 @@ import { createStore } from './state.js';
 import { startPython } from './python.js';
 import * as storage from './storage.js';
 import { loadLibrary } from './library.js';
+import { loadHistory, recordPrinted } from './history.js';
 import { SerialTransport, queryStatus, printRaster, feedTape, errorMessage } from '../printer.js';
 import {
   tapeKey, newRoll, correctRoll, countPrint, rollLeft, formatTape, planParts, partItems,
@@ -27,6 +28,11 @@ export const DEFAULT_LABEL = {
   qr_data: '',
   qr_position: 'left',
   qr_scale: 0.95,
+  barcode_enabled: false,
+  barcode_data: '',
+  barcode_show_text: true,
+  barcode_position: 'left',
+  barcode_scale: 1.0,
   image: null,  // {name, data: Uint8Array}
   image_position: 'left',
   image_scale: 1.0,
@@ -55,6 +61,7 @@ export const DEFAULT_SETTINGS = {
   bin_font: null,  // font for all text on bin labels, instead of BIN_FONT
   bin_bold_name: true,  // the name on bin labels (SCREWS, BEARINGS) in the bold of that font
   tape_rolls: {},  // the tape counter: one roll per kind of tape (see tape.js)
+  history_keep: 50,  // printed labels the history keeps, besides the pinned ones: 20, 50 or 200
 };
 
 export const BIN_FONT = 'Arimo Medium';
@@ -151,6 +158,7 @@ export async function start() {
   applyTheme(app.get().settings.theme);
   storage.askToPersist();
   loadLibrary().catch((err) => console.warn('Icon library', err));
+  loadHistory().catch((err) => console.warn('Print history', err));
 
   if (printer.get().supported) {
     try {
@@ -260,10 +268,14 @@ export function resetLabelSettings() {
   say('Settings reset. Your text is kept.');
 }
 
+// A label saved before barcodes has no barcode fields
+export const hasBarcode = (label) => !!(label.barcode_enabled && (label.barcode_data || '').trim());
+
 // What Python's LabelConfig gets: the label minus the app's own fields
 export function renderOptions(label) {
   const { image, ...options } = label;
   options.qr_enabled = label.qr_enabled && label.qr_data.trim() !== '';
+  options.barcode_enabled = hasBarcode(label);
   options.image_data = image ? image.data : null;
   // The web app fits text to the tape unless text_height_mm sets a letter height, so a label
   // saved by the desktop app with a fixed size in points fits too
@@ -272,7 +284,7 @@ export function renderOptions(label) {
   // custom size fits too)
   if (!TEXT_SIZES.includes(options.text_height_mm)) options.text_height_mm = null;
   options.text_height_fallback = true;
-  if (!options.text.trim() && !options.qr_enabled && !image) options.text = ' ';
+  if (!options.text.trim() && !options.qr_enabled && !options.barcode_enabled && !image) options.text = ' ';
   return options;
 }
 
@@ -297,7 +309,7 @@ export function currentItem() {
   return mode === 'bin' && bin ? { mode, bin: bin[bin.kind] } : { mode: 'text', label };
 }
 
-function itemTapeWidth(item) {
+export function itemTapeWidth(item) {
   return item.mode === 'bin' ? BIN_TAPE_MM : item.label.tape_width_mm;
 }
 
@@ -313,7 +325,7 @@ export function itemTitle(item) {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
   }
-  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : item.label.image ? 'Picture' : 'Label');
+  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : hasBarcode(item.label) ? 'Barcode' : item.label.image ? 'Picture' : 'Label');
 }
 
 // A text size preset that is too tall for the text (say 7 mm with two lines) was drawn fitted,
@@ -587,10 +599,49 @@ export async function printLabel() {
     if (result.confirmed) {
       printer.set({ state: 'ready', message: '' });
       say('Printed.');
+      recordPrinted([current.item.mode === 'bin' ? { ...current.item, font: binFont() } : current.item]);
     } else {
       say('Print sent, but the printer did not confirm completion. Check the label.', true);
     }
   });
+}
+
+// Prints a label from the history as it was, without opening it in the editor
+export async function printItem(item) {
+  if (!py || !printer.get().transport) return;
+  let result;
+  try {
+    result = await py.render_label(itemOptions(item));
+  } catch (err) {
+    say(`Couldn't draw the label: ${errorMessage(err)}`, true);
+    return;
+  }
+  if (tooLong(result.metrics)) return;
+  await printerJob(async () => {
+    const done = await printRaster(printer.get().transport, py, result.raster, {
+      required_tape_width_mm: itemTapeWidth(item),
+    }, (message) => say(message));
+    countTape(done.status, result.metrics.total_used_length_mm);
+    if (done.confirmed) {
+      printer.set({ state: 'ready', message: '' });
+      say('Printed.');
+      recordPrinted([item]);
+    } else {
+      say('Print sent, but the printer did not confirm completion. Check the label.', true);
+    }
+  });
+}
+
+// The preview of a label that is not in the editor, like one from the history
+export async function renderItem(item) {
+  const result = await py.render_label(itemOptions(item));
+  return {
+    previewUrl: URL.createObjectURL(new Blob([result.preview_png], { type: 'image/png' })),
+    dotsUrl: URL.createObjectURL(new Blob([result.dots_png], { type: 'image/png' })),
+    metrics: result.metrics,
+    tape_width_mm: itemTapeWidth(item),
+    tape_bg_color: item.mode === 'bin' ? '#FFFFFF' : item.label.tape_bg_color,
+  };
 }
 
 export function feed() {
@@ -618,7 +669,7 @@ let undoTimer = null;
 const UNDO_SECONDS = 8;
 
 const labelKey = (item) => JSON.stringify(item.mode === 'bin' ? [item.bin, item.font] : item.label);
-const sameLabel = (a, b) => a.mode === b.mode && labelKey(a) === labelKey(b);
+export const sameLabel = (a, b) => a.mode === b.mode && labelKey(a) === labelKey(b);
 export const copiesOf = (item) => Math.max(1, item.copies || 1);
 // Every printed label, copies included
 export const queueLabelCount = (queue) => queue.reduce((sum, item) => sum + copiesOf(item), 0);
@@ -655,10 +706,16 @@ async function makeThumb(item) {
 }
 
 export function addToQueue() {
-  const item = { id: nextQueueId++, ...structuredClone(currentItem()) };
-  if (item.mode === 'bin') item.font = binFont();
-  if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !item.label.image) {
-    say('Add some text, a QR code or a picture first.', true);
+  const item = currentItem();
+  return queueItem(item.mode === 'bin' ? { ...item, font: binFont() } : item);
+}
+
+// Adds a label ({mode, label} or {mode, bin, font}) to the queue, like one from the history
+export function queueItem(label) {
+  const item = { id: nextQueueId++, ...structuredClone({ mode: label.mode, label: label.label, bin: label.bin, font: label.font }) };
+  for (const key of ['label', 'bin', 'font']) if (item[key] === undefined) delete item[key];
+  if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !hasBarcode(item.label) && !item.label.image) {
+    say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
   }
   const { queue } = app.get();
@@ -785,6 +842,7 @@ export async function renderQueue() {
           queue,
           owners,
           lengths: null,  // from queue_lengths, once the queue needs splitting
+          items: queue,
         },
       });
     } catch (err) {
@@ -848,7 +906,10 @@ export async function printQueue({ whole = false } = {}) {
       required_tape_width_mm: strip.tape_width_mm,
     }, (message) => say(message));
     countTape(result.status, rendered.metrics.total_used_length_mm);
-    if (result.confirmed) printer.set({ state: 'ready', message: '' });
+    if (result.confirmed) {
+      printer.set({ state: 'ready', message: '' });
+      recordPrinted(items);
+    }
     const labels = part.to - part.from + 1;
     if (run.next + 1 < run.parts.length) {
       app.set({ queueRun: { ...run, next: run.next + 1, hidden: false } });
@@ -885,6 +946,7 @@ async function printWholeQueue() {
       printer.set({ state: 'ready', message: '' });
       say(`Printed ${strip.count} labels as one strip.`);
       app.set({ queuePrinted: strip.count });
+      recordPrinted(strip.items);
     } else {
       say(`Queue of ${strip.count} labels sent, but the printer did not confirm completion.`, true);
     }

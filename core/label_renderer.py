@@ -11,6 +11,8 @@ from typing import List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import qrcode
 
+from core import barcode
+
 from core import rich_text
 from core.font_manager import font_manager
 from core.specs import (
@@ -78,6 +80,11 @@ class LabelConfig:
     qr_data: str = ""
     qr_position: str = "left"  # "left", "right", "standalone"
     qr_scale: float = 1.0  # relative to printable height
+    barcode_enabled: bool = False
+    barcode_data: str = ""
+    barcode_show_text: bool = True  # The code in plain text under the bars
+    barcode_position: str = "left"  # "left", "right"
+    barcode_scale: float = 1.0  # relative to printable height
     
     # Image / Icon Merge
     image_path: Optional[str] = None
@@ -148,6 +155,15 @@ class LabelRenderer:
         side = max(int(target_height * scale), 8)
         return img.resize((side, side), Image.Resampling.NEAREST)
 
+    def generate_barcode_image(
+        self, data: str, target_height: int, scale: float = 1.0, show_text: bool = True,
+        font_name: str = "Arial",
+    ) -> Optional[Image.Image]:
+        """A Code 128 barcode as tall as the printable height times scale, or None."""
+        height = min(max(int(target_height * scale), 8), target_height)
+        font = font_manager.load_font(font_name, 12) if show_text else None
+        return barcode.render(data, height, show_text, font)
+
     def process_user_image(
         self, image_path: str, target_height: int, scale: float = 1.0, white_level: int = 240
     ) -> Optional[Image.Image]:
@@ -184,6 +200,7 @@ class LabelRenderer:
         self._max_text_height_mm = None
         self._text_height_fell_back = False
         self._cut_off_mm = 0.0
+        self._barcode_bad_chars = ""
         # Hardware inventory layouts are designed for 64 printable dots, so they always use 12 mm tape
         spec = self._get_tape_spec(INVENTORY_TAPE_WIDTH_MM if is_inventory else config.tape_width_mm)
         printable_h = spec["printable_height"]
@@ -244,6 +261,14 @@ class LabelRenderer:
         if config.qr_enabled and config.qr_data.strip():
             qr_img = self.generate_qr_image(config.qr_data, inner_h, config.qr_scale)
 
+        # 3b. Handle Barcode (Code 128): the bars keep their scannable width, Size sets their height
+        barcode_img = None
+        if config.barcode_enabled and config.barcode_data.strip():
+            self._barcode_bad_chars = barcode.unsupported_chars(config.barcode_data.strip())
+            barcode_img = self.generate_barcode_image(
+                config.barcode_data, inner_h, config.barcode_scale, config.barcode_show_text, config.font_name
+            )
+
         # 4. Handle Merged Image
         merged_img = None
         if config.image_path:
@@ -263,6 +288,12 @@ class LabelRenderer:
                 elements_left.append(qr_img)
             elif config.qr_position == "right":
                 elements_right.append(qr_img)
+
+        if barcode_img:
+            if config.barcode_position == "right":
+                elements_right.append(barcode_img)
+            else:
+                elements_left.append(barcode_img)
 
         if merged_img:
             if config.image_position == "left":
@@ -436,6 +467,9 @@ class LabelRenderer:
         elif self._cut_off_mm >= 0.5:
             warning = (f"The content needs {config.fixed_width_mm + self._cut_off_mm:.0f} mm, so the end is cut off "
                        f"at {config.fixed_width_mm:g} mm.")
+        elif getattr(self, "_barcode_bad_chars", ""):
+            warning = (f"A barcode can't hold {self._barcode_bad_chars}. Use plain letters, numbers "
+                       "and symbols.")
         elif getattr(self, "_last_text_overflow", False) and config.text_height_mm and not self._text_height_fell_back:
             warning = (f"Text at {config.text_height_mm:g} mm is taller than this tape prints and will be "
                        "clipped. Pick a smaller size or fewer lines.")

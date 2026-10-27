@@ -14,6 +14,7 @@ const PATHS = {
   close: html`<path d="M6 6l12 12M18 6L6 18"/>`,
   image: html`<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>`,
   qr: html`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21h.01M17.5 17.5h3.5v3.5h-3.5z"/>`,
+  barcode: html`<path d="M4 5v14M7.5 5v14M10 5v14M14 5v14M16.5 5v14M20 5v14" stroke-width="1.6"/><path d="M12 5v14M18.5 5v14" stroke-width="0.9"/>`,
   wifi: html`<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/>`,
   download: html`<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`,
   feed: html`<path d="M4 12h12M12 7l5 5-5 5M20 5v14"/>`,
@@ -44,6 +45,7 @@ const PATHS = {
   fill: html`<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1" fill="currentColor"/>`,
   heart: html`<path d="M12 20s-7-4.4-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.6-9 9-9 9z"/>`,
   github: html`<path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3.1-.4 6.4-1.5 6.4-7A5.4 5.4 0 0 0 20 4.8 5.1 5.1 0 0 0 19.9 1S18.7.7 16 2.5a13.4 13.4 0 0 0-7 0C6.3.7 5.1 1 5.1 1A5.1 5.1 0 0 0 5 4.8a5.4 5.4 0 0 0-1.5 3.8c0 5.4 3.3 6.6 6.4 7A3.4 3.4 0 0 0 9 18.1V22"/>`,
+  history: html`<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>`,
   cloud: html`<path d="M7 18h10a4 4 0 0 0 .6-8 6 6 0 0 0-11.4 1.5A3.3 3.3 0 0 0 7 18z"/>`,
 };
 
