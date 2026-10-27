@@ -4,7 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/McTobe/cube-labeler)](https://github.com/McTobe/cube-labeler/releases/latest)
 ![Platform: Windows](https://img.shields.io/badge/platform-Windows-0078D6)
 ![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 
 A desktop app for designing and printing labels on the **Brother P-touch Cube (PT-P300BT)** over Bluetooth. It shows an exact preview of the printed tape, prints several labels as one strip to save tape, has a dedicated editor for storage bin labels and comes with a library of 140 printable icons that you can add your own to.
 
@@ -182,4 +182,6 @@ Brother and P-touch are trademarks of Brother Industries, Ltd. This project is n
 
 ## License
 
-Cube Labeler is released under the [MIT License](LICENSE), except `core/ptcbp.py` and `core/ptstatus.py`. Those two files are based on [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT), which doesn't state a license, so they are not covered by MIT. See [LICENSE](LICENSE) for details.
+Cube Labeler is released under the [GNU Affero General Public License v3.0](LICENSE). You can use, change and share it, and if you share a changed version, or run one for other people as a web app, you share its source code under the same license.
+
+The exceptions are `core/ptcbp.py` and `core/ptstatus.py`. Those two files are based on [Ircama/PT-P300BT](https://github.com/Ircama/PT-P300BT), which doesn't state a license, so they are not covered by the AGPL. See [NOTICE.md](NOTICE.md) for details and the third-party parts.
