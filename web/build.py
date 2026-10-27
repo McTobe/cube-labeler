@@ -42,7 +42,8 @@ CORE_MODULES = [
 
 UI_MODULES = ["__init__.py", "templates.py"]
 
-FONTS = ["Arimo-Regular.ttf", "Arimo-Bold.ttf", "OFL.txt"]
+# Every font in web/fonts and its licence, all under the SIL Open Font License
+FONTS = sorted(name for name in os.listdir(os.path.join(WEB_DIR, "fonts")) if name.endswith((".ttf", ".txt")))
 
 MANIFEST = {
     "name": "Cube Labeler",

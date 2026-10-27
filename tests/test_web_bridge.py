@@ -255,6 +255,31 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         self.assertEqual(item["label"]["text"], "ELECTRONICS & CORDS\nShelf 2 - Row B")
         self.assertIn(item["label"]["font_name"], cube_web.font_names())
 
+    def test_starting_points_and_bin_labels_use_shipped_fonts(self):
+        from unittest import mock
+        from core.font_manager import FontManager
+        from ui.templates import BUILTIN_PRESETS, WEB_PRESETS
+        with mock.patch("core.font_manager.system_font_dirs", return_value=[]), \
+                mock.patch("core.font_manager.sys.platform", "linux"):
+            shipped = FontManager()
+        shipped.scan_font_dir(os.path.join(BASE_DIR, "web", "fonts"))
+        names = shipped.get_font_names()
+        self.assertIn(cube_web.WEB_BIN_FONT, names)
+        for family in cube_web.WEB_FONT_SUBSTITUTES.values():
+            self.assertIn(family, names)
+            self.assertIn(family + " Bold", names)
+        with mock.patch.object(cube_web, "font_names", return_value=names):
+            self.assertEqual(cube_web._web_font("Consolas Bold"), "JetBrains Mono Bold")
+            self.assertEqual(cube_web._web_font("Segoe UI"), "Inter")
+            self.assertEqual(cube_web._web_font("Arial Bold"), "Arimo Bold")
+            self.assertEqual(cube_web._web_font("Calibri"), "Arimo")
+            presets = cube_web.template_presets()
+        self.assertEqual(len(presets), len(BUILTIN_PRESETS) + len(WEB_PRESETS))
+        for preset in presets:
+            self.assertIn(preset["label"]["font_name"], names, preset["key"])
+        for preset in WEB_PRESETS.values():
+            self.assertIn(preset["config"]["font_name"], names)
+
     def test_web_template_opens_on_the_desktop(self):
         import json
         from ui.templates import config_from_dict

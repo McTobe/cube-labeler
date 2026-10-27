@@ -29,5 +29,9 @@ project until its author adds a license.
 
 ## Third-party parts
 
-- Arimo font (`web/fonts/`), under the SIL Open Font License 1.1 (`web/fonts/OFL.txt`).
+- Fonts in `web/fonts/`, all under the SIL Open Font License 1.1: Arimo (`OFL.txt`), and Atkinson
+  Hyperlegible, Barlow Condensed, Inter, JetBrains Mono, Lexend, Nunito and Zilla Slab (each with its
+  own `OFL-<name>.txt`). Arimo Medium and the static Inter, JetBrains Mono, Lexend and Nunito files
+  are made from the upstream variable fonts, and all but Arimo Regular and Bold are cut down to
+  Latin characters.
 - Preact and htm (`web/vendor/`), under the MIT License (see `web/vendor/README.md`).

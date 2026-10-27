@@ -19,6 +19,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from core.font_manager import font_manager
 from core.specs import DOT_PITCH_MM, INVENTORY_TAPE_WIDTH_MM, get_tape_spec
 
+# The font for all text on bin labels. The web version has no Arial and sets its own
+# Arimo Medium here (see web/cube_web.py).
+BIN_FONT = "Arial Bold"
+
 # Icon library pictures used for drive icons (unless a label asks for the simple drawn ones)
 DRIVE_LIBRARY_ICONS = {
     "internal_hex": "hex_socket.png",
@@ -167,13 +171,14 @@ class InventoryRenderer:
         max_h: int,
         start_pt: int = 22,
         min_pt: int = 9,
-        font_name: str = "Arial Bold",
+        font_name: Optional[str] = None,
         scale: int = 4,
     ) -> ImageFont.FreeTypeFont:
         """
         Dynamically finds the largest font size (between start_pt and min_pt)
         that fits within (max_w, max_h).
         """
+        font_name = font_name or BIN_FONT
         if not text:
             return font_manager.load_font(font_name, start_pt * scale)
         for pt in range(start_pt, min_pt - 1, -1):
@@ -443,7 +448,7 @@ class InventoryRenderer:
             pad_sides = int(10 * scale)
 
             if has_size_txt:
-                font = font_manager.load_font("Arial Bold", 22 * scale)
+                font = font_manager.load_font(BIN_FONT, 22 * scale)
                 bbox = font.getbbox(txt)
                 txt_w = bbox[2] - bbox[0]
                 needed_w = txt_w + gap + icon_w + pad_sides
@@ -507,12 +512,12 @@ class InventoryRenderer:
     ):
         has_std = bool(cfg.standard_line1.strip())
         if has_std:
-            f_len = font_manager.load_font("Arial Bold", 24 * scale)
+            f_len = font_manager.load_font(BIN_FONT, 24 * scale)
             draw.text((x0 + w * 0.45, y0 + h * 0.35), cfg.length_single, font=f_len, fill=0, anchor="mm")
-            f_sub = font_manager.load_font("Arial Bold", 12 * scale)
+            f_sub = font_manager.load_font(BIN_FONT, 12 * scale)
             draw.text((x0 + w * 0.45, y0 + h * 0.75), f"{cfg.standard_line1} {cfg.standard_line2}".strip(), font=f_sub, fill=0, anchor="mm")
         else:
-            f_len = font_manager.load_font("Arial Bold", 28 * scale)
+            f_len = font_manager.load_font(BIN_FONT, 28 * scale)
             draw.text((x0 + w // 2, y0 + h // 2), cfg.length_single, font=f_len, fill=0, anchor="mm")
 
     def _render_fastener_dual(
@@ -522,17 +527,17 @@ class InventoryRenderer:
         texts = (cfg.length_dual_1, cfg.length_dual_2)
         room = w * 0.44 - 8 * scale
         size = 22 * scale
-        f_len = font_manager.load_font("Arial Bold", size)
+        f_len = font_manager.load_font(BIN_FONT, size)
         while size > 10 * scale and max(draw.textlength(t, font=f_len) for t in texts) > room:
             size -= scale
-            f_len = font_manager.load_font("Arial Bold", size)
+            f_len = font_manager.load_font(BIN_FONT, size)
         draw.text((x0 + w * 0.28, y0 + h // 2), cfg.length_dual_1, font=f_len, fill=0, anchor="mm")
         draw.text((x0 + w * 0.72, y0 + h // 2), cfg.length_dual_2, font=f_len, fill=0, anchor="mm")
 
     def _render_fastener_quad(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int, line_w: int
     ):
-        f_grid = font_manager.load_font("Arial Bold", 15 * scale)
+        f_grid = font_manager.load_font(BIN_FONT, 15 * scale)
         draw.text((x0 + w * 0.28, y0 + h * 0.28), cfg.length_quad_1, font=f_grid, fill=0, anchor="mm")
         draw.text((x0 + w * 0.72, y0 + h * 0.28), cfg.length_quad_2, font=f_grid, fill=0, anchor="mm")
         draw.text((x0 + w * 0.28, y0 + h * 0.72), cfg.length_quad_3, font=f_grid, fill=0, anchor="mm")
@@ -541,7 +546,7 @@ class InventoryRenderer:
     def _render_fastener_assortment(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int
     ):
-        f_assort = font_manager.load_font("Arial Bold", 14 * scale)
+        f_assort = font_manager.load_font(BIN_FONT, 14 * scale)
         draw.text((x0 + w // 2, y0 + h * 0.30), cfg.assortment_line1, font=f_assort, fill=0, anchor="mm")
         draw.text((x0 + w // 2, y0 + h * 0.70), cfg.assortment_line2, font=f_assort, fill=0, anchor="mm")
 

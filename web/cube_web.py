@@ -21,12 +21,17 @@ IMAGE_DIR = os.path.join(tempfile.gettempdir(), "cube-labeler-images")
 
 _renderer = None
 
+# Bin labels use Arial Bold on the desktop; Arimo Bold looked too heavy and Arimo Regular too thin
+WEB_BIN_FONT = "Arimo Medium"
+
 
 def _get_renderer():
     """Imports the renderer (and Pillow) on first use, so the printer functions work without it."""
     global _renderer
     if _renderer is None:
+        from core import inventory_renderer
         from core.label_renderer import LabelRenderer
+        inventory_renderer.BIN_FONT = WEB_BIN_FONT
         _renderer = LabelRenderer()
     return _renderer
 
@@ -463,13 +468,31 @@ def edit_icon(original: Any, edit: Any = None, touch: Any = None, view: int = 48
 
 # --- Templates: the desktop app's template files, read and written by the web version ---
 
+# Fonts the web version ships in place of Windows fonts that templates name
+WEB_FONT_SUBSTITUTES = {
+    "Consolas": "JetBrains Mono",
+    "Courier New": "JetBrains Mono",
+    "Segoe UI": "Inter",
+    "Verdana": "Inter",
+    "Tahoma": "Inter",
+}
+
+
 def _web_font(name: Any) -> str:
-    """A font this browser has for a template's font: the same one, else Arimo (bold if it was)."""
+    """
+    A font this browser has for a template's font: the same one, a shipped look-alike, else
+    Arimo (bold if it was).
+    """
     names = font_names()
     if name in names:
         return name
-    bold = "Arimo Bold" if "bold" in str(name or "").lower() and "Arimo Bold" in names else None
-    return bold or ("Arimo" if "Arimo" in names else names[0])
+    text = str(name or "")
+    bold = " Bold" if "bold" in text.lower() else ""
+    family = WEB_FONT_SUBSTITUTES.get(text[:-5] if text.lower().endswith(" bold") else text, "Arimo")
+    for candidate in (family + bold, "Arimo" + bold, "Arimo"):
+        if candidate in names:
+            return candidate
+    return names[0]
 
 
 def _b64(data: Optional[bytes]) -> Optional[str]:
@@ -577,10 +600,10 @@ def template_to_desktop(item: Any) -> str:
 
 
 def template_presets() -> List[Dict[str, Any]]:
-    """The desktop app's starting points: [{"key", "name", "description", "mode", "label"}]."""
-    from ui.templates import BUILTIN_PRESETS
+    """The starting points: [{"key", "name", "description", "mode", "label"}]."""
+    from ui.templates import BUILTIN_PRESETS, WEB_PRESETS
     out = []
-    for key, preset in BUILTIN_PRESETS.items():
+    for key, preset in {**BUILTIN_PRESETS, **WEB_PRESETS}.items():
         item = template_from_desktop(preset["config"])
         out.append({"key": key, "name": preset["name"], "description": preset["description"], **item})
     return out

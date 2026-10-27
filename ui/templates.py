@@ -121,6 +121,91 @@ BUILTIN_PRESETS: Dict[str, dict] = {
 }
 
 
+# More starting points for the web version, which ships these fonts (web/fonts). The desktop
+# app keeps the six above.
+WEB_PRESETS: Dict[str, dict] = {
+    "Network Port": {
+        "name": "Network Port Tag",
+        "description": "Switch and port number for patch cables and wall sockets.",
+        "config": {
+            "text": "**SW1 - PORT 12**\\nOffice desk",
+            "font_name": "JetBrains Mono",
+            "auto_fit_font": True,
+            "alignment": "center",
+            "line_spacing": 1.1,
+            "h_padding": 10,
+            "frame": "rounded",
+            "tape_width_mm": 12,
+        }
+    },
+    "Fuse Box": {
+        "name": "Fuse Box / Breaker",
+        "description": "Breaker number on the left, what it powers on the right.",
+        "config": {
+            "text": "# **F3**\\n---\\n**KITCHEN**\\nOutlets - 16 A",
+            "font_name": "Barlow Condensed",
+            "auto_fit_font": True,
+            "alignment": "center",
+            "line_spacing": 1.1,
+            "h_padding": 8,
+            "tape_width_mm": 12,
+        }
+    },
+    "Freezer Food": {
+        "name": "Freezer / Leftovers",
+        "description": "What's in the box and when it was frozen.",
+        "config": {
+            "text": "**CHILI CON CARNE**\\n-# Frozen 2026-10-27 - 4 portions",
+            "font_name": "Nunito",
+            "auto_fit_font": True,
+            "alignment": "center",
+            "line_spacing": 1.15,
+            "h_padding": 10,
+            "frame": "rounded",
+            "tape_width_mm": 12,
+        }
+    },
+    "Warning": {
+        "name": "Warning Sign",
+        "description": "White-on-black warning with a short instruction.",
+        "config": {
+            "text": "==CAUTION==\\n**230 V** - switch off first",
+            "font_name": "Lexend",
+            "auto_fit_font": True,
+            "alignment": "center",
+            "line_spacing": 1.15,
+            "h_padding": 10,
+            "tape_width_mm": 12,
+        }
+    },
+    "Charger": {
+        "name": "Charger / Device",
+        "description": "Easy-to-read tag for chargers, power supplies and cables.",
+        "config": {
+            "text": "**USB-C CHARGER**\\n65 W - Living room",
+            "font_name": "Atkinson Hyperlegible",
+            "auto_fit_font": True,
+            "alignment": "center",
+            "line_spacing": 1.15,
+            "h_padding": 10,
+            "tape_width_mm": 12,
+        }
+    },
+    "Plant Marker": {
+        "name": "Plant Marker",
+        "description": "Plant name with the variety and when it was sown.",
+        "config": {
+            "text": "**Tomato**\\n*Sungold* - sown April 2026",
+            "font_name": "Zilla Slab",
+            "auto_fit_font": True,
+            "alignment": "center",
+            "line_spacing": 1.15,
+            "h_padding": 10,
+            "tape_width_mm": 12,
+        }
+    },
+}
+
 def get_preset_names() -> List[str]:
     return list(BUILTIN_PRESETS.keys())
 
