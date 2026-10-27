@@ -24,6 +24,11 @@ export const DEFAULT_LABEL = {
   qr_data: '',
   qr_position: 'left',
   qr_scale: 0.95,
+  barcode_enabled: false,
+  barcode_data: '',
+  barcode_show_text: true,
+  barcode_position: 'left',
+  barcode_scale: 1.0,
   image: null,  // {name, data: Uint8Array}
   image_position: 'left',
   image_scale: 1.0,
@@ -248,10 +253,14 @@ export function resetLabelSettings() {
   say('Settings reset. Your text is kept.');
 }
 
+// A label saved before barcodes has no barcode fields
+export const hasBarcode = (label) => !!(label.barcode_enabled && (label.barcode_data || '').trim());
+
 // What Python's LabelConfig gets: the label minus the app's own fields
 export function renderOptions(label) {
   const { image, ...options } = label;
   options.qr_enabled = label.qr_enabled && label.qr_data.trim() !== '';
+  options.barcode_enabled = hasBarcode(label);
   options.image_data = image ? image.data : null;
   // The web app fits text to the tape unless text_height_mm sets a letter height, so a label
   // saved by the desktop app with a fixed size in points fits too
@@ -260,7 +269,7 @@ export function renderOptions(label) {
   // custom size fits too)
   if (!TEXT_SIZES.includes(options.text_height_mm)) options.text_height_mm = null;
   options.text_height_fallback = true;
-  if (!options.text.trim() && !options.qr_enabled && !image) options.text = ' ';
+  if (!options.text.trim() && !options.qr_enabled && !options.barcode_enabled && !image) options.text = ' ';
   return options;
 }
 
@@ -301,7 +310,7 @@ export function itemTitle(item) {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
   }
-  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : item.label.image ? 'Picture' : 'Label');
+  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : hasBarcode(item.label) ? 'Barcode' : item.label.image ? 'Picture' : 'Label');
 }
 
 // A text size preset that is too tall for the text (say 7 mm with two lines) was drawn fitted,
@@ -612,8 +621,8 @@ async function makeThumb(item) {
 export function addToQueue() {
   const item = { id: nextQueueId++, ...structuredClone(currentItem()) };
   if (item.mode === 'bin') item.font = binFont();
-  if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !item.label.image) {
-    say('Add some text, a QR code or a picture first.', true);
+  if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !hasBarcode(item.label) && !item.label.image) {
+    say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
   }
   const { queue } = app.get();

@@ -638,8 +638,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .text-card .card-head { gap: 12px; }
 .fmt-text { font-size: 0.85rem; }
 
-/* The extras next to the label text (QR code, picture) as tabs, each holding what goes in at
-   the top and where it sits and how big at the bottom */
+/* The extras next to the label text (QR code, barcode, picture) as tabs, each holding what goes
+   in at the top and where it sits and how big at the bottom */
+.insert-tabs { container-type: inline-size; }
 .insert-tab-bar {
   display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; padding: 3px;
   background: var(--raised); border: 1px solid var(--border); border-radius: 10px;
@@ -650,6 +651,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 @media (min-width: 900px) { .insert-tab-bar button { min-height: 36px; } }
 .insert-tab-bar button.on { background: var(--card); box-shadow: var(--shadow); font-weight: 600; color: var(--accent); }
+/* Three names don't fit a narrow half card on one line each, so the tabs show just their icons */
+@container (max-width: 300px) { .insert-tab-bar .tab-name { display: none; } }
+.tab-name { white-space: nowrap; }
 .on-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .insert-panel { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
 .insert-group > :first-child { margin-top: 14px; }

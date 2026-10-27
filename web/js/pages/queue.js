@@ -10,7 +10,7 @@ import { binSummary } from './bin.js';
 import {
   app, boot, printer, connectPrinter, itemTitle, moveQueueItem, removeQueueItem, clearQueue,
   editQueueItem, printQueue, keepPrintedQueue, showingQueue, savePicture, setQueueCopies,
-  undoQueueRemoval, copiesOf, queueLabelCount, textLines, BIN_FONT,
+  undoQueueRemoval, copiesOf, queueLabelCount, textLines, hasBarcode, BIN_FONT,
 } from '../app.js';
 
 function itemDetail(item) {
@@ -19,7 +19,7 @@ function itemDetail(item) {
   const l = item.label;
   // The lines after the title tell labels with the same first line apart
   const more = textLines(l).slice(1).join(' · ');
-  return `${more ? `${more} · ` : ''}${l.tape_width_mm} mm tape${l.fixed_width_mm ? `, ${l.fixed_width_mm} mm long` : ''}${l.qr_enabled && l.qr_data ? ', QR code' : ''} · ${l.font_name}`;
+  return `${more ? `${more} · ` : ''}${l.tape_width_mm} mm tape${l.fixed_width_mm ? `, ${l.fixed_width_mm} mm long` : ''}${l.qr_enabled && l.qr_data ? ', QR code' : ''}${hasBarcode(l) ? ', barcode' : ''} · ${l.font_name}`;
 }
 
 // Dragging a row by its handle: where it started, where it would land and how far it moved

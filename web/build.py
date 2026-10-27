@@ -26,6 +26,7 @@ PAGE_DIRS = ["js", "vendor"]
 CORE_MODULES = [
     "__init__.py",
     "ai_generator.py",
+    "barcode.py",
     "config.py",
     "font_manager.py",
     "icon_editor.py",
