@@ -280,6 +280,21 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         for preset in WEB_PRESETS.values():
             self.assertIn(preset["config"]["font_name"], names)
 
+    def test_bin_font_from_settings(self):
+        from unittest import mock
+        from core import inventory_renderer
+        part = cube_web.bin_defaults("en")["component"]
+        try:
+            with mock.patch.object(cube_web, "font_names", return_value=["Arimo", "Inter Bold"]):
+                cube_web._label_config({"bin": part, "bin_font": "Inter Bold"})
+                self.assertEqual(inventory_renderer.BIN_FONT, "Inter Bold")
+                cube_web._label_config({"bin": part, "bin_font": "Removed Font"})
+                self.assertEqual(inventory_renderer.BIN_FONT, cube_web.WEB_BIN_FONT)
+                cube_web._label_config({"bin": part})
+                self.assertEqual(inventory_renderer.BIN_FONT, cube_web.WEB_BIN_FONT)
+        finally:
+            inventory_renderer.BIN_FONT = "Arial Bold"
+
     def test_web_template_opens_on_the_desktop(self):
         import json
         from ui.templates import config_from_dict

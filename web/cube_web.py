@@ -21,17 +21,15 @@ IMAGE_DIR = os.path.join(tempfile.gettempdir(), "cube-labeler-images")
 
 _renderer = None
 
-# Bin labels use Arial Bold on the desktop; Arimo Bold looked too heavy and Arimo Regular too thin
-WEB_BIN_FONT = "Arimo Medium"
+# Bin labels use Arial Bold on the desktop; here Arimo SemiBold, unless Settings picks another
+WEB_BIN_FONT = "Arimo SemiBold"
 
 
 def _get_renderer():
     """Imports the renderer (and Pillow) on first use, so the printer functions work without it."""
     global _renderer
     if _renderer is None:
-        from core import inventory_renderer
         from core.label_renderer import LabelRenderer
-        inventory_renderer.BIN_FONT = WEB_BIN_FONT
         _renderer = LabelRenderer()
     return _renderer
 
@@ -145,11 +143,17 @@ def _bin_config(data: Dict[str, Any]):
     return cfg
 
 
+def _use_bin_font(name: Any) -> None:
+    """Draws bin labels in the font from Settings, or the default one if it isn't here (anymore)."""
+    from core import inventory_renderer
+    inventory_renderer.BIN_FONT = name if name in font_names() else WEB_BIN_FONT
+
+
 def _label_config(options: Any):
     """
     LabelConfig from the page's options: LabelConfig field names (text, font_name,
     tape_width_mm, auto_fit_font, ...), a picture as bytes in image_data, and a bin label in
-    "bin" (see _bin_config). Unknown keys are ignored.
+    "bin" (see _bin_config) with its font from Settings in "bin_font". Unknown keys are ignored.
     """
     from core.label_renderer import LabelConfig
     from core.specs import INVENTORY_TAPE_WIDTH_MM
@@ -160,6 +164,7 @@ def _label_config(options: Any):
     if raw.get("image_data") is not None:
         opts["image_path"] = _image_path(raw["image_data"])
     if raw.get("bin") is not None:
+        _use_bin_font(raw.get("bin_font"))
         opts["inventory_config"] = _bin_config(raw["bin"])
         opts["tape_width_mm"] = INVENTORY_TAPE_WIDTH_MM
     return LabelConfig(**opts)

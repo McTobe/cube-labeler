@@ -48,7 +48,10 @@ export const DEFAULT_SETTINGS = {
   bin_label_mm: null,  // the user's own bin label length for Reset, instead of 32 mm
   default_tape_mm: null,  // tape width a reset text label goes back to, instead of 12 mm
   default_font: null,  // font a reset text label goes back to, instead of Arimo
+  bin_font: null,  // font for all text on bin labels, instead of BIN_FONT
 };
+
+export const BIN_FONT = 'Arimo SemiBold';
 
 export const MAX_TAPE_MM = 499;
 export const BIN_TAPE_MM = 12;
@@ -187,6 +190,10 @@ export async function updateSettings(change) {
   app.set({ settings });
   storage.save('settings', settings);
   if ('theme' in change) applyTheme(settings.theme);
+  if ('bin_font' in change) {
+    queueRenderStale = true;
+    if (app.get().mode === 'bin') renderNow();
+  }
 }
 
 // --- Editing and rendering -----------------------------------------------------------------
@@ -253,7 +260,7 @@ export function renderOptions(label) {
 
 function binOptions(cfg) {
   const { icon, ...rest } = cfg;
-  return { bin: { ...rest, icon_data: icon ? icon.data : null } };
+  return { bin: { ...rest, icon_data: icon ? icon.data : null }, bin_font: app.get().settings.bin_font };
 }
 
 // A queue item or the label being edited, as render options for Python
