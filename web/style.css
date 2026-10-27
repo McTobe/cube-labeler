@@ -638,6 +638,24 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .text-card .card-head { gap: 12px; }
 .fmt-text { font-size: 0.85rem; }
 
+/* The extras next to the label text (QR code, picture) as tabs, each holding what goes in at
+   the top and where it sits and how big at the bottom */
+.insert-tab-bar {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; padding: 3px;
+  background: var(--raised); border: 1px solid var(--border); border-radius: 10px;
+}
+.insert-tab-bar button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 32px;
+  border: none; border-radius: 8px; background: none; font-size: 0.92rem; color: var(--muted);
+}
+@media (min-width: 900px) { .insert-tab-bar button { min-height: 36px; } }
+.insert-tab-bar button.on { background: var(--card); box-shadow: var(--shadow); font-weight: 600; color: var(--accent); }
+.on-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.insert-panel { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
+.insert-group > :first-child { margin-top: 14px; }
+.insert-group .row > .secondary { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.insert-card { padding-top: 14px; }
+
 .picture-row { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; }
 .picture-thumb {
   width: 52px;
@@ -698,6 +716,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   /* The text box takes the room down to the marker tips, at least about four lines */
   .label-preview-col .text-card textarea { flex: 1; min-height: calc(4 * 1.5em + 22px); resize: none; }
   .label-preview-col .length-grid.quad { grid-template-columns: repeat(4, 1fr); }
+  /* The text card splits in half: the text, a thin line, then the extras in tabs */
+  .text-split { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; }
+  .text-col, .insert-col { display: flex; flex-direction: column; min-width: 0; }
+  .text-col { padding-right: 20px; }
+  .insert-col { padding-left: 20px; border-left: 1px solid var(--border); }
+  .insert-tabs, .insert-panel { flex: 1; display: flex; flex-direction: column; }
+  .insert-panel { justify-content: space-between; }
+}
+/* With half the card for the text, the marker tips only fit on a big window; the help button has them too */
+@media (min-width: 900px) and (max-width: 1599px) {
+  .text-col .marker-tips, .text-col .wide-text, .text-col .size-mark + .fmt-text { display: none; }
+  .text-col .format-bar { gap: 4px; }
 }
 
 /* --- Sheets (dialogs) ---------------------------------------------------------------------- */

@@ -13,6 +13,8 @@ const PATHS = {
   more: html`<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>`,
   close: html`<path d="M6 6l12 12M18 6L6 18"/>`,
   image: html`<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>`,
+  qr: html`<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v.01M14 21h.01M17.5 17.5h3.5v3.5h-3.5z"/>`,
+  wifi: html`<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/>`,
   download: html`<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>`,
   feed: html`<path d="M4 12h12M12 7l5 5-5 5M20 5v14"/>`,
   help: html`<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>`,
