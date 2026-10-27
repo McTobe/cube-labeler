@@ -14,7 +14,7 @@ import { app, start, pageChanged, queueLabelCount } from './app.js';
 import { useStore } from './state.js';
 import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive, driveReady } from './gdrive.js';
-import { APP_VERSION } from './version.js';
+import { APP_VERSION, BUILD_CHANNEL, BUILD_COMMIT } from './version.js';
 
 // Marks the page while a phone keyboard is up for a text field, so the page can make room for
 // it. The keyboard shrinks the window (interactive-widget in index.html); a window that is just
@@ -101,8 +101,11 @@ function App() {
       <header class="topbar">
         <h1>${page.id === 'label' ? html`<span class="brand-inline">Cube Labeler</span><span class="page-name">Label</span>` : page.title}</h1>
         <span class="top-chips">
-          <a class="printer-chip link-chip wide-only" href=${`${REPO_URL}/releases`} target="_blank" rel="noopener"
-            title="What's new in each version">v${APP_VERSION}</a>
+          ${BUILD_CHANNEL
+            ? html`<a class="printer-chip link-chip wide-only" href=${`${REPO_URL}/commit/${BUILD_COMMIT}`} target="_blank" rel="noopener"
+                title=${`Next build from main, commit ${BUILD_COMMIT}`}>v${APP_VERSION}<span class="version-badge">${BUILD_CHANNEL}</span></a>`
+            : html`<a class="printer-chip link-chip wide-only" href=${`${REPO_URL}/releases`} target="_blank" rel="noopener"
+                title="What's new in each version">v${APP_VERSION}</a>`}
           <a class="printer-chip link-chip wide-only" href=${REPO_URL} target="_blank" rel="noopener" title="Cube Labeler on GitHub">
             <${Icon} name="github" size=${17} /><span class="chip-label">GitHub</span></a>
           <a class="printer-chip link-chip support-chip wide-only" href=${KOFI_URL} target="_blank" rel="noopener"

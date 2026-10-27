@@ -152,7 +152,7 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 | `drive_auth.py` | The Docker image's sign-in helper, which keeps people signed in to Google Drive (see `docs/google-sign-in.md`). |
 | `about.html`, `privacy.html` | The About page (a plain page that explains the app, the homepage on Google's consent screen) and the privacy policy. |
 | `docker/` | The Docker image's nginx config and the script that starts the sign-in helper. |
-| `js/version.js` | The version number shown in Settings (`APP_VERSION`), bumped for each release. |
+| `js/version.js` | The version number shown in Settings (`APP_VERSION`), bumped for each release. `build.py` fills in `BUILD_CHANNEL` and `BUILD_COMMIT` from the `CUBE_BUILD_CHANNEL` and `CUBE_BUILD_COMMIT` environment variables; images built from main set them, so the app shows a "next" badge with the commit on hover. |
 | `serve.py` | Builds the site and serves it on this computer and the local network (`run_web.bat` runs it). |
 | `build.py` | Packs the page, the needed `core/` modules, `cube_web.py`, the fonts and the icons into `web/dist/`; the app icons are made from `assets/icon.png`. |
 | `fonts/` | Fonts under the SIL Open Font License: Arimo (Arial-compatible; SemiBold is the standard bin label font, set in Settings) plus everyday (Atkinson Hyperlegible, Barlow Condensed, Bebas Neue, Inter, JetBrains Mono, Lexend, Montserrat, Nunito, Open Sans, Oswald, Roboto), playful (Caveat, Comic Neue, Fredoka, Pacifico, Patrick Hand) and classic (Cinzel, EB Garamond, Great Vibes, Zilla Slab) fonts, each with its licence file. Browsers can't hand system fonts to Python, so the app ships its own; **Add font** loads more. |

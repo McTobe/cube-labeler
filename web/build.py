@@ -148,6 +148,20 @@ def build_service_worker() -> None:
         f.write(source)
 
 
+def stamp_build_info() -> None:
+    """Writes the build channel and commit (CUBE_BUILD_CHANNEL, CUBE_BUILD_COMMIT) into js/version.js."""
+    path = os.path.join(DIST_DIR, "js", "version.js")
+    with open(path, encoding="utf-8") as f:
+        source = f.read()
+    for name, env in (("BUILD_CHANNEL", "CUBE_BUILD_CHANNEL"), ("BUILD_COMMIT", "CUBE_BUILD_COMMIT")):
+        value = os.environ.get(env, "").strip()
+        if name == "BUILD_COMMIT":
+            value = value[:7]  # the short id, like GitHub shows
+        source = source.replace(f"export const {name} = '';", f"export const {name} = {json.dumps(value)};")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(source)
+
+
 def empty_dist() -> None:
     """
     Removes the files of the last build but keeps its folders: a server running from dist/
@@ -171,6 +185,7 @@ def main() -> int:
         shutil.copy2(os.path.join(WEB_DIR, name), DIST_DIR)
     for name in PAGE_DIRS:
         shutil.copytree(os.path.join(WEB_DIR, name), os.path.join(DIST_DIR, name), dirs_exist_ok=True)
+    stamp_build_info()
     build_core_zip(os.path.join(DIST_DIR, "cube_core.zip"))
     build_icons()
     build_icon_library()
