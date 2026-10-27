@@ -1352,3 +1352,34 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .font-list .font-sample { font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .font-list .font-note { flex: none; font-size: 0.8rem; color: var(--muted); }
 
+
+/* --- Tape counter (js/tape.js) ------------------------------------------------------------- */
+
+.printer-chip.low-tape { background: var(--warn-bg); border-color: var(--warn); }
+.tape-roll {
+  margin: 14px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--raised);
+}
+.tape-roll.low { background: var(--warn-bg); border-color: var(--warn); }
+.tape-roll-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.tape-roll-head h3 { margin: 0; font-size: 1rem; }
+.tape-roll .hint { margin: 8px 0 0; }
+.tape-roll .button-row { margin-bottom: 0; }
+.tape-left { margin: 8px 0 6px; color: var(--muted); }
+.tape-left b { font-size: 1.6rem; color: var(--text); margin-right: 4px; font-variant-numeric: tabular-nums; }
+.tape-bar { height: 8px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.tape-bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.tape-roll.low .tape-bar span { background: var(--warn); }
+.tape-sheet p { margin: 0 0 12px; }
+.tape-sheet .field { margin-bottom: 8px; }
+.tape-sheet p.hint { margin-top: -4px; }
+input.tape-number { width: 160px; }
+.tape-plan p { margin: 0 0 8px; }
+.tape-plan.short { background: var(--warn-bg); border-color: var(--warn); }
+.tape-parts { margin: 0 0 8px; padding-left: 22px; }
+.tape-parts li { margin-bottom: 4px; }
+.tape-plan .button-row { margin-bottom: 0; }
+@media (max-width: 480px) { .chip-tape { display: none; } }

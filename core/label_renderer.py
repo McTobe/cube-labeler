@@ -332,6 +332,42 @@ class LabelRenderer:
 
         return img_canvas, spec, print_border, printable_h, canvas_h, effective_size
 
+    def _single_pad(self, config: LabelConfig) -> int:
+        """
+        Blank dots on each side of a label printed on its own. A label gets the same half-gap
+        of tape as a label in a batch, so single and queued prints look alike. Bin labels are
+        drawn border to border, so without cut lines they still get a little blank tape on
+        each side.
+        """
+        if config.cut_line:
+            return BATCH_GAP_DOTS // 2
+        if getattr(config, "inventory_config", None) is not None:
+            return int(round(SINGLE_BIN_PADDING_MM / self.DOT_PITCH_MM))
+        return 0
+
+    def tape_lengths(self, configs: List[LabelConfig], gap_dots: int = BATCH_GAP_DOTS) -> dict:
+        """
+        What it takes to work out the tape any run of these labels uses, without drawing the
+        strips: each label's width in dots in a batch and on its own, the gap between batched
+        labels and the blank tape at a batch's two ends. A run of n >= 2 labels prints
+        sum(widths) + gap * (n - 1) + ends dots, one label prints its single width, and every
+        print adds the lead of tape before it (all as render_batch and render count them).
+        """
+        widths, singles = [], []
+        for cfg in configs:
+            canvas = self._render_base_canvas(cfg)[0]
+            widths.append(canvas.width)
+            singles.append(canvas.width + 2 * self._single_pad(cfg))
+        return {
+            "widths": widths,
+            "singles": singles,
+            "gap": gap_dots,
+            "ends": 2 * (gap_dots // 2),
+            "dot_mm": self.DOT_PITCH_MM,
+            "lead_mm": TAPE_LEAD_MM,
+            "max_mm": self.MAX_TOTAL_LENGTH_MM,
+        }
+
     def render(
         self, config: LabelConfig
     ) -> Tuple[Image.Image, Image.Image, bytes, LabelMetrics]:
@@ -343,14 +379,7 @@ class LabelRenderer:
             self._render_base_canvas(config)
         )
 
-        # A label gets the same half-gap of tape as a label in a batch, so single and
-        # queued prints look alike. Bin labels are drawn border to border, so without
-        # cut lines they still get a little blank tape on each side.
-        pad = 0
-        if config.cut_line:
-            pad = BATCH_GAP_DOTS // 2
-        elif getattr(config, "inventory_config", None) is not None:
-            pad = int(round(SINGLE_BIN_PADDING_MM / self.DOT_PITCH_MM))
+        pad = self._single_pad(config)
         if pad:
             padded = Image.new("RGB", (img_canvas.width + 2 * pad, img_canvas.height), "white")
             padded.paste(img_canvas, (pad, 0))

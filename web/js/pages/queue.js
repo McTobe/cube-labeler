@@ -7,10 +7,13 @@ import { Menu } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
 import { binSummary } from './bin.js';
+import { NewRollSheet } from '../printer-ui.js';
+import { formatTape } from '../tape.js';
 import {
   app, boot, printer, connectPrinter, itemTitle, moveQueueItem, removeQueueItem, clearQueue,
   editQueueItem, printQueue, keepPrintedQueue, showingQueue, savePicture, setQueueCopies,
-  undoQueueRemoval, copiesOf, queueLabelCount, textLines, BIN_FONT,
+  undoQueueRemoval, copiesOf, queueLabelCount, textLines, BIN_FONT, MAX_TAPE_MM, checkStatus,
+  hideQueueRun, stopQueueRun,
 } from '../app.js';
 
 function itemDetail(item) {
@@ -74,8 +77,74 @@ function summary(count, render) {
   return html`${parts.join(' · ')}<br />${saving}`;
 }
 
+const labelRange = (part) => (part.from === part.to ? `label ${part.from + 1}` : `labels ${part.from + 1} to ${part.to + 1}`);
+const partSize = (part) => formatTape(part.mm);
+
+// The queue needs more than one print: longer than the printer's limit, or than the roll's
+// tape left. Says how it splits, and prints it in parts or (when it fits one print) anyway.
+function PlanCard({ plan, busy, onNewRoll }) {
+  const { parts, long, needed, left } = plan;
+  const short = left !== null && needed > left;
+  const anyway = !long && html`<button class="secondary" disabled=${busy} onClick=${() => printQueue({ whole: true })}>Print it all anyway</button>`;
+  if (parts[0].newRoll) {
+    return html`<section class="card tape-plan short">
+      <h2 class="card-title">Not enough tape for the first label</h2>
+      <p>This strip needs about <b>${formatTape(needed)}</b>, and the roll has about <b>${formatTape(left)}</b> left.
+        That is not enough for the first label, so load a new roll first.</p>
+      <div class="button-row">
+        <button class="primary" disabled=${busy} onClick=${onNewRoll}>New roll loaded, print</button>
+        ${anyway}
+      </div>
+    </section>`;
+  }
+  const when = (part, i) => {
+    if (i === 0) return 'Prints now.';
+    if (part.newRoll) return 'Prints after you load a new roll.';
+    return `Prints after part ${i}.`;
+  };
+  return html`<section class=${`card tape-plan${short ? ' short' : ''}`}>
+    <h2 class="card-title">${short ? 'Not enough tape for the whole queue' : 'Too long for one print'}</h2>
+    <p>${short
+      ? html`This strip needs about <b>${formatTape(needed)}</b>, and the roll has about <b>${formatTape(left)}</b> left.`
+      : html`This strip needs about <b>${formatTape(needed)}</b>, and the printer prints up to ${formatTape(MAX_TAPE_MM)} at a time.`}</p>
+    <ol class="tape-parts">
+      ${parts.map((part, i) => html`<li><b>Part ${i + 1}:</b> ${labelRange(part)}, ${partSize(part)}. ${when(part, i)}</li>`)}
+    </ol>
+    <p class="hint">Labels are never cut in half. The parts are split at a cut line.</p>
+    <div class="button-row">
+      <button class="primary" disabled=${busy} onClick=${() => printQueue()}>Print in ${parts.length} parts</button>
+      ${anyway}
+    </div>
+  </section>`;
+}
+
+// Between two parts: what to do before the next one prints
+function RunCard({ run, width, busy, onNewRoll }) {
+  const part = run.parts[run.next];
+  const n = run.next + 1;
+  if (part.newRoll) {
+    return html`<section class="card tape-plan">
+      <h2 class="card-title">Part ${run.next} printed. Load a new roll</h2>
+      <p>Put a new ${width} mm roll in the printer, then print part ${n}: ${labelRange(part)}, ${partSize(part)}.</p>
+      <div class="button-row">
+        <button class="primary" disabled=${busy} onClick=${onNewRoll}>New roll loaded, print part ${n}</button>
+        <button class="secondary" onClick=${hideQueueRun}>Later</button>
+      </div>
+    </section>`;
+  }
+  return html`<section class="card tape-plan">
+    <h2 class="card-title">Part ${run.next} of ${run.parts.length} printed</h2>
+    <p>Cut off the strip, then print part ${n}: ${labelRange(part)}, ${partSize(part)}.</p>
+    <div class="button-row">
+      <button class="primary" disabled=${busy} onClick=${() => printQueue()}>Print part ${n}</button>
+      <button class="secondary" onClick=${hideQueueRun}>Later</button>
+    </div>
+  </section>`;
+}
+
 export function QueuePage() {
-  const { queue, queueRender, thumbs, queuePrinted, queueUndo } = useStore(app);
+  const { queue, queueRender, thumbs, queuePrinted, queueUndo, queuePlan, queueRun } = useStore(app);
+  const [rollSheet, setRollSheet] = useState(false);
   const p = useStore(printer);
   const { phase } = useStore(boot);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -101,6 +170,16 @@ export function QueuePage() {
 
   const count = queueLabelCount(queue);
   const needsPrinter = p.supported && !p.transport;
+  const nextPart = queueRun ? queueRun.parts[queueRun.next] : queuePlan ? queuePlan.parts[0] : null;
+  let printText = count ? `Print queue (${count})` : 'Print queue';
+  if (queueRun) printText = `Print part ${queueRun.next + 1} of ${queueRun.parts.length}`;
+  else if (queuePlan && queuePlan.parts.length > 1 && !nextPart.newRoll) printText = `Print in ${queuePlan.parts.length} parts (${count})`;
+  // A part that goes on a new roll: read the new roll's tape, say its length, then print
+  const newRollThenPrint = async () => {
+    await checkStatus();
+    if (printer.get().info && printer.get().state === 'ready') setRollSheet(true);
+  };
+  const print = () => (nextPart && nextPart.newRoll ? newRollThenPrint() : printQueue());
   // The strip and its spans can lag a moment behind the list while it redraws
   const spans = queueRender && queueRender.count === count ? queueRender.spans : null;
   return html`<div class="label-page queue-page">
@@ -113,14 +192,15 @@ export function QueuePage() {
           ${needsPrinter
             ? html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
                 <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`
-            : html`<button class="primary big" disabled=${!ready || !count || p.busy || !p.supported} onClick=${printQueue}>
-                <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : count ? `Print queue (${count})` : 'Print queue'}</button>`}
+            : html`<button class="primary big" disabled=${!ready || !count || p.busy || !p.supported} onClick=${print}>
+                <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : printText}</button>`}
           <span class="menu-anchor">
             <button class="secondary big icon-only" aria-label="More actions" onClick=${() => setMenuOpen(true)}>
               <${Icon} name="more" /></button>
             <${Menu} open=${menuOpen} onClose=${() => setMenuOpen(false)} items=${[
               { label: 'Save strip as picture', icon: 'download', action: () => savePicture(true), disabled: !queueRender },
               { label: 'Clear queue', icon: 'close', action: clearQueue, disabled: !count || p.busy },
+              queueRun && { label: 'Stop printing in parts', icon: 'undo', action: stopQueueRun, disabled: p.busy },
             ]} />
           </span>
         </div>
@@ -132,6 +212,11 @@ export function QueuePage() {
         <span>${queueUndo.text}</span>
         <button class="secondary" onClick=${undoQueueRemoval}><${Icon} name="undo" size=${18} /> Undo</button>
       </div>`}
+      ${queueRun && !queueRun.hidden && html`<${RunCard} run=${queueRun} width=${queueRender ? queueRender.tape_width_mm : ''}
+        busy=${p.busy || needsPrinter} onNewRoll=${newRollThenPrint} />`}
+      ${!queueRun && queuePlan && html`<${PlanCard} plan=${queuePlan} busy=${p.busy || needsPrinter || !ready} onNewRoll=${newRollThenPrint} />`}
+      <${NewRollSheet} open=${rollSheet} info=${p.info} action="Start counting and print"
+        onClose=${() => setRollSheet(false)} onDone=${() => { setRollSheet(false); printQueue(); }} />
       ${queuePrinted > 0 && html`<section class="card printed">
         <p>Printed ${queuePrinted} labels. Clear the queue?</p>
         <div class="button-row">

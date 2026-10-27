@@ -23,6 +23,11 @@ It has everything the desktop app has:
   sync** to your own Drive (the newest 3 backups are kept).
 - **The printer panel**: connect, status, battery and tape, feed tape. Labels can also be saved
   as a picture.
+- **The tape counter**: say which roll is in the printer (8 m, 4 m or another length) and the
+  printer chip shows how much is left, counting every print and its 25 mm feed, per kind of tape
+  and across devices with Drive sync. It turns amber under 30 cm. A queue that needs more tape
+  than is left, or more than the printer's 499 mm per print, prints in parts split at cut lines,
+  with a prompt for a new roll when one is needed.
 
 The label, queue, icons, settings and added fonts are kept in the browser, and after the first
 visit the app also starts offline. The layout is tabs on a phone and a sidebar on a wide screen,
@@ -141,6 +146,7 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 | `index.html`, `style.css` | The page shell and its look (light and dark). |
 | `js/main.js` | Navigation and pages. The pages live in `js/pages/`, shared controls in `js/ui.js`. |
 | `js/app.js` | App state and actions: start Python, render, print, keep settings. |
+| `js/tape.js` | The tape counter's sums: tape left per roll, merging counts from several devices, and splitting a queue into parts that fit. |
 | `js/worker.js`, `js/python.js` | Pyodide runs in a Web Worker so the page stays smooth; `python.js` calls into it. |
 | `js/library.js` | The icon library: built-in icons from `icons/library.json` (made by `build.py`) and your own icons, with the desktop app's keys so backups move between the two. |
 | `js/storage.js` | Keeps the label, settings and fonts in the browser's IndexedDB. |
@@ -165,5 +171,6 @@ uses too.
 - `python -m unittest tests.test_web_bridge` (from the repository root) checks `cube_web.py`
   on CPython, including that a web print job is byte-for-byte the same as the desktop driver's.
 - `python -m unittest tests.test_drive_auth` checks the sign-in helper against a pretend Google.
-- `npm install && npm test` (from `web/`) runs `printer.js` against the real Python core in
-  Pyodide under Node, with a fake serial port playing the printer.
+- `npm install && npm test` (from `web/`) checks the tape counter's sums in `js/tape.js`, then
+  runs `printer.js` against the real Python core in Pyodide under Node, with a fake serial port
+  playing the printer.

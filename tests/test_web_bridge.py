@@ -172,6 +172,25 @@ class TestWebBinLabelsAndQueue(unittest.TestCase):
         self.assertLess(spans[-1][1], 1)
         self.assertEqual(cube_web.render_queue([{"text": "Solo"}])["spans"], [[0.0, 1.0]])
 
+    def test_queue_lengths_match_the_strips_they_describe(self):
+        bin_label = {"bin": cube_web.bin_defaults("en")["fastener"]}
+        labels = [{"text": "One"}, {"text": "A longer label"}, bin_label]
+        info = cube_web.queue_lengths(labels)
+        to_mm = lambda dots: dots * info["dot_mm"] + info["lead_mm"]
+        # One label on its own, for every kind
+        for i, label in enumerate(labels):
+            with self.subTest(single=i):
+                metrics = cube_web.render_queue([label])["metrics"]
+                self.assertAlmostEqual(to_mm(info["singles"][i]), metrics["total_used_length_mm"], delta=0.06)
+        # Runs of labels, copies included
+        for copies in ([1, 1, 1], [2, 1, 3]):
+            with self.subTest(copies=copies):
+                widths = [w for w, n in zip(info["widths"], copies) for _ in range(n)]
+                dots = sum(widths) + info["gap"] * (len(widths) - 1) + info["ends"]
+                metrics = cube_web.render_queue(labels, copies)["metrics"]
+                self.assertAlmostEqual(to_mm(dots), metrics["total_used_length_mm"], delta=0.06)
+        self.assertEqual(info["max_mm"], 499.0)
+
     def test_bin_defaults_and_suggestions_follow_the_language(self):
         self.assertEqual(cube_web.bin_defaults("sv")["fastener"]["category"], "SKRUV")
         self.assertIn("KULLAGER", cube_web.bin_name_suggestions("sv")["component"])
