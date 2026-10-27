@@ -21,8 +21,9 @@ IMAGE_DIR = os.path.join(tempfile.gettempdir(), "cube-labeler-images")
 
 _renderer = None
 
-# Bin labels use Arial Bold on the desktop; here Arimo SemiBold, unless Settings picks another
-WEB_BIN_FONT = "Arimo SemiBold"
+# Bin labels use Arial Bold on the desktop; here Arimo Medium, unless Settings picks another
+WEB_BIN_FONT = "Arimo Medium"
+WEIGHT_NAMES = (" Regular", " Medium", " SemiBold", " Light", " ExtraLight", " Thin", " ExtraBold", " Black")
 
 
 def _get_renderer():
@@ -56,6 +57,15 @@ def tape_widths():
 def font_names():
     from core.font_manager import font_manager
     return font_manager.get_font_names()
+
+
+def font_file(name: str) -> Optional[bytes]:
+    """The file of a font from font_names(), for showing it in the page's font menus."""
+    from core.font_manager import font_manager
+    if name not in font_names():
+        return None
+    with open(font_manager.resolve_font_path(name), "rb") as f:
+        return f.read()
 
 
 def add_font(filename: str, data: Any) -> Optional[str]:
@@ -143,17 +153,32 @@ def _bin_config(data: Dict[str, Any]):
     return cfg
 
 
-def _use_bin_font(name: Any) -> None:
-    """Draws bin labels in the font from Settings, or the default one if it isn't here (anymore)."""
+def bold_font(name: str, names: List[str]) -> str:
+    """The bold font of name's family ("Arimo Medium" -> "Arimo Bold"), or name if it has none."""
+    if name.endswith(" Bold"):
+        return name
+    family = next((name[:-len(w)] for w in WEIGHT_NAMES if name.endswith(w)), name)
+    return family + " Bold" if family + " Bold" in names else name
+
+
+def _use_bin_font(name: Any, bold_name: Any = True) -> None:
+    """
+    Draws bin labels in the font from Settings, or the default one if it isn't here (anymore),
+    with the name (SCREWS, BEARINGS) in that font's bold unless bold_name is off.
+    """
     from core import inventory_renderer
-    inventory_renderer.BIN_FONT = name if name in font_names() else WEB_BIN_FONT
+    names = font_names()
+    font = name if name in names else WEB_BIN_FONT
+    inventory_renderer.BIN_FONT = font
+    inventory_renderer.BIN_NAME_FONT = bold_font(font, names) if bold_name is not False else None
 
 
 def _label_config(options: Any):
     """
     LabelConfig from the page's options: LabelConfig field names (text, font_name,
     tape_width_mm, auto_fit_font, ...), a picture as bytes in image_data, and a bin label in
-    "bin" (see _bin_config) with its font from Settings in "bin_font". Unknown keys are ignored.
+    "bin" (see _bin_config) with its font from Settings in "bin_font" and "bin_bold_name".
+    Unknown keys are ignored.
     """
     from core.label_renderer import LabelConfig
     from core.specs import INVENTORY_TAPE_WIDTH_MM
@@ -164,7 +189,7 @@ def _label_config(options: Any):
     if raw.get("image_data") is not None:
         opts["image_path"] = _image_path(raw["image_data"])
     if raw.get("bin") is not None:
-        _use_bin_font(raw.get("bin_font"))
+        _use_bin_font(raw.get("bin_font"), raw.get("bin_bold_name", True))
         opts["inventory_config"] = _bin_config(raw["bin"])
         opts["tape_width_mm"] = INVENTORY_TAPE_WIDTH_MM
     return LabelConfig(**opts)

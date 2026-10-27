@@ -7,6 +7,7 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
+import { FontPicker } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
@@ -248,8 +249,9 @@ function FontSection() {
 
   return html`<${Section} id="font" title="Font and layout" summary=${label.font_name}>
     <div class="row">
-      <${Select} label="Font" value=${label.font_name} options=${names.map((n) => [n, n])}
-        onChange=${(font_name) => updateLabel({ font_name })} />
+      <${Field} label="Font">
+        <${FontPicker} value=${label.font_name} fonts=${names} onChange=${(font_name) => updateLabel({ font_name })} />
+      <//>
       <button class="secondary add-font" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Add font</button>
       <input ref=${fileRef} type="file" accept=".ttf,.otf,.ttc" hidden onChange=${onFile} />
     </div>

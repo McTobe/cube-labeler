@@ -19,9 +19,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from core.font_manager import font_manager
 from core.specs import DOT_PITCH_MM, INVENTORY_TAPE_WIDTH_MM, get_tape_spec
 
-# The font for all text on bin labels. The web version has no Arial and sets its own
-# Arimo Medium here (see web/cube_web.py).
+# The font for all text on bin labels, and for the name (SCREWS, BEARINGS) when it should
+# differ (None: BIN_FONT). The web version has no Arial and sets its own (see web/cube_web.py).
 BIN_FONT = "Arial Bold"
+BIN_NAME_FONT = None
 
 # Icon library pictures used for drive icons (unless a label asks for the simple drawn ones)
 DRIVE_LIBRARY_ICONS = {
@@ -423,7 +424,7 @@ class InventoryRenderer:
         cat_txt = cfg.category.strip().upper()
         safe_cat_w = max(10, rem_w - 10 * scale)
         safe_cat_h = max(6, header_h - 4 * scale)
-        font_cat = self._fit_text_font(cat_txt, safe_cat_w, safe_cat_h, start_pt=22, min_pt=8, scale=scale)
+        font_cat = self._fit_text_font(cat_txt, safe_cat_w, safe_cat_h, start_pt=22, min_pt=8, font_name=BIN_NAME_FONT, scale=scale)
         draw.text(
             (anchor_w + rem_w // 2, header_h // 2),
             cat_txt,
@@ -666,7 +667,7 @@ class InventoryRenderer:
         cat_txt = cfg.category_banner.strip().upper()
         safe_banner_w = max(10, left_content_w - 12 * scale)
         safe_banner_h = max(6, banner_h - 4 * scale)
-        font_banner = self._fit_text_font(cat_txt, safe_banner_w, safe_banner_h, start_pt=22, min_pt=8, scale=scale)
+        font_banner = self._fit_text_font(cat_txt, safe_banner_w, safe_banner_h, start_pt=22, min_pt=8, font_name=BIN_NAME_FONT, scale=scale)
         draw.text(
             (left_content_w // 2, banner_h // 2),
             cat_txt,

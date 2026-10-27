@@ -49,9 +49,10 @@ export const DEFAULT_SETTINGS = {
   default_tape_mm: null,  // tape width a reset text label goes back to, instead of 12 mm
   default_font: null,  // font a reset text label goes back to, instead of Arimo
   bin_font: null,  // font for all text on bin labels, instead of BIN_FONT
+  bin_bold_name: true,  // the name on bin labels (SCREWS, BEARINGS) in the bold of that font
 };
 
-export const BIN_FONT = 'Arimo SemiBold';
+export const BIN_FONT = 'Arimo Medium';
 
 export const MAX_TAPE_MM = 499;
 export const BIN_TAPE_MM = 12;
@@ -190,7 +191,7 @@ export async function updateSettings(change) {
   app.set({ settings });
   storage.save('settings', settings);
   if ('theme' in change) applyTheme(settings.theme);
-  if ('bin_font' in change) {
+  if ('bin_font' in change || 'bin_bold_name' in change) {
     queueRenderStale = true;
     if (app.get().mode === 'bin') renderNow();
   }
@@ -260,7 +261,8 @@ export function renderOptions(label) {
 
 function binOptions(cfg) {
   const { icon, ...rest } = cfg;
-  return { bin: { ...rest, icon_data: icon ? icon.data : null }, bin_font: app.get().settings.bin_font };
+  const { bin_font, bin_bold_name } = app.get().settings;
+  return { bin: { ...rest, icon_data: icon ? icon.data : null }, bin_font, bin_bold_name: bin_bold_name !== false };
 }
 
 // A queue item or the label being edited, as render options for Python
@@ -341,6 +343,24 @@ export const toggleStyle = (text, start, end, style) => py.toggle_style(text, st
 export const restyleLines = (text, start, end, changes) => py.restyle_lines(text, start, end, changes);
 export const lineStyleAt = (text, pos) => (py ? py.line_style_at(text, pos) : Promise.resolve(['normal', null]));
 
+// Font menus show each font in its own face. The files come from Python, each loaded once.
+const fontFaces = new Map();
+let fontFaceCount = 0;
+export function fontFace(name) {
+  if (!py) return Promise.resolve(null);
+  if (!fontFaces.has(name)) {
+    fontFaces.set(name, (async () => {
+      const data = await py.font_file(name);
+      if (!data) return null;
+      const family = `cube-font-${++fontFaceCount}`;
+      const face = new FontFace(family, data);
+      document.fonts.add(await face.load());
+      return family;
+    })().catch(() => null));
+  }
+  return fontFaces.get(name);
+}
+
 export async function addFont(file) {
   const data = new Uint8Array(await file.arrayBuffer());
   const name = await py.add_font(file.name, data);
@@ -348,6 +368,7 @@ export async function addFont(file) {
     say(`${file.name} is not a font file Cube Labeler can read.`, true);
     return null;
   }
+  fontFaces.delete(name);
   const fonts = (await storage.load('fonts', [])).filter((f) => f.filename !== file.name);
   fonts.push({ filename: file.name, data });
   await storage.save('fonts', fonts);

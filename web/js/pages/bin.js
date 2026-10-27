@@ -7,6 +7,7 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { IconPickerSheet } from './icons.js';
 import { Field, Section, Segmented, Toggle } from '../ui.js';
+import { FontPicker } from '../font-picker.js';
 import { useStore } from '../state.js';
 import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say, BIN_FONT } from '../app.js';
 
@@ -339,11 +340,13 @@ export function BinOptions() {
       <p class="hint">${settings.bin_label_mm ? `Your default is ${settings.bin_label_mm} mm. It goes with your backups and sync.` : `Make a length your default and Reset goes back to it on every device.`}</p>
     <//>
     <${Section} id="bin-font" title="Font" summary=${font}>
-      <${Field} label="Bin label font" hint="For all bin labels, also the ones in the queue. It goes with your backups and sync.">
-        <select aria-label="Bin label font" value=${font} onChange=${(e) => updateSettings({ bin_font: e.currentTarget.value === BIN_FONT ? null : e.currentTarget.value })}>
-          ${fonts.map((f) => html`<option value=${f}>${f === BIN_FONT ? `${f} (standard)` : f}</option>`)}
-        </select>
+      <${Field} label="Bin label font">
+        <${FontPicker} value=${font} fonts=${fonts} standard=${BIN_FONT} ariaLabel="Bin label font"
+          onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
       <//>
+      <${Toggle} label="Bold name" checked=${settings.bin_bold_name !== false}
+        onChange=${(bin_bold_name) => updateSettings({ bin_bold_name })} />
+      <p class="hint">For all bin labels, also the ones in the queue. Bold name prints the name, like ${bin.kind === 'fastener' ? 'SCREWS' : 'BEARINGS'}, in the font's bold. These go with your backups and sync.</p>
     <//>
     ${bin.kind === 'fastener' && html`<${Section} id="bin-drive" title="Drive icon" summary=${cfg.simple_drive_icon ? 'Simple' : 'Library picture'}>
       <${Toggle} label="Simple drive icon" checked=${cfg.simple_drive_icon} disabled=${!builtInDrive}

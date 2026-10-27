@@ -285,15 +285,27 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         from core import inventory_renderer
         part = cube_web.bin_defaults("en")["component"]
         try:
-            with mock.patch.object(cube_web, "font_names", return_value=["Arimo", "Inter Bold"]):
-                cube_web._label_config({"bin": part, "bin_font": "Inter Bold"})
-                self.assertEqual(inventory_renderer.BIN_FONT, "Inter Bold")
+            names = ["Arimo", "Arimo Bold", "Arimo Medium", "Inter", "Inter Bold", "[Custom] Mine"]
+            with mock.patch.object(cube_web, "font_names", return_value=names):
+                cube_web._label_config({"bin": part, "bin_font": "Inter"})
+                self.assertEqual(inventory_renderer.BIN_FONT, "Inter")
+                self.assertEqual(inventory_renderer.BIN_NAME_FONT, "Inter Bold")
+                cube_web._label_config({"bin": part, "bin_font": "Inter", "bin_bold_name": False})
+                self.assertIsNone(inventory_renderer.BIN_NAME_FONT)
+                cube_web._label_config({"bin": part, "bin_font": "[Custom] Mine"})
+                self.assertEqual(inventory_renderer.BIN_NAME_FONT, "[Custom] Mine")
                 cube_web._label_config({"bin": part, "bin_font": "Removed Font"})
                 self.assertEqual(inventory_renderer.BIN_FONT, cube_web.WEB_BIN_FONT)
                 cube_web._label_config({"bin": part})
-                self.assertEqual(inventory_renderer.BIN_FONT, cube_web.WEB_BIN_FONT)
+                self.assertEqual(inventory_renderer.BIN_FONT, "Arimo Medium")
+                self.assertEqual(inventory_renderer.BIN_NAME_FONT, "Arimo Bold")
         finally:
-            inventory_renderer.BIN_FONT = "Arial Bold"
+            inventory_renderer.BIN_FONT, inventory_renderer.BIN_NAME_FONT = "Arial Bold", None
+
+    def test_font_file_for_the_font_menus(self):
+        name = cube_web.font_names()[0]
+        self.assertGreater(len(cube_web.font_file(name)), 1000)
+        self.assertIsNone(cube_web.font_file("No Such Font"))
 
     def test_web_template_opens_on_the_desktop(self):
         import json

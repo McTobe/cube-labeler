@@ -5,6 +5,7 @@ import { Segmented, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateSettings, labelDefaults, BIN_FONT } from '../app.js';
 import { FACTORY_LABEL_MM } from './bin.js';
+import { FontPicker } from '../font-picker.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
 import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
 import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
@@ -335,9 +336,8 @@ function LabelDefaultsCard() {
       </label>
       <label class="default-row">
         <span><span class="field-label">Text label font</span><span class="hint">The font Reset picks for the text.</span></span>
-        <select value=${defaults.font_name} onChange=${(e) => updateSettings({ default_font: e.currentTarget.value })}>
-          ${fonts.map((f) => html`<option value=${f}>${f}</option>`)}
-        </select>
+        <${FontPicker} value=${defaults.font_name} fonts=${fonts} ariaLabel="Text label font"
+          onChange=${(default_font) => updateSettings({ default_font })} />
       </label>
       <label class="default-row">
         <span><span class="field-label">Bin label length</span><span class="hint">Empty means the factory ${FACTORY_LABEL_MM} mm.</span></span>
@@ -349,10 +349,9 @@ function LabelDefaultsCard() {
       </label>
       <label class="default-row">
         <span><span class="field-label">Bin label font</span><span class="hint">All text on bin labels.</span></span>
-        <select value=${fonts.includes(settings.bin_font) ? settings.bin_font : BIN_FONT}
-          onChange=${(e) => updateSettings({ bin_font: e.currentTarget.value === BIN_FONT ? null : e.currentTarget.value })}>
-          ${fonts.map((f) => html`<option value=${f}>${f === BIN_FONT ? `${f} (standard)` : f}</option>`)}
-        </select>
+        <${FontPicker} value=${fonts.includes(settings.bin_font) ? settings.bin_font : BIN_FONT} fonts=${fonts}
+          standard=${BIN_FONT} ariaLabel="Bin label font"
+          onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
       </label>
     </div>
   </section>`;
