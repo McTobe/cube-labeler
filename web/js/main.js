@@ -10,6 +10,7 @@ import { Sheet } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
+import { HistoryPage } from './pages/history.js';
 import { app, start, pageChanged, queueLabelCount } from './app.js';
 import { useStore } from './state.js';
 import { startAutoBackup, autoBackup } from './autobackup.js';
@@ -37,6 +38,7 @@ const KOFI_URL = 'https://ko-fi.com/thetobek';
 const PAGES = [
   { id: 'label', title: 'Label', icon: 'label' },
   { id: 'queue', title: 'Queue', icon: 'queue' },
+  { id: 'history', title: 'History', icon: 'history' },
   { id: 'icons', title: 'Icons', icon: 'icons' },
   { id: 'templates', title: 'Templates', icon: 'templates' },
   { id: 'settings', title: 'Settings', icon: 'settings' },
@@ -86,6 +88,7 @@ function App() {
   let body;
   if (page.id === 'label') body = html`<${LabelPage} />`;
   else if (page.id === 'queue') body = html`<${QueuePage} />`;
+  else if (page.id === 'history') body = html`<${HistoryPage} />`;
   else if (page.id === 'icons') body = html`<${IconsPage} />`;
   else if (page.id === 'templates') body = html`<${TemplatesPage} />`;
   else body = html`<${SettingsPage} />`;

@@ -70,7 +70,7 @@ function splitRows(spans, lengthMm) {
 // Shows the label being edited, or the strip passed in (the queue page passes its strip)
 // spans (the queue's) are where each label sits on the strip: pointing at one calls onPoint
 // with its list item, clicking calls onPick, and the label of item active is outlined
-export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
+export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: stripTapeMm }) {
   const state = useStore(app);
   const render = strip === undefined ? state.render : strip;
   const renderError = strip === undefined ? state.renderError : null;
@@ -85,8 +85,8 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick }) {
   // Phones always use Fit: browsers there don't size CSS millimetres to the screen, so Real
   // size comes out far too small
   const zoom = wide ? zoomChoice : 'fit';
-  // Bin labels and queue strips are on 12 mm tape
-  const tapeMm = strip === undefined && state.mode === 'text' ? Number(label.tape_width_mm) || 12 : 12;
+  // Bin labels and queue strips are on 12 mm tape; a label from the history says its own
+  const tapeMm = stripTapeMm || (strip === undefined && state.mode === 'text' ? Number(label.tape_width_mm) || 12 : 12);
   const box = useStageBox(stageRef);
   const oneRow = [{ from: 0, to: 1 }];
   const lengthMm = render && render.metrics ? render.metrics.print_length_mm : 0;

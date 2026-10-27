@@ -652,6 +652,9 @@ TOUCH_SUFFIX = ".touch.png"
 TEMPLATES_FOLDER = "templates"
 FONTS_FOLDER = "fonts"
 FONT_SUFFIXES = (".ttf", ".otf", ".ttc")
+# The web version's print history, as JSON text the page makes and reads; the desktop app keeps
+# it with its other files when it restores settings
+HISTORY_FILE = "web_history.json"
 # Settings that belong to one device or are secrets never go in a backup (as on the desktop)
 _LOCAL_SUFFIXES = ("_api_key", "_api_key_protected")
 _LOCAL_KEYS = ("last_serial_port",)
@@ -720,6 +723,8 @@ def _backup_parts(data: Any):
         font = _to_dict(font)
         if _safe_font_file(font.get("filename")):
             files[f"{FONTS_FOLDER}/{font['filename']}"] = _to_bytes(font["data"])
+    if isinstance(data.get("history"), str):
+        files[HISTORY_FILE] = data["history"].encode("utf-8")
     settings = {k: v for k, v in _to_dict(data.get("settings")).items() if not _is_local_setting(k)}
     manifest = {
         "format": BACKUP_FORMAT,
@@ -736,7 +741,8 @@ def make_backup(data: Any) -> bytes:
     """
     A .cubebackup file the desktop app can restore, from what the page keeps:
     {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch"}],
-     "settings": {...}, "templates": [{"name", "json"}], "fonts": [{"filename", "data"}]}. Icons,
+     "settings": {...}, "templates": [{"name", "json"}], "fonts": [{"filename", "data"}],
+     "history": the print history's JSON text or None}. Icons,
     originals, touch-ups and fonts are bytes; touch-ups may be the page's raw cells. Settings that
     belong to one device are left out.
     """
@@ -793,7 +799,7 @@ def open_backup(data: Any) -> Dict[str, Any]:
     Reads a .cubebackup (or an older .cubeicons) file from the desktop app or the web version:
     {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch" as cells}],
      "settings": {...} or None, "templates": [{"name", "item"}], "skipped_templates": [names],
-     "fonts": [{"filename", "data"}]}.
+     "fonts": [{"filename", "data"}], "history": the web version's print history as JSON text or None}.
     Raises ValueError with a readable message when it is not a backup this version can read.
     """
     import json
@@ -849,12 +855,19 @@ def open_backup(data: Any) -> Dict[str, Any]:
                 "original": original, "touch": touch_cells(touch) if touch and _is_png(touch) else None,
             })
 
-        settings, templates, skipped, fonts = None, [], [], []
+        settings, templates, skipped, fonts, history = None, [], [], [], None
         if manifest["format"] == BACKUP_FORMAT:
             settings = manifest.get("settings") if isinstance(manifest.get("settings"), dict) else {}
             listed_files = manifest.get("files") if isinstance(manifest.get("files"), list) else []
             for path in listed_files[:BACKUP_MAX_FILES]:
                 if not isinstance(path, str) or ".." in path:
+                    continue
+                if path == HISTORY_FILE:
+                    content = member(f"data/{path}")
+                    try:
+                        history = content.decode("utf-8") if content is not None else None
+                    except UnicodeDecodeError:
+                        history = None
                     continue
                 if path.startswith(FONTS_FOLDER + "/") and _safe_font_file(path[len(FONTS_FOLDER) + 1:]):
                     content = member(f"data/{path}")
@@ -872,7 +885,7 @@ def open_backup(data: Any) -> Dict[str, Any]:
                 except ValueError:
                     skipped.append(name)
     return {"created": str(manifest.get("created") or ""), "icons": icons, "settings": settings,
-            "templates": templates, "skipped_templates": skipped, "fonts": fonts}
+            "templates": templates, "skipped_templates": skipped, "fonts": fonts, "history": history}
 
 
 # --- AI icons: the page sends the request itself, straight from the browser with the key

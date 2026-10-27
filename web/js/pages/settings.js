@@ -6,6 +6,7 @@ import { useStore } from '../state.js';
 import { app, boot, updateSettings, labelDefaults, BIN_FONT } from '../app.js';
 import { FACTORY_LABEL_MM } from './bin.js';
 import { FontPicker } from '../font-picker.js';
+import { HISTORY_SIZES, historySizeChanged } from '../history.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
 import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
 import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
@@ -33,7 +34,7 @@ function formatDate(iso) {
 }
 
 function RestoreSheet({ opened, onClose, onDone }) {
-  const [parts, setParts] = useState({ icons: true, settings: true, templates: true, fonts: true });
+  const [parts, setParts] = useState({ icons: true, settings: true, templates: true, fonts: true, history: true });
   const [onConflict, setOnConflict] = useState('skip');
   const [busy, setBusy] = useState(false);
   if (!opened) return html`<${Sheet} open=${false} title="" onClose=${onClose} />`;
@@ -42,12 +43,13 @@ function RestoreSheet({ opened, onClose, onDone }) {
     settings: opened.settings !== null,
     templates: opened.templates.length > 0,
     fonts: (opened.fonts || []).length > 0,
+    history: (opened.history || []).length > 0,
   };
   const conflicts = (parts.icons ? opened.iconPlan.conflicts : 0) + (parts.templates ? opened.templatePlan.conflicts : 0);
   const restore = async () => {
     setBusy(true);
     try {
-      onDone(await restoreBackup(opened, { icons: parts.icons && has.icons, settings: parts.settings && has.settings, templates: parts.templates && has.templates, fonts: parts.fonts && has.fonts }, onConflict));
+      onDone(await restoreBackup(opened, Object.fromEntries(Object.keys(has).map((k) => [k, parts[k] && has[k]])), onConflict));
     } catch (err) {
       onDone(null, errorMessage(err));
     } finally {
@@ -64,6 +66,7 @@ function RestoreSheet({ opened, onClose, onDone }) {
     ${Object.values(has).filter(Boolean).length <= 1
       ? html`<p>${has.icons ? `${plural(opened.icons.length, 'icon')} (${iconNote})` : has.templates ? plural(opened.templates.length, 'template')
         : has.settings ? 'Your settings, favourites and recently used icons' : has.fonts ? plural(opened.fonts.length, 'added font')
+        : has.history ? `${plural(opened.history.length, 'printed label')} from the print history`
         : 'This backup is empty.'}</p>`
       : html`<div class="restore-parts">
       ${has.icons && html`<${Toggle} label=${`${plural(opened.icons.length, 'icon')} (${iconNote})`} checked=${parts.icons}
@@ -74,6 +77,8 @@ function RestoreSheet({ opened, onClose, onDone }) {
         onChange=${(settings) => setParts({ ...parts, settings })} />`}
       ${has.fonts && html`<${Toggle} label=${plural(opened.fonts.length, 'added font')} checked=${parts.fonts}
         onChange=${(fonts) => setParts({ ...parts, fonts })} />`}
+      ${has.history && html`<${Toggle} label=${`Print history (${plural(opened.history.length, 'label')})`} checked=${parts.history}
+        onChange=${(history) => setParts({ ...parts, history })} />`}
     </div>`}
     ${opened.skipped_templates.length > 0 && html`<p class="hint">Left out, could not be read: ${opened.skipped_templates.join(', ')}.</p>`}
     ${conflicts > 0 && html`<${Segmented} label=${`${plural(conflicts, 'icon or template', 'icons or templates')} with the same name as one of yours`}
@@ -137,6 +142,7 @@ function BackupCard() {
     if (result.templates) said.push(`${plural(result.templates.added + result.templates.replaced, 'template')} restored`);
     if (result.settings) said.push('settings restored');
     if (result.fonts) said.push(`${plural(result.fonts, 'font')} added`);
+    if (result.history) said.push(`${plural(result.history, 'printed label')} added to the history`);
     const skipped = (result.icons ? result.icons.skipped : 0) + (result.templates ? result.templates.skipped : 0);
     if (skipped) said.push(`${skipped} kept as yours`);
     setMessage({ text: said.length ? `Done: ${said.join(', ')}.` : 'Everything in the backup was already here.', error: false });
@@ -153,7 +159,7 @@ function BackupCard() {
     </div>
     <div class="settings-part">
     <h3>Backup file</h3>
-    <p class="hint">One file with your own icons, templates and settings. It restores here or in the desktop app, on any device.
+    <p class="hint">One file with your own icons, templates, settings and print history. It restores here or in the desktop app, on any device.
       ${last ? ` Last backup: ${formatDate(last)}.` : ' No backup saved from this browser yet.'}</p>
     <div class="button-row">
       <button class="primary" disabled=${!ready || busy} onClick=${save}>${busy ? 'Saving…' : 'Save a backup'}</button>
@@ -215,7 +221,7 @@ export function SyncPanel() {
     : auto.driveLast ? html`<p class="hint last-synced">Last synced: ${formatDate(auto.driveLast)}</p>` : null;
   let state;
   if (!d.on) {
-    state = html`<p class="hint">Sign in with Google on each device you use, and your own icons, templates and settings follow you.
+    state = html`<p class="hint">Sign in with Google on each device you use, and your own icons, templates, settings and print history follow you.
       Changes are saved to a ${'"Cube Labeler backups"'} folder in your Drive and picked up by your other devices when you open the app.
       The app can only see the files it made there.</p>
       <div class="button-row"><button class="primary" disabled=${!ready} onClick=${() => run(async () => { await signInToDrive(); await startDriveBackup(); })}>Sign in with Google</button></div>`;
@@ -326,7 +332,7 @@ function LabelDefaultsCard() {
   };
   return html`<section class="card">
     <h2 class="card-title">Label defaults</h2>
-    <p class="hint">What Reset goes back to on the Label page, and the bin label font. These go with your backups and sync.</p>
+    <p class="hint">What Reset goes back to on the Label page, the bin label font and the print history. These go with your backups and sync.</p>
     <div class="defaults-rows">
       <label class="default-row">
         <span><span class="field-label">Text label tape</span><span class="hint">New text labels start on this tape width.</span></span>
@@ -353,6 +359,13 @@ function LabelDefaultsCard() {
           standard=${BIN_FONT} ariaLabel="Bin label font"
           onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
       </div>
+      <label class="default-row">
+        <span><span class="field-label">Print history</span><span class="hint">The newest printed labels kept. Pinned ones always stay.</span></span>
+        <select value=${HISTORY_SIZES.includes(settings.history_keep) ? settings.history_keep : 50}
+          onChange=${async (e) => { await updateSettings({ history_keep: Number(e.currentTarget.value) }); historySizeChanged(); }}>
+          ${HISTORY_SIZES.map((n) => html`<option value=${n}>Last ${n}</option>`)}
+        </select>
+      </label>
     </div>
   </section>`;
 }
