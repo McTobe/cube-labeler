@@ -7,8 +7,9 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { IconPickerSheet } from './icons.js';
 import { Field, Section, Segmented, Toggle } from '../ui.js';
+import { FontField } from '../font-picker.js';
 import { useStore } from '../state.js';
-import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say } from '../app.js';
+import { app, boot, updateBin, updateSettings, setBinIcon, setBinIconBytes, addToQueue, say, BIN_FONT } from '../app.js';
 
 const QUICK_SIZES = ['M2', 'M2.5', 'M3', 'M4', 'M5', 'M6', 'M8', 'M10'];
 const QUICK_LENGTHS = ['4', '6', '8', '10', '12', '16', '20', '25', '30', '35', '40', '50'];
@@ -292,7 +293,7 @@ export function BinCard() {
 
 // The bin label's less used options, in the side panel
 export function BinOptions() {
-  const { bin, settings } = useStore(app);
+  const { bin, settings, fonts } = useStore(app);
   const [widthText, setWidthText] = useState(null);
   if (!bin) return null;
   const cfg = bin[bin.kind];
@@ -308,6 +309,7 @@ export function BinOptions() {
   const current = Number(cfg.label_width_mm);
   const reset = () => { setWidthText(null); updateBin({ label_width_mm: fallback }); };
   const keep = () => { updateSettings({ bin_label_mm: current }); say(`Reset now goes back to ${current} mm.`); };
+  const font = fonts.includes(settings.bin_font) ? settings.bin_font : BIN_FONT;
 
   return html`
     <section class="card drawer-card">
@@ -336,6 +338,13 @@ export function BinOptions() {
         ${current !== fallback && current >= 10 && html`<button class="secondary" onClick=${keep}>Make ${current} mm my default</button>`}
       </div>
       <p class="hint">${settings.bin_label_mm ? `Your default is ${settings.bin_label_mm} mm. It goes with your backups and sync.` : `Make a length your default and Reset goes back to it on every device.`}</p>
+    <//>
+    <${Section} id="bin-font" title="Font" summary=${font}>
+      <${FontField} label="Bin label font" value=${font} fonts=${fonts} standard=${BIN_FONT}
+        onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
+      <${Toggle} label="Bold name" checked=${settings.bin_bold_name !== false}
+        onChange=${(bin_bold_name) => updateSettings({ bin_bold_name })} />
+      <p class="hint">For new bin labels; ones already in the queue keep the font they were added with. Bold name prints the name, like ${bin.kind === 'fastener' ? 'SCREWS' : 'BEARINGS'}, in the font's bold. These go with your backups and sync.</p>
     <//>
     ${bin.kind === 'fastener' && html`<${Section} id="bin-drive" title="Drive icon" summary=${cfg.simple_drive_icon ? 'Simple' : 'Library picture'}>
       <${Toggle} label="Simple drive icon" checked=${cfg.simple_drive_icon} disabled=${!builtInDrive}

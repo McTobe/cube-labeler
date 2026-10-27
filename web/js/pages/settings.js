@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { Segmented, Sheet, Toggle } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, updateSettings, labelDefaults } from '../app.js';
+import { app, boot, updateSettings, labelDefaults, BIN_FONT } from '../app.js';
 import { FACTORY_LABEL_MM } from './bin.js';
+import { FontPicker } from '../font-picker.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
 import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
 import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
@@ -311,7 +312,7 @@ function AiCard() {
   </section>`;
 }
 
-// The defaults new and reset labels start from; they go with backups and sync
+// The defaults new and reset labels start from, and the bin label font; they go with backups and sync
 function LabelDefaultsCard() {
   const { settings, fonts, tapeWidths } = useStore(app);
   const [binText, setBinText] = useState(null);
@@ -325,7 +326,7 @@ function LabelDefaultsCard() {
   };
   return html`<section class="card">
     <h2 class="card-title">Label defaults</h2>
-    <p class="hint">What Reset goes back to on the Label page. These go with your backups and sync.</p>
+    <p class="hint">What Reset goes back to on the Label page, and the bin label font. These go with your backups and sync.</p>
     <div class="defaults-rows">
       <label class="default-row">
         <span><span class="field-label">Text label tape</span><span class="hint">New text labels start on this tape width.</span></span>
@@ -335,9 +336,8 @@ function LabelDefaultsCard() {
       </label>
       <label class="default-row">
         <span><span class="field-label">Text label font</span><span class="hint">The font Reset picks for the text.</span></span>
-        <select value=${defaults.font_name} onChange=${(e) => updateSettings({ default_font: e.currentTarget.value })}>
-          ${fonts.map((f) => html`<option value=${f}>${f}</option>`)}
-        </select>
+        <${FontPicker} value=${defaults.font_name} fonts=${fonts} ariaLabel="Text label font"
+          onChange=${(default_font) => updateSettings({ default_font })} />
       </label>
       <label class="default-row">
         <span><span class="field-label">Bin label length</span><span class="hint">Empty means the factory ${FACTORY_LABEL_MM} mm.</span></span>
@@ -346,6 +346,12 @@ function LabelDefaultsCard() {
             placeholder=${String(FACTORY_LABEL_MM)} onInput=${onBin} onBlur=${() => setBinText(null)} />
           <span>mm</span>
         </span>
+      </label>
+      <label class="default-row">
+        <span><span class="field-label">Bin label font</span><span class="hint">For new bin labels. Queued ones keep theirs.</span></span>
+        <${FontPicker} value=${fonts.includes(settings.bin_font) ? settings.bin_font : BIN_FONT} fonts=${fonts}
+          standard=${BIN_FONT} ariaLabel="Bin label font"
+          onChange=${(f) => updateSettings({ bin_font: f === BIN_FONT ? null : f })} />
       </label>
     </div>
   </section>`;
@@ -401,7 +407,7 @@ export function SettingsPage() {
         <${StorageUse} />
       </p>
       <p class="hint">Labels are drawn by the same Python code as the desktop app, running in this browser with Pyodide.
-        Arimo font under the SIL Open Font License.</p>
+        Fonts under the SIL Open Font License.</p>
     </footer>
   </div>`;
 }

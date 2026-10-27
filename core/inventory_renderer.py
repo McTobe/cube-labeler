@@ -19,6 +19,11 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from core.font_manager import font_manager
 from core.specs import DOT_PITCH_MM, INVENTORY_TAPE_WIDTH_MM, get_tape_spec
 
+# The font for all text on bin labels, and for the name (SCREWS, BEARINGS) when it should
+# differ (None: BIN_FONT). A label's own font_name and name_font_name win over these.
+BIN_FONT = "Arial Bold"
+BIN_NAME_FONT = None
+
 # Icon library pictures used for drive icons (unless a label asks for the simple drawn ones)
 DRIVE_LIBRARY_ICONS = {
     "internal_hex": "hex_socket.png",
@@ -131,6 +136,10 @@ class FastenerLabelConfig:
     label_width_mm: float = 32.0          # Fits a typical organizer bin (32 mm ~ 227 dots)
     tape_width_mm: int = 12
 
+    # Fonts: None draws the text in BIN_FONT and the name in BIN_NAME_FONT (else the label's font)
+    font_name: Optional[str] = None
+    name_font_name: Optional[str] = None
+
 
 @dataclass
 class ComponentLabelConfig:
@@ -145,6 +154,10 @@ class ComponentLabelConfig:
     label_width_mm: float = 32.0          # Fits a typical organizer bin (32 mm ~ 227 dots)
     tape_width_mm: int = 12
 
+    # Fonts: None draws the text in BIN_FONT and the name in BIN_NAME_FONT (else the label's font)
+    font_name: Optional[str] = None
+    name_font_name: Optional[str] = None
+
 
 class InventoryRenderer:
     """
@@ -158,7 +171,12 @@ class InventoryRenderer:
     SUPERSAMPLE = 4        # 4x internal rendering for crisp geometric vector drawing
 
     def __init__(self):
-        pass
+        self._font = BIN_FONT
+        self._name_font = BIN_NAME_FONT or BIN_FONT
+
+    def _use_fonts(self, cfg) -> None:
+        self._font = cfg.font_name or BIN_FONT
+        self._name_font = cfg.name_font_name or BIN_NAME_FONT or self._font
 
     @staticmethod
     def _fit_text_font(
@@ -167,13 +185,14 @@ class InventoryRenderer:
         max_h: int,
         start_pt: int = 22,
         min_pt: int = 9,
-        font_name: str = "Arial Bold",
+        font_name: Optional[str] = None,
         scale: int = 4,
     ) -> ImageFont.FreeTypeFont:
         """
         Dynamically finds the largest font size (between start_pt and min_pt)
         that fits within (max_w, max_h).
         """
+        font_name = font_name or BIN_FONT
         if not text:
             return font_manager.load_font(font_name, start_pt * scale)
         for pt in range(start_pt, min_pt - 1, -1):
@@ -382,6 +401,7 @@ class InventoryRenderer:
         Renders Archetype A (Threaded Fastener).
         Returns a high-contrast 1-bit PIL Image of height 64 dots.
         """
+        self._use_fonts(cfg)
         scale = self.SUPERSAMPLE
         target_h = self.PRINTABLE_HEIGHT
         target_w = max(int(round(cfg.label_width_mm / self.DOT_PITCH_MM)), 120)
@@ -407,7 +427,7 @@ class InventoryRenderer:
         thread_txt = cfg.thread_size.strip()
         safe_anchor_w = max(10, anchor_w - 6 * scale)
         safe_anchor_h = max(10, canvas_h - 6 * scale)
-        font_anchor = self._fit_text_font(thread_txt, safe_anchor_w, safe_anchor_h, start_pt=52, min_pt=18, scale=scale)
+        font_anchor = self._fit_text_font(thread_txt, safe_anchor_w, safe_anchor_h, start_pt=52, min_pt=18, font_name=self._font, scale=scale)
         draw.text((anchor_w // 2, canvas_h // 2), thread_txt, font=font_anchor, fill=255, anchor="mm")
 
         # 3. Top Category Header Bar (Top 36% of remaining area)
@@ -418,7 +438,7 @@ class InventoryRenderer:
         cat_txt = cfg.category.strip().upper()
         safe_cat_w = max(10, rem_w - 10 * scale)
         safe_cat_h = max(6, header_h - 4 * scale)
-        font_cat = self._fit_text_font(cat_txt, safe_cat_w, safe_cat_h, start_pt=22, min_pt=8, scale=scale)
+        font_cat = self._fit_text_font(cat_txt, safe_cat_w, safe_cat_h, start_pt=22, min_pt=8, font_name=self._name_font, scale=scale)
         draw.text(
             (anchor_w + rem_w // 2, header_h // 2),
             cat_txt,
@@ -443,7 +463,7 @@ class InventoryRenderer:
             pad_sides = int(10 * scale)
 
             if has_size_txt:
-                font = font_manager.load_font("Arial Bold", 22 * scale)
+                font = font_manager.load_font(self._font, 22 * scale)
                 bbox = font.getbbox(txt)
                 txt_w = bbox[2] - bbox[0]
                 needed_w = txt_w + gap + icon_w + pad_sides
@@ -507,12 +527,12 @@ class InventoryRenderer:
     ):
         has_std = bool(cfg.standard_line1.strip())
         if has_std:
-            f_len = font_manager.load_font("Arial Bold", 24 * scale)
+            f_len = font_manager.load_font(self._font, 24 * scale)
             draw.text((x0 + w * 0.45, y0 + h * 0.35), cfg.length_single, font=f_len, fill=0, anchor="mm")
-            f_sub = font_manager.load_font("Arial Bold", 12 * scale)
+            f_sub = font_manager.load_font(self._font, 12 * scale)
             draw.text((x0 + w * 0.45, y0 + h * 0.75), f"{cfg.standard_line1} {cfg.standard_line2}".strip(), font=f_sub, fill=0, anchor="mm")
         else:
-            f_len = font_manager.load_font("Arial Bold", 28 * scale)
+            f_len = font_manager.load_font(self._font, 28 * scale)
             draw.text((x0 + w // 2, y0 + h // 2), cfg.length_single, font=f_len, fill=0, anchor="mm")
 
     def _render_fastener_dual(
@@ -522,17 +542,17 @@ class InventoryRenderer:
         texts = (cfg.length_dual_1, cfg.length_dual_2)
         room = w * 0.44 - 8 * scale
         size = 22 * scale
-        f_len = font_manager.load_font("Arial Bold", size)
+        f_len = font_manager.load_font(self._font, size)
         while size > 10 * scale and max(draw.textlength(t, font=f_len) for t in texts) > room:
             size -= scale
-            f_len = font_manager.load_font("Arial Bold", size)
+            f_len = font_manager.load_font(self._font, size)
         draw.text((x0 + w * 0.28, y0 + h // 2), cfg.length_dual_1, font=f_len, fill=0, anchor="mm")
         draw.text((x0 + w * 0.72, y0 + h // 2), cfg.length_dual_2, font=f_len, fill=0, anchor="mm")
 
     def _render_fastener_quad(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int, line_w: int
     ):
-        f_grid = font_manager.load_font("Arial Bold", 15 * scale)
+        f_grid = font_manager.load_font(self._font, 15 * scale)
         draw.text((x0 + w * 0.28, y0 + h * 0.28), cfg.length_quad_1, font=f_grid, fill=0, anchor="mm")
         draw.text((x0 + w * 0.72, y0 + h * 0.28), cfg.length_quad_2, font=f_grid, fill=0, anchor="mm")
         draw.text((x0 + w * 0.28, y0 + h * 0.72), cfg.length_quad_3, font=f_grid, fill=0, anchor="mm")
@@ -541,7 +561,7 @@ class InventoryRenderer:
     def _render_fastener_assortment(
         self, draw: ImageDraw.ImageDraw, x0: int, y0: int, w: int, h: int, cfg: FastenerLabelConfig, scale: int
     ):
-        f_assort = font_manager.load_font("Arial Bold", 14 * scale)
+        f_assort = font_manager.load_font(self._font, 14 * scale)
         draw.text((x0 + w // 2, y0 + h * 0.30), cfg.assortment_line1, font=f_assort, fill=0, anchor="mm")
         draw.text((x0 + w // 2, y0 + h * 0.70), cfg.assortment_line2, font=f_assort, fill=0, anchor="mm")
 
@@ -572,7 +592,7 @@ class InventoryRenderer:
 
             # Fit text font (defaults to 22pt bold, never shrinking for numbers up to 3-4 chars)
             max_txt_w = max(10, w - gap - icon_w - int(8 * scale))
-            font = self._fit_text_font(txt, max_txt_w, int(h * 0.75), start_pt=22, min_pt=10, scale=scale)
+            font = self._fit_text_font(txt, max_txt_w, int(h * 0.75), start_pt=22, min_pt=10, font_name=self._font, scale=scale)
             bbox = font.getbbox(txt)
             txt_w = bbox[2] - bbox[0]
 
@@ -601,7 +621,7 @@ class InventoryRenderer:
         elif has_size_txt:
             # Solo text (no icon)
             cx = x0 + w // 2
-            font = self._fit_text_font(txt, max(10, w - int(8 * scale)), int(h * 0.75), start_pt=22, min_pt=10, scale=scale)
+            font = self._fit_text_font(txt, max(10, w - int(8 * scale)), int(h * 0.75), start_pt=22, min_pt=10, font_name=self._font, scale=scale)
             draw.text((cx, cy), txt, font=font, fill=0, anchor="mm")
 
     # =========================================================================
@@ -613,6 +633,7 @@ class InventoryRenderer:
         Renders Archetype B (Discrete Components & Electrical Modules).
         Returns a high-contrast 1-bit PIL Image of height 64 dots.
         """
+        self._use_fonts(cfg)
         scale = self.SUPERSAMPLE
         target_h = self.PRINTABLE_HEIGHT
         target_w = max(int(round(cfg.label_width_mm / self.DOT_PITCH_MM)), 120)
@@ -661,7 +682,7 @@ class InventoryRenderer:
         cat_txt = cfg.category_banner.strip().upper()
         safe_banner_w = max(10, left_content_w - 12 * scale)
         safe_banner_h = max(6, banner_h - 4 * scale)
-        font_banner = self._fit_text_font(cat_txt, safe_banner_w, safe_banner_h, start_pt=22, min_pt=8, scale=scale)
+        font_banner = self._fit_text_font(cat_txt, safe_banner_w, safe_banner_h, start_pt=22, min_pt=8, font_name=self._name_font, scale=scale)
         draw.text(
             (left_content_w // 2, banner_h // 2),
             cat_txt,
@@ -677,12 +698,12 @@ class InventoryRenderer:
         safe_content_w = max(10, left_content_w - 10 * scale)
 
         if has_sec:
-            f_pri = self._fit_text_font(cfg.spec_primary, safe_content_w, int(bot_h * 0.48), start_pt=21, min_pt=8, scale=scale)
+            f_pri = self._fit_text_font(cfg.spec_primary, safe_content_w, int(bot_h * 0.48), start_pt=21, min_pt=8, font_name=self._font, scale=scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h * 0.35), cfg.spec_primary, font=f_pri, fill=0, anchor="mm")
-            f_sec = self._fit_text_font(cfg.spec_secondary, safe_content_w, int(bot_h * 0.36), start_pt=13, min_pt=7, scale=scale)
+            f_sec = self._fit_text_font(cfg.spec_secondary, safe_content_w, int(bot_h * 0.36), start_pt=13, min_pt=7, font_name=self._font, scale=scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h * 0.75), cfg.spec_secondary, font=f_sec, fill=0, anchor="mm")
         else:
-            f_pri = self._fit_text_font(cfg.spec_primary, safe_content_w, int(bot_h * 0.75), start_pt=28, min_pt=9, scale=scale)
+            f_pri = self._fit_text_font(cfg.spec_primary, safe_content_w, int(bot_h * 0.75), start_pt=28, min_pt=9, font_name=self._font, scale=scale)
             draw.text((left_content_w // 2, bot_y0 + bot_h // 2), cfg.spec_primary, font=f_pri, fill=0, anchor="mm")
 
         # Downsample to target 64 dots height

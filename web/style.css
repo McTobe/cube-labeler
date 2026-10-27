@@ -1263,3 +1263,55 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .sync-chip .chip-label { display: none; }
   .sync-chip { padding-left: 10px; padding-right: 10px; }
 }
+
+/* Font menus: each font shown in its own face (js/font-picker.js) */
+.font-picker { display: block; min-width: 0; }
+.font-picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px 8px 12px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: left;
+  font-weight: 400;
+}
+.font-picker-button .font-sample { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.05rem; }
+.font-picker-button .icon { flex: none; color: var(--muted); }
+.font-list {
+  position: fixed;
+  top: 0;
+  left: 0;
+  visibility: hidden;  /* until it has been placed next to its button */
+  overflow-y: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 6px;
+  z-index: 41;
+}
+.font-list button {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  color: var(--text);
+  text-align: left;
+  font-weight: 400;
+}
+.font-list button:hover, .font-list button:focus-visible { background: var(--raised); }
+.font-list button.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.font-list .font-sample { font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.font-list .font-note { flex: none; font-size: 0.8rem; color: var(--muted); }

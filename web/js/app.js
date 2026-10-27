@@ -48,7 +48,11 @@ export const DEFAULT_SETTINGS = {
   bin_label_mm: null,  // the user's own bin label length for Reset, instead of 32 mm
   default_tape_mm: null,  // tape width a reset text label goes back to, instead of 12 mm
   default_font: null,  // font a reset text label goes back to, instead of Arimo
+  bin_font: null,  // font for all text on bin labels, instead of BIN_FONT
+  bin_bold_name: true,  // the name on bin labels (SCREWS, BEARINGS) in the bold of that font
 };
+
+export const BIN_FONT = 'Arimo Medium';
 
 export const MAX_TAPE_MM = 499;
 export const BIN_TAPE_MM = 12;
@@ -187,6 +191,7 @@ export async function updateSettings(change) {
   app.set({ settings });
   storage.save('settings', settings);
   if ('theme' in change) applyTheme(settings.theme);
+  if (('bin_font' in change || 'bin_bold_name' in change) && app.get().mode === 'bin') renderNow();
 }
 
 // --- Editing and rendering -----------------------------------------------------------------
@@ -251,14 +256,20 @@ export function renderOptions(label) {
   return options;
 }
 
-function binOptions(cfg) {
+// The bin label font from Settings, which a queued bin label keeps as it was when added
+function binFont() {
+  const { bin_font, bin_bold_name } = app.get().settings;
+  return { bin_font, bin_bold_name: bin_bold_name !== false };
+}
+
+function binOptions(cfg, font = binFont()) {
   const { icon, ...rest } = cfg;
-  return { bin: { ...rest, icon_data: icon ? icon.data : null } };
+  return { bin: { ...rest, icon_data: icon ? icon.data : null }, ...font };
 }
 
 // A queue item or the label being edited, as render options for Python
 export function itemOptions(item) {
-  return item.mode === 'bin' ? binOptions(item.bin) : renderOptions(item.label);
+  return item.mode === 'bin' ? binOptions(item.bin, item.font) : renderOptions(item.label);
 }
 
 export function currentItem() {
@@ -334,6 +345,25 @@ export const toggleStyle = (text, start, end, style) => py.toggle_style(text, st
 export const restyleLines = (text, start, end, changes) => py.restyle_lines(text, start, end, changes);
 export const lineStyleAt = (text, pos) => (py ? py.line_style_at(text, pos) : Promise.resolve(['normal', null]));
 
+// Font menus show each font in its own face. The files come from Python, each loaded once.
+const fontFaces = new Map();
+let fontFaceCount = 0;
+export function fontFace(name) {
+  if (!py) return Promise.resolve(null);
+  if (!fontFaces.has(name)) {
+    fontFaces.set(name, (async () => {
+      const data = await py.font_file(name);
+      if (!data) return null;
+      const family = `cube-font-${++fontFaceCount}`;
+      const face = new FontFace(family, data);
+      document.fonts.add(await face.load());
+      return family;
+    })().catch(() => null));
+  }
+  return fontFaces.get(name);
+}
+
+// Adds a font file the user picked; returns its name, for the caller to choose it
 export async function addFont(file) {
   const data = new Uint8Array(await file.arrayBuffer());
   const name = await py.add_font(file.name, data);
@@ -341,11 +371,11 @@ export async function addFont(file) {
     say(`${file.name} is not a font file Cube Labeler can read.`, true);
     return null;
   }
+  fontFaces.delete(name);
   const fonts = (await storage.load('fonts', [])).filter((f) => f.filename !== file.name);
   fonts.push({ filename: file.name, data });
   await storage.save('fonts', fonts);
   app.set({ fonts: await py.font_names() });
-  updateLabel({ font_name: name });
   say(`Added ${name}.`);
   return name;
 }
@@ -524,7 +554,8 @@ let nextQueueId = Date.now();
 let undoTimer = null;
 const UNDO_SECONDS = 8;
 
-const sameLabel = (a, b) => a.mode === b.mode && JSON.stringify(a.mode === 'bin' ? a.bin : a.label) === JSON.stringify(b.mode === 'bin' ? b.bin : b.label);
+const labelKey = (item) => JSON.stringify(item.mode === 'bin' ? [item.bin, item.font] : item.label);
+const sameLabel = (a, b) => a.mode === b.mode && labelKey(a) === labelKey(b);
 export const copiesOf = (item) => Math.max(1, item.copies || 1);
 // Every printed label, copies included
 export const queueLabelCount = (queue) => queue.reduce((sum, item) => sum + copiesOf(item), 0);
@@ -562,6 +593,7 @@ async function makeThumb(item) {
 
 export function addToQueue() {
   const item = { id: nextQueueId++, ...structuredClone(currentItem()) };
+  if (item.mode === 'bin') item.font = binFont();
   if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !item.label.image) {
     say('Add some text, a QR code or a picture first.', true);
     return false;
@@ -634,6 +666,8 @@ export function openItem(item) {
     const bin = app.get().bin;
     app.set({ mode: 'bin', bin: { ...bin, kind: item.bin.kind, [item.bin.kind]: item.bin } });
     storage.save('bin', app.get().bin);
+    // A queued label opens in the font it was added with
+    if (item.font) updateSettings({ bin_font: item.font.bin_font ?? null, bin_bold_name: item.font.bin_bold_name });
   } else {
     app.set({ mode: 'text', label: { ...DEFAULT_LABEL, ...item.label } });
     storage.save('label', app.get().label);

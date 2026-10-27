@@ -11,7 +11,7 @@ import hashlib
 import io
 import os
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from core import protocol
 from core.specs import TAPE_SPECS
@@ -20,6 +20,10 @@ USER_FONT_DIR = os.path.join(tempfile.gettempdir(), "cube-labeler-fonts")
 IMAGE_DIR = os.path.join(tempfile.gettempdir(), "cube-labeler-images")
 
 _renderer = None
+
+# Bin labels use Arial Bold on the desktop; here Arimo Medium, unless Settings picks another
+WEB_BIN_FONT = "Arimo Medium"
+WEIGHT_NAMES = (" Regular", " Medium", " SemiBold", " Light", " ExtraLight", " Thin", " ExtraBold", " Black")
 
 
 def _get_renderer():
@@ -53,6 +57,15 @@ def tape_widths():
 def font_names():
     from core.font_manager import font_manager
     return font_manager.get_font_names()
+
+
+def font_file(name: str) -> Optional[bytes]:
+    """The file of a font from font_names(), for showing it in the page's font menus."""
+    from core.font_manager import font_manager
+    if name not in font_names():
+        return None
+    with open(font_manager.resolve_font_path(name), "rb") as f:
+        return f.read()
 
 
 def add_font(filename: str, data: Any) -> Optional[str]:
@@ -140,11 +153,30 @@ def _bin_config(data: Dict[str, Any]):
     return cfg
 
 
+def bold_font(name: str, names: List[str]) -> str:
+    """The bold font of name's family ("Arimo Medium" -> "Arimo Bold"), or name if it has none."""
+    if name.endswith(" Bold"):
+        return name
+    family = next((name[:-len(w)] for w in WEIGHT_NAMES if name.endswith(w)), name)
+    return family + " Bold" if family + " Bold" in names else name
+
+
+def _bin_fonts(name: Any, bold_name: Any = True) -> Tuple[str, str]:
+    """
+    The fonts for a bin label: the font from Settings, or the default one if it isn't here
+    (anymore), and for the name (SCREWS, BEARINGS) that font's bold unless bold_name is off.
+    """
+    names = font_names()
+    font = name if name in names else WEB_BIN_FONT
+    return font, bold_font(font, names) if bold_name is not False else font
+
+
 def _label_config(options: Any):
     """
     LabelConfig from the page's options: LabelConfig field names (text, font_name,
     tape_width_mm, auto_fit_font, ...), a picture as bytes in image_data, and a bin label in
-    "bin" (see _bin_config). Unknown keys are ignored.
+    "bin" (see _bin_config) with its font from Settings in "bin_font" and "bin_bold_name".
+    Unknown keys are ignored.
     """
     from core.label_renderer import LabelConfig
     from core.specs import INVENTORY_TAPE_WIDTH_MM
@@ -155,7 +187,9 @@ def _label_config(options: Any):
     if raw.get("image_data") is not None:
         opts["image_path"] = _image_path(raw["image_data"])
     if raw.get("bin") is not None:
-        opts["inventory_config"] = _bin_config(raw["bin"])
+        inv = _bin_config(raw["bin"])
+        inv.font_name, inv.name_font_name = _bin_fonts(raw.get("bin_font"), raw.get("bin_bold_name", True))
+        opts["inventory_config"] = inv
         opts["tape_width_mm"] = INVENTORY_TAPE_WIDTH_MM
     return LabelConfig(**opts)
 
@@ -463,13 +497,33 @@ def edit_icon(original: Any, edit: Any = None, touch: Any = None, view: int = 48
 
 # --- Templates: the desktop app's template files, read and written by the web version ---
 
+# Fonts the web version ships in place of Windows fonts that templates name
+WEB_FONT_SUBSTITUTES = {
+    "Consolas": "JetBrains Mono",
+    "Courier New": "JetBrains Mono",
+    "Segoe UI": "Inter",
+    "Verdana": "Inter",
+    "Tahoma": "Inter",
+    "Comic Sans MS": "Comic Neue",
+    "Garamond": "EB Garamond",
+}
+
+
 def _web_font(name: Any) -> str:
-    """A font this browser has for a template's font: the same one, else Arimo (bold if it was)."""
+    """
+    A font this browser has for a template's font: the same one, a shipped look-alike, else
+    Arimo (bold if it was).
+    """
     names = font_names()
     if name in names:
         return name
-    bold = "Arimo Bold" if "bold" in str(name or "").lower() and "Arimo Bold" in names else None
-    return bold or ("Arimo" if "Arimo" in names else names[0])
+    text = str(name or "")
+    bold = " Bold" if "bold" in text.lower() else ""
+    family = WEB_FONT_SUBSTITUTES.get(text[:-5] if text.lower().endswith(" bold") else text, "Arimo")
+    for candidate in (family + bold, "Arimo" + bold, "Arimo"):
+        if candidate in names:
+            return candidate
+    return names[0]
 
 
 def _b64(data: Optional[bytes]) -> Optional[str]:
@@ -577,10 +631,10 @@ def template_to_desktop(item: Any) -> str:
 
 
 def template_presets() -> List[Dict[str, Any]]:
-    """The desktop app's starting points: [{"key", "name", "description", "mode", "label"}]."""
-    from ui.templates import BUILTIN_PRESETS
+    """The starting points: [{"key", "name", "description", "mode", "label"}]."""
+    from ui.templates import BUILTIN_PRESETS, WEB_PRESETS
     out = []
-    for key, preset in BUILTIN_PRESETS.items():
+    for key, preset in {**BUILTIN_PRESETS, **WEB_PRESETS}.items():
         item = template_from_desktop(preset["config"])
         out.append({"key": key, "name": preset["name"], "description": preset["description"], **item})
     return out

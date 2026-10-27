@@ -7,10 +7,11 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
+import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, toggleStyle, restyleLines, lineStyleAt,
-  addFont, setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount,
+  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -236,23 +237,10 @@ function StylingHelp() {
 
 function FontSection() {
   const { label, fonts } = useStore(app);
-  const { phase } = useStore(boot);
-  const fileRef = useRef(null);
   const names = fonts.length ? fonts : [label.font_name];
 
-  const onFile = async (e) => {
-    const file = e.currentTarget.files[0];
-    e.currentTarget.value = '';
-    if (file) await addFont(file);
-  };
-
   return html`<${Section} id="font" title="Font and layout" summary=${label.font_name}>
-    <div class="row">
-      <${Select} label="Font" value=${label.font_name} options=${names.map((n) => [n, n])}
-        onChange=${(font_name) => updateLabel({ font_name })} />
-      <button class="secondary add-font" disabled=${phase !== 'ready'} onClick=${() => fileRef.current.click()}>Add font</button>
-      <input ref=${fileRef} type="file" accept=".ttf,.otf,.ttc" hidden onChange=${onFile} />
-    </div>
+    <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => updateLabel({ font_name })} />
     <p class="hint">Text always fills the tape height. Make a line bigger or smaller with the size menu above the text, or all text with Text scale under Advanced.</p>
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
