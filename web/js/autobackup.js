@@ -10,6 +10,7 @@ import { app, boot, say, backupDigest, makeBackup } from './app.js';
 import { library, deleteUserIcon, setFavourites } from './library.js';
 import { templates, loadTemplates, deleteTemplate } from './templates.js';
 import { collectBackup, readBackup, restoreBackup } from './backup.js';
+import { history, loadHistory, historyIds } from './history.js';
 import { drive, driveReady, loadDrive, uploadDriveBackup, continueDrive, listDriveBackups, downloadDriveBackup } from './gdrive.js';
 
 // Not the desktop app's "Cube Labeler backup ", so the two apps never prune each other's files
@@ -96,10 +97,11 @@ async function syncDrive({ force }) {
     const [newest] = await listDriveBackups();
     if (newest && newest.id !== (await storage.load('driveSyncedId', null))) {
       const opened = await readBackup(await downloadDriveBackup(newest));
-      await restoreBackup(opened, { icons: true, settings: true, templates: true, fonts: true }, 'replace');
       // What was here at the last sync but is gone from the newer backup was deleted on the
       // other device; anything else only here is new on this one and stays
       const before = await storage.load('driveSyncedItems', null);
+      await restoreBackup(opened, { icons: true, settings: true, templates: true, fonts: true, history: true }, 'replace',
+        before && before.history ? before.history : null);
       if (before) {
         const icons = new Set(opened.icons.map((entry) => `user/${entry.file}`.toLowerCase()));
         const names = new Set(opened.templates.map((t) => t.name.trim().toLowerCase()));
@@ -130,6 +132,7 @@ async function syncDrive({ force }) {
     await storage.save('driveSyncedItems', {
       icons: library.get().user.map((icon) => icon.key.toLowerCase()),
       templates: templates.get().mine.map((t) => t.name.trim().toLowerCase()),
+      history: historyIds(),
     });
     autoBackup.set({ driveError: '', drivePending: false });
   } catch (err) {
@@ -217,15 +220,21 @@ export async function startAutoBackup() {
   autoBackup.set({ folder: autoBackup.get().supported ? folder : null, last, driveLast });
   const watch = async () => {
     if (!templates.get().ready) await loadTemplates();
-    let seen = { user: library.get().user, favourites: library.get().favourites, mine: templates.get().mine, settings: app.get().settings };
+    await loadHistory();
+    const watched = () => ({
+      user: library.get().user, favourites: library.get().favourites, mine: templates.get().mine, settings: app.get().settings,
+      history: history.get().entries,
+    });
+    let seen = watched();
     const check = () => {
-      const now = { user: library.get().user, favourites: library.get().favourites, mine: templates.get().mine, settings: app.get().settings };
+      const now = watched();
       if (Object.keys(now).some((key) => now[key] !== seen[key])) schedule();
       seen = now;
     };
     library.subscribe(check);
     templates.subscribe(check);
     app.subscribe(check);
+    history.subscribe(check);
     if (autoBackup.get().folder) autoBackup.set({ allowed: await permission(folder, false) });
     schedule();
     // Coming back to the app (another tab, the phone's app switcher) picks up other devices' changes

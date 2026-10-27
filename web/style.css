@@ -552,7 +552,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   background: var(--bar);
   border-top: 1px solid var(--border);
 }
-.page-label main, .page-queue main { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 110px); }
+.page-label main, .page-queue main, .page-history main { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 110px); }
 .action-buttons { display: flex; gap: 8px; }
 .action-buttons > .primary { flex: 1; }
 .status-line { min-height: 1.3em; margin: 0 2px 6px; font-size: 0.85rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -676,7 +676,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* Desktop: a workspace that fills the window. The preview takes the free room with the text
    and Print under it; the settings are a panel along the right edge that scrolls on its own. */
 @media (min-width: 900px) {
-  .page-label main, .page-queue main { max-width: none; padding: 0; height: calc(100vh - var(--top-h)); }
+  .page-label main, .page-queue main, .page-history main { max-width: none; padding: 0; height: calc(100vh - var(--top-h)); }
   .label-page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) clamp(360px, 28vw, 460px);
@@ -1356,3 +1356,47 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .font-list .font-sample { font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .font-list .font-note { flex: none; font-size: 0.8rem; color: var(--muted); }
 
+
+/* --- History ------------------------------------------------------------------------------- */
+/* The picked label on the left, large, with what it was and its buttons; the list on the right */
+.history-facts { padding: 14px 16px; }
+.history-facts .card-head { gap: 8px; }
+.history-facts .card-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.facts-tools { display: flex; flex: none; gap: 2px; }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 10px 0 0; font-size: 0.95rem; }
+.facts dt { color: var(--muted); font-size: 0.88rem; line-height: 1.5rem; }
+.facts dd { margin: 0; line-height: 1.5rem; }
+.history-page .action-buttons > .secondary { flex: none; }
+.icon-button.star { width: 36px; height: 36px; padding: 0; justify-content: center; align-items: center; border-radius: 8px; }
+.icon-button.star.on { color: #e0a100; }
+.history-card { padding-bottom: 8px; }
+.history-card .card-head { align-items: baseline; }
+.history-note { margin: 4px 0 12px; }
+.history-filter { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 10px; }
+.group-title { margin: 16px 0 6px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.history-list { list-style: none; margin: 0 -8px; padding: 0; }
+.history-row { position: relative; display: flex; align-items: center; gap: 4px; padding-right: 6px; border-radius: 10px; }
+/* A thin line between rows, left out next to the picked one */
+.history-row + .history-row::before { content: ''; position: absolute; top: 0; left: 8px; right: 8px; border-top: 1px solid var(--border); }
+.history-row.active::before, .history-row.active + .history-row::before, .history-row:hover::before, .history-row:hover + .history-row::before { display: none; }
+.history-row:hover { background: var(--raised); }
+.history-row.active { background: var(--accent-soft); }
+.history-pick {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px; border: none; background: none;
+  text-align: left; border-radius: 10px;
+}
+.history-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.history-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 28px 8px 20px; text-align: center; color: var(--muted); }
+.history-empty p { margin: 0; }
+@media (max-width: 899px) {
+  /* The picked label scrolls away with the list instead of staying pinned on top */
+  .history-page .label-preview-col { position: static; }
+  .history-page .history-facts { margin: 10px 0 0; }
+  .history-page .action-buttons > .secondary { padding: 8px 12px; }
+}
+@media (min-width: 900px) {
+  .history-page .history-facts { margin: 0; flex: none; }
+  /* Room for three buttons: the two secondary ones keep their size, Print again takes the rest */
+  .history-page .action-buttons > .secondary { min-width: 140px; }
+}
