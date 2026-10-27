@@ -21,6 +21,9 @@ const SIZE_MARKS = { large: 'L', medium: 'M', normal: 'N', small: 'S' };
 // Toolbar buttons don't take the focus, so the phone keyboard and the selection stay put
 const keepFocus = (e) => e.preventDefault();
 const ALIGNS = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
+// Letter heights in mm, like the sizes on a label maker. 12 mm tape prints at most about 9 mm.
+const TEXT_SIZES = [3, 5, 7];
+const MAX_TEXT_MM = 9;
 const FRAMES = [['none', 'None'], ['box', 'Box'], ['rounded', 'Rounded']];
 const SIDES = [['left', 'Left of text'], ['right', 'Right of text']];
 const TAPE_COLOURS = [
@@ -239,14 +242,66 @@ function FontSection() {
   const { label, fonts } = useStore(app);
   const names = fonts.length ? fonts : [label.font_name];
 
-  return html`<${Section} id="font" title="Font and layout" summary=${label.font_name}>
+  return html`<${Section} id="font" title="Font and layout" summary=${label.text_height_mm ? `${label.font_name}, ${label.text_height_mm} mm` : label.font_name}>
     <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => updateLabel({ font_name })} />
-    <p class="hint">Text always fills the tape height. Make a line bigger or smaller with the size menu above the text, or all text with Text scale under Advanced.</p>
+    <${TextSizeField} />
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
     <${Segmented} label="Frame" options=${FRAMES} value=${label.frame}
       onChange=${(frame) => updateLabel({ frame })} />
   <//>`;
+}
+
+// Fit fills the tape; a size in mm is the height of a capital letter, the same on every label.
+// The size menu above the text still makes a line bigger or smaller than that.
+function TextSizeField() {
+  const { label } = useStore(app);
+  const mm = label.text_height_mm;
+  const preset = mm == null ? 'fit' : TEXT_SIZES.includes(mm) ? String(mm) : 'custom';
+  const [custom, setCustom] = useState(preset === 'custom');
+  const [customText, setCustomText] = useState(preset === 'custom' ? String(mm) : '');
+  const inputRef = useRef(null);
+  const chosen = custom ? 'custom' : preset;
+
+  useEffect(() => {
+    if (preset === 'custom') { setCustom(true); setCustomText(String(mm)); }
+    else if (!custom) setCustomText('');
+  }, [mm]);
+
+  const choose = (v) => {
+    if (v === 'custom') {
+      setCustom(true);
+      const value = Number(customText.replace(',', '.'));
+      updateLabel({ text_height_mm: value > 0 ? Math.min(value, MAX_TEXT_MM) : mm ?? 4 });
+      if (!customText) setCustomText(String(mm ?? 4));
+      requestAnimationFrame(() => inputRef.current && inputRef.current.select());
+      return;
+    }
+    setCustom(false);
+    updateLabel({ text_height_mm: v === 'fit' ? null : Number(v) });
+  };
+
+  const onCustom = (e) => {
+    const text = e.currentTarget.value;
+    setCustomText(text);
+    const value = Number(text.replace(',', '.'));
+    if (text.trim() !== '' && value > 0) updateLabel({ text_height_mm: Math.min(value, MAX_TEXT_MM) });
+  };
+
+  const options = [['fit', 'Fit'], ...TEXT_SIZES.map((v) => [String(v), `${v} mm`]), ['custom', 'Custom']];
+  const hint = html`<p class="hint">Fit fills the tape height. A size in mm is the height of a capital letter, the same on every label.</p>`;
+  // The Custom segment turns into a small mm box, so nothing below it moves
+  return html`<${Field} label="Text size">
+    <div class="segmented" role="radiogroup" aria-label="Text size">
+      ${options.map(([v, t]) => html`<label class=${`${v === chosen ? 'selected' : ''}${v === 'custom' ? ' size-custom' : ''}`}>
+        <input type="radio" name="text-size" checked=${v === chosen} onChange=${() => choose(v)} />
+        ${v === 'custom' && chosen === 'custom'
+          ? html`<span class="size-input"><input ref=${inputRef} type="text" inputmode="decimal"
+              aria-label=${`Letter height in mm, up to ${MAX_TEXT_MM}`} value=${customText} onInput=${onCustom} /> mm</span>`
+          : html`<span>${t}</span>`}
+      </label>`)}
+    </div>
+  <//>${hint}`;
 }
 
 function wifiCode({ ssid, password, security, hidden }) {
@@ -367,6 +422,7 @@ function AdvancedSection() {
   const { label, previewDots } = useStore(app);
   return html`<${Section} id="advanced" title="Advanced" defaultOpen=${false}>
     <${Slider} label="Text scale" min=${50} max=${150} step=${5} value=${label.font_scale} format=${(v) => `${v}%`}
+      disabled=${label.text_height_mm != null} display=${label.text_height_mm != null ? 'Off for a size in mm' : undefined}
       onChange=${(font_scale) => updateLabel({ font_scale })} />
     <${Slider} label="Line spacing" min=${0.8} max=${2} step=${0.05} value=${label.line_spacing} format=${(v) => `${v.toFixed(2)}×`}
       onChange=${(line_spacing) => updateLabel({ line_spacing })} />

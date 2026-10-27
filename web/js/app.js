@@ -29,6 +29,7 @@ export const DEFAULT_LABEL = {
   image_scale: 1.0,
   fixed_width_mm: null,
   font_scale: 100,
+  text_height_mm: null,  // letter height in mm, or null to fit the tape
   line_spacing: 1.2,
   h_padding: 8,
   stroke_width: 0,
@@ -249,8 +250,8 @@ export function renderOptions(label) {
   const { image, ...options } = label;
   options.qr_enabled = label.qr_enabled && label.qr_data.trim() !== '';
   options.image_data = image ? image.data : null;
-  // The web app always fits text to the tape (line sizes and Text scale adjust it), so a
-  // label saved by the desktop app with a fixed size fits too
+  // The web app fits text to the tape unless text_height_mm sets a letter height, so a label
+  // saved by the desktop app with a fixed size in points fits too
   options.auto_fit_font = true;
   if (!options.text.trim() && !options.qr_enabled && !image) options.text = ' ';
   return options;
