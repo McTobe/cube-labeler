@@ -40,6 +40,10 @@ export const autoBackup = createStore({
   driveError: '',
   drivePending: false,  // a backup waits for the user to sign in to Google again
   offline: false,  // the last sync could not reach Google
+  checked: null,  // when sync last found Drive and this device in step
+  log: [],  // the newest syncs (see logSync)
+  undo: null,  // when the copy kept before the last sync from Drive was made, while it can be undone
+  join: null,  // what is where, while the user picks how this device joins sync (see previewJoin)
 });
 
 let timer = null;
@@ -112,15 +116,21 @@ const sideOf = (digests, part) => (part === 'templates'
   ? Object.fromEntries(Object.entries(digests.templates).map(([k, v]) => [k, v.hash])) : digests[part]);
 const baseSide = (base, part) => base && { l: sideOf(base.l, part), r: sideOf(base.r, part) };
 
-// Brings in a newer backup from Drive, item by item (see syncplan.js), and returns what changed.
-// base: both sides' fingerprints at the last sync, or null (then nothing is deleted).
-async function mergeFromDrive(opened, base, from) {
+const emptyCounts = () => ({
+  icons: { added: 0, changed: 0, removed: 0 }, templates: { added: 0, changed: 0, removed: 0 },
+  copies: 0, settings: 0, fonts: 0, history: 0,
+});
+
+// Brings another backup into this device, item by item (see syncplan.js), and returns what
+// changed. base: both sides' fingerprints at the last sync, or null (then nothing is deleted).
+// from names the other side in the names of copies kept of things changed on both sides.
+// keepUndo: first keep a copy of this device, so the sync can be undone here.
+async function mergeFromDrive(opened, base, from, { keepUndo = true } = {}) {
   const contents = await collectBackup();
   const local = await backupItemDigests(contents);
   const remote = opened.digests;
-  // A copy of this device as it was, so the sync can be undone here
-  await storage.save('syncUndo', { created: contents.created, data: await makeBackup(contents) });
-  const counts = { added: 0, changed: 0, removed: 0, copies: 0, settings: 0 };
+  const before = keepUndo ? { created: contents.created, data: await makeBackup(contents) } : null;
+  const counts = emptyCounts();
   const copyName = (name) => `${name} (${from})`;
 
   // Icons
@@ -131,13 +141,13 @@ async function mergeFromDrive(opened, base, from) {
     .map((entry) => ({ ...entry, meta: { ...entry.meta, title: copyName(entry.meta.title || entry.file.replace(/\.png$/i, '').replace(/_/g, ' ')) } }));
   if (take.length) {
     const done = restoreIcons(take, 'replace');
-    counts.added += done.added;
-    counts.changed += done.replaced;
+    counts.icons.added += done.added;
+    counts.icons.changed += done.replaced;
   }
   if (copies.length) counts.copies += restoreIcons(copies, 'keep_both').added;
   for (const key of icons.drop) {
     const icon = library.get().user.find((i) => i.key.slice(5).toLowerCase() === key);
-    if (icon) { deleteUserIcon(icon.key); counts.removed++; }
+    if (icon) { deleteUserIcon(icon.key); counts.icons.removed++; }
   }
 
   // Templates (keyed by their file name, like the backup keeps them)
@@ -148,7 +158,7 @@ async function mergeFromDrive(opened, base, from) {
     if (!t) continue;
     const mine = local.templates[key];
     putTemplate(mine ? mine.name : t.name, t.item);
-    counts[mine ? 'changed' : 'added']++;
+    counts.templates[mine ? 'changed' : 'added']++;
   }
   for (const key of tplans.conflict) {
     const t = byStem.get(key);
@@ -156,7 +166,7 @@ async function mergeFromDrive(opened, base, from) {
   }
   for (const key of tplans.drop) {
     const mine = local.templates[key];
-    if (mine) { deleteTemplate(mine.name); counts.removed++; }
+    if (mine) { deleteTemplate(mine.name); counts.templates.removed++; }
   }
 
   // Settings, one by one; what is not taken from Drive stays as it is here
@@ -168,32 +178,71 @@ async function mergeFromDrive(opened, base, from) {
     for (const key of takeKeys) settings[key] = opened.settings[key];
     // Tape counts always add up from both devices (see mergeRolls)
     if ('web_tape_rolls' in opened.settings) settings.web_tape_rolls = opened.settings.web_tape_rolls;
-    counts.settings = takeKeys.length;
+    counts.settings = takeKeys.filter((key) => key !== 'web_tape_rolls').length;
   }
   const result = await restoreBackup({ ...opened, settings }, { settings: !!settings, fonts: true, history: true }, 'skip',
     base ? base.history : null);
   if (settings) setFavourites(settings.icon_favourites);
   counts.history = result.history || 0;
   counts.fonts = result.fonts || 0;
+  if (before && describe(counts)) {
+    // Undo later takes back only what this merge changed (see undoLastSync)
+    const after = await backupItemDigests(await collectBackup());
+    await storage.save('syncUndo', { ...before, after, history: historyIds() });
+    autoBackup.set({ undo: before.created });
+  }
   return counts;
 }
 
-function describe(counts) {
-  const parts = [];
+// "2 icons added, 1 template changed, 1 setting changed"
+export function describe(counts) {
   const n = (count, one, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
-  if (counts.added) parts.push(`${n(counts.added, 'thing')} added`);
-  if (counts.changed) parts.push(`${counts.changed} changed`);
-  if (counts.removed) parts.push(`${counts.removed} removed`);
-  if (counts.copies) parts.push(`${n(counts.copies, 'copy', 'copies')} kept of things changed on both devices`);
+  const parts = [];
+  for (const [part, one] of [['icons', 'icon'], ['templates', 'template']]) {
+    for (const what of ['added', 'changed', 'removed']) {
+      if (counts[part][what]) parts.push(`${n(counts[part][what], one)} ${what}`);
+    }
+  }
+  if (counts.copies) parts.push(`${n(counts.copies, 'copy', 'copies')} kept of things changed on both sides`);
   if (counts.settings) parts.push(`${n(counts.settings, 'setting')} changed`);
   if (counts.fonts) parts.push(`${n(counts.fonts, 'font')} added`);
   if (counts.history) parts.push(`${n(counts.history, 'printed label')} in the history`);
   return parts.join(', ');
 }
 
+// What this device's upload changes in Drive, from the fingerprints on both sides
+function uploadCounts(mine, theirs) {
+  const counts = emptyCounts();
+  for (const part of ['icons', 'templates']) {
+    const a = sideOf(mine, part);
+    const b = sideOf(theirs, part);
+    for (const key of Object.keys(a)) {
+      if (!(key in b)) counts[part].added++;
+      else if (a[key] !== b[key]) counts[part].changed++;
+    }
+    for (const key of Object.keys(b)) if (!(key in a)) counts[part].removed++;
+  }
+  counts.settings = Object.keys(mine.settings)
+    .filter((key) => !['icon_recent', 'web_tape_rolls'].includes(key) && mine.settings[key] !== theirs.settings[key]).length;
+  return counts;
+}
+
+// The newest syncs, for Settings: [{at, from, what, undo}], newest first
 async function logSync(entry) {
-  const log = await storage.load('syncLog', []);
-  await storage.save('syncLog', [entry, ...log].slice(0, SYNC_LOG));
+  const log = [entry, ...(await storage.load('syncLog', []))].slice(0, SYNC_LOG);
+  await storage.save('syncLog', log);
+  autoBackup.set({ log });
+}
+
+async function rememberSync(fileId, mine, remote, remoteHistory) {
+  const historyNow = historyIds();
+  await storage.save('driveSyncBase', {
+    account: drive.get().email || '',
+    file: fileId,
+    l: mine,
+    r: remote || mine,
+    history: historyNow.filter((id) => remoteHistory.includes(id)),
+  });
 }
 
 // Brings this device in step with Google Drive. A newer backup from another device is merged in
@@ -204,6 +253,7 @@ async function syncDrive({ force }) {
     autoBackup.set({ drivePending: true });
     return;
   }
+  if (autoBackup.get().join) return;
   try {
     const files = await listDriveBackups();
     const [newest] = files;
@@ -223,6 +273,7 @@ async function syncDrive({ force }) {
         base = p ? { l: p.digests, r: p.digests, history: (p.history || []).map((e) => e.id) } : null;
       }
       const from = (newest.appProperties && newest.appProperties.device) || 'other device';
+      if (autoBackup.get().join) return;  // the user picks how this device joins first
       const counts = await mergeFromDrive(opened, base, from);
       remoteDigests = opened.digests;
       remoteHistory = (opened.history || []).map((e) => e.id);
@@ -232,8 +283,8 @@ async function syncDrive({ force }) {
       autoBackup.set({ driveLast: newest.createdTime });
       const what = describe(counts);
       if (what) {
-        await logSync({ at: localTime(), from, what, file: newest.id });
-        say(`Synced from Google Drive: ${what}.`);
+        await logSync({ at: localTime(), from, what, undo: true });
+        say(`Synced from ${from}: ${what}.`);
       }
     }
     const contents = await collectBackup();
@@ -246,6 +297,8 @@ async function syncDrive({ force }) {
         digest, parent: newest ? newest.id : null, device: deviceName(), icons: contents.icons.length, templates: contents.templates.length,
       });
       syncedId = id;
+      const what = remoteDigests ? describe(uploadCounts(mine, remoteDigests)) : '';
+      if (what) await logSync({ at: localTime(), from: 'this device', what });
       remoteDigests = mine;
       remoteHistory = historyIds();
       await storage.save('driveSyncedId', id);
@@ -258,16 +311,10 @@ async function syncDrive({ force }) {
       for (const old of pruneBackups(after, { recent: DRIVE_RECENT, days: DRIVE_DAYS })) await trashDriveBackup(old).catch(() => {});
     }
     // Both sides as they are now, for the next sync to tell who changed what
-    const historyNow = historyIds();
-    await storage.save('driveSyncBase', {
-      account,
-      file: syncedId,
-      l: mine,
-      r: remoteDigests || mine,
-      history: historyNow.filter((id) => remoteHistory.includes(id)),
-    });
-    await storage.save('driveCheckedAt', localTime());
-    autoBackup.set({ driveError: '', drivePending: false, offline: false });
+    await rememberSync(syncedId, mine, remoteDigests, remoteHistory);
+    const checked = localTime();
+    await storage.save('driveCheckedAt', checked);
+    autoBackup.set({ driveError: '', drivePending: false, offline: false, checked });
   } catch (err) {
     if (offline(err)) autoBackup.set({ driveError: 'Offline. Sync goes on by itself when the internet is back.', offline: true });
     else autoBackup.set({ driveError: failed(err), drivePending: !driveReady(), offline: false });
@@ -350,13 +397,113 @@ export async function continueDriveBackup() {
   return backupNow();
 }
 
-// Right after signing in: takes what is in Drive first, then uploads what this device adds
+// Right after signing in. When Drive already has a backup and this device has things of its
+// own, the user first picks how to join (see JoinSheet); otherwise Drive's backup is merged in
+// and what this device adds is uploaded.
 export async function startDriveBackup() {
   await storage.save('driveSyncedId', null);
   await storage.save('driveSyncBase', null);
   await storage.save('driveBackupDigest', '');
   autoBackup.set({ driveError: '' });
+  const join = await previewJoin().catch(() => null);
+  if (join) { autoBackup.set({ join }); return false; }
   return backupNow();
+}
+
+// What is in Drive and what only this device has, or null when there is nothing to choose
+async function previewJoin() {
+  const [newest] = await listDriveBackups();
+  if (!newest) return null;
+  const contents = await collectBackup();
+  if (!contents.icons.length && !contents.templates.length) return null;
+  const opened = await readBackup(await downloadDriveBackup(newest));
+  const local = await backupItemDigests(contents);
+  const count = (part) => {
+    const a = sideOf(local, part);
+    const b = sideOf(opened.digests, part);
+    return {
+      onlyHere: Object.keys(a).filter((k) => !(k in b)).length,
+      differ: Object.keys(a).filter((k) => k in b && a[k] !== b[k]),
+    };
+  };
+  const icons = count('icons');
+  const tpl = count('templates');
+  if (!icons.onlyHere && !tpl.onlyHere && !icons.differ.length && !tpl.differ.length) return null;
+  return {
+    newest,
+    opened,
+    from: (newest.appProperties && newest.appProperties.device) || '',
+    drive: { icons: opened.icons.length, templates: opened.templates.length, history: (opened.history || []).length },
+    onlyHere: { icons: icons.onlyHere, templates: tpl.onlyHere },
+    differ: {
+      icons: icons.differ.length,
+      templates: tpl.differ.map((k) => (opened.templates.find((t) => t.name.toLowerCase() === k) || { name: k }).name),
+    },
+  };
+}
+
+// Joins sync the way the user picked: 'merge' keeps everything from both (things on both sides
+// that differ are kept twice), 'drive' makes this device like Drive, 'mine' makes Drive like
+// this device. Must run after startDriveBackup found something to choose.
+export async function joinDrive(how) {
+  const join = autoBackup.get().join;
+  if (!join) return backupNow();
+  autoBackup.set({ busy: true });
+  try {
+    await whileLocked(async () => {
+      await reloadPending();
+      const { opened, newest } = join;
+      const local = await backupItemDigests(await collectBackup());
+      const theirs = (opened.history || []).map((e) => e.id);
+      const base = how === 'drive' ? { l: local, r: local, history: historyIds() }
+        : how === 'mine' ? { l: opened.digests, r: opened.digests, history: theirs } : null;
+      const counts = await mergeFromDrive(opened, base, join.from || 'Drive');
+      await storage.save('driveSyncedId', newest.id);
+      await storage.save('driveBackupDigest', (newest.appProperties && newest.appProperties.digest) || '');
+      await storage.save('driveBackupLast', newest.createdTime);
+      await rememberSync(newest.id, await backupItemDigests(await collectBackup()), opened.digests, theirs);
+      const what = describe(counts);
+      await logSync({ at: localTime(), from: join.from || 'Drive', what: what ? `Joined sync: ${what}` : 'Joined sync', undo: !!what });
+      autoBackup.set({ driveLast: newest.createdTime });
+    });
+  } finally {
+    autoBackup.set({ busy: false, join: null });
+  }
+  return backupNow();
+}
+
+// Cancelled joining: nothing changed here, and sync stays off
+export function cancelJoin() {
+  autoBackup.set({ join: null });
+}
+
+// Takes back what the last sync from Drive changed here, keeping what was changed since. The
+// result goes to Drive like any other change.
+export async function undoLastSync() {
+  const copy = await storage.load('syncUndo', null);
+  if (!copy) return false;
+  autoBackup.set({ busy: true });
+  try {
+    await whileLocked(async () => {
+      await reloadPending();
+      const opened = await readBackup(new File([copy.data], 'before sync.cubebackup'));
+      const base = { l: copy.after, r: copy.after, history: copy.history };
+      const counts = await mergeFromDrive(opened, base, 'before sync', { keepUndo: false });
+      await storage.save('syncUndo', null);
+      const what = describe(counts);
+      await logSync({ at: localTime(), from: 'this device', what: what ? `Undid the last sync: ${what}` : 'Undid the last sync' });
+      autoBackup.set({ undo: null });
+    });
+  } finally {
+    autoBackup.set({ busy: false });
+  }
+  return backupNow();
+}
+
+// The copy of this device kept before the last sync, as a backup file
+export async function beforeSyncFile() {
+  const copy = await storage.load('syncUndo', null);
+  return copy ? { created: copy.created, file: new File([copy.data], 'Before the last sync.cubebackup', { type: 'application/zip' }) } : null;
 }
 
 function schedule() {
@@ -391,10 +538,11 @@ export async function stopAutoBackup() {
 
 // Loads the chosen folder and starts watching for changes once the app is ready
 export async function startAutoBackup() {
-  const [folder, last, driveLast] = await Promise.all([
-    storage.load('autoBackupFolder', null), storage.load('autoBackupLast', null), storage.load('driveBackupLast', null), loadDrive(),
+  const [folder, last, driveLast, checked, log, undo] = await Promise.all([
+    storage.load('autoBackupFolder', null), storage.load('autoBackupLast', null), storage.load('driveBackupLast', null),
+    storage.load('driveCheckedAt', null), storage.load('syncLog', []), storage.load('syncUndo', null), loadDrive(),
   ]);
-  autoBackup.set({ folder: autoBackup.get().supported ? folder : null, last, driveLast });
+  autoBackup.set({ folder: autoBackup.get().supported ? folder : null, last, driveLast, checked, log, undo: undo ? undo.created : null });
   const watch = async () => {
     if (!templates.get().ready) await loadTemplates();
     await loadHistory();

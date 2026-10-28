@@ -8,8 +8,9 @@ const PYO = process.env.PYODIDE_DIR || path.join(__dirname, '..', 'node_modules'
 const BASE = process.env.APP_URL || 'http://localhost:8000/';
 
 // --- Fake Drive, one per Google account -----------------------------------------------------
-let clock = Date.parse('2026-10-28T10:00:00Z');
-const tick = () => new Date((clock += 1000)).toISOString();
+// Drive's clock: now, but always a little later than the file before
+let clock = 0;
+const tick = () => new Date((clock = Math.max(clock + 1000, Date.now()))).toISOString();
 let nextId = 1;
 const drives = {};  // account -> Map(id -> file)
 const driveOf = (account) => (drives[account] ||= new Map());
@@ -153,7 +154,8 @@ const inPage = {
   },
   async putTemplate(page, name, text) {
     return page.evaluate(async ([name, text]) => {
-      const { putTemplate } = await import('./js/templates.js');
+      const { putTemplate, templates, loadTemplates } = await import('./js/templates.js');
+      if (!templates.get().ready) await loadTemplates();
       const { currentItem } = await import('./js/app.js');
       const item = structuredClone(currentItem());
       item.label.text = text;
@@ -163,13 +165,19 @@ const inPage = {
   async setting(page, change) {
     return page.evaluate(async (change) => (await import('./js/app.js')).updateSettings(change), change);
   },
-  async signIn(page) {
-    await page.evaluate(async () => {
+  // Signs in; when the device has things of its own and Drive has a backup, joins as `how`
+  // ('merge', 'drive' or 'mine'), or with how = null leaves the Join sheet open
+  async signIn(page, how = 'merge') {
+    await page.evaluate(async (how) => {
       const { signInToDrive } = await import('./js/gdrive.js');
-      const { startDriveBackup } = await import('./js/autobackup.js');
+      const { startDriveBackup, joinDrive, autoBackup } = await import('./js/autobackup.js');
       await signInToDrive();
       await startDriveBackup();
-    });
+      if (how && autoBackup.get().join) await joinDrive(how);
+    }, how);
+  },
+  async undo(page) {
+    await page.evaluate(async () => (await import('./js/autobackup.js')).undoLastSync());
   },
   async signOut(page) {
     await page.evaluate(async () => (await import('./js/gdrive.js')).signOutOfDrive());

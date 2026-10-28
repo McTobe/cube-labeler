@@ -6,8 +6,11 @@ import { useStore } from '../state.js';
 import { app, boot, updateSettings, labelDefaults } from '../app.js';
 import { HISTORY_SIZES, historySizeChanged } from '../history.js';
 import { saveBackup, lastBackup, readBackup, restoreBackup } from '../backup.js';
-import { autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup } from '../autobackup.js';
-import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup } from '../gdrive.js';
+import {
+  autoBackup, backupNow, chooseFolder, allowFolder, stopAutoBackup, startDriveBackup, continueDriveBackup, joinDrive, cancelJoin,
+  undoLastSync, beforeSyncFile,
+} from '../autobackup.js';
+import { drive, driveReady, signInToDrive, signOutOfDrive, listDriveBackups, downloadDriveBackup, cancelSignIn } from '../gdrive.js';
 import { ai, loadAi, setKey, setModel } from '../ai.js';
 import { errorMessage } from '../../printer.js';
 import { PrinterPanel } from '../printer-ui.js';
@@ -29,6 +32,29 @@ function formatDate(iso) {
   if (!iso) return '';
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// "17:42", "Yesterday 21:05", "Mon 26 Oct": short times for lists of syncs and versions
+function shortDate(iso, { time = true } = {}) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const clock = date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const day = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(new Date()) - day(date)) / 86400000);
+  if (days === 0) return time ? clock : 'Today';
+  if (days === 1) return time ? `Yesterday ${clock}` : 'Yesterday';
+  return date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+// "a minute ago", "5 minutes ago", "3 hours ago", or the date
+function ago(iso) {
+  const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (!(minutes >= 0)) return '';
+  if (minutes < 2) return 'a minute ago';
+  if (minutes < 60) return `${minutes} minutes ago`;
+  if (minutes < 120) return 'an hour ago';
+  if (minutes < 24 * 60) return `${Math.round(minutes / 60)} hours ago`;
+  return formatDate(iso);
 }
 
 function RestoreSheet({ opened, onClose, onDone }) {
@@ -110,17 +136,6 @@ function BackupCard() {
       setBusy(false);
     }
   };
-  const [picking, setPicking] = useState(false);
-  const d = useStore(drive);
-  const fromDrive = async (file) => {
-    setPicking(false);
-    try {
-      setOpened(await readBackup(await downloadDriveBackup(file)));
-      setMessage({ text: '', error: false });
-    } catch (err) {
-      setMessage({ text: `${file.name}: ${errorMessage(err)}`, error: true });
-    }
-  };
   const onFile = async (e) => {
     const file = e.currentTarget.files[0];
     e.currentTarget.value = '';
@@ -134,16 +149,7 @@ function BackupCard() {
   };
   const done = (result, error) => {
     setOpened(null);
-    if (error) { setMessage({ text: `Restoring failed: ${error}`, error: true }); return; }
-    const said = [];
-    if (result.icons) said.push(`${plural(result.icons.added + result.icons.replaced, 'icon')} restored`);
-    if (result.templates) said.push(`${plural(result.templates.added + result.templates.replaced, 'template')} restored`);
-    if (result.settings) said.push('settings restored');
-    if (result.fonts) said.push(`${plural(result.fonts, 'font')} added`);
-    if (result.history) said.push(`${plural(result.history, 'printed label')} added to the history`);
-    const skipped = (result.icons ? result.icons.skipped : 0) + (result.templates ? result.templates.skipped : 0);
-    if (skipped) said.push(`${skipped} kept as yours`);
-    setMessage({ text: said.length ? `Done: ${said.join(', ')}.` : 'Everything in the backup was already here.', error: false });
+    setMessage(restoredMessage(result, error));
   };
 
   const ready = phase === 'ready';
@@ -162,24 +168,37 @@ function BackupCard() {
     <div class="button-row">
       <button class="primary" disabled=${!ready || busy} onClick=${save}>${busy ? 'Saving…' : 'Save a backup'}</button>
       <button class="secondary" disabled=${!ready} onClick=${() => fileRef.current.click()}>Restore from a backup</button>
-      ${d.on && html`<button class="secondary" disabled=${!ready} onClick=${() => setPicking(true)}>Restore from Google Drive</button>`}
       <input ref=${fileRef} type="file" accept=".cubebackup,.cubeicons,application/zip" hidden onChange=${onFile} />
     </div>
     ${message.text && html`<p class=${`status-line${message.error ? ' error' : ''}`} role="status">${message.text}</p>`}
     </div>
     <${AutoBackup} ready=${ready} />
     <${RestoreSheet} opened=${opened} onClose=${() => setOpened(null)} onDone=${done} />
-    <${DrivePicker} open=${picking} onClose=${() => setPicking(false)} onPick=${fromDrive} />
   </section>`;
 }
 
-// The backups in Google Drive, to pick one to restore
-function DrivePicker({ open, onClose, onPick }) {
-  const d = useStore(drive);
+// What a restore did, for a status line
+function restoredMessage(result, error) {
+  if (error) return { text: `Restoring failed: ${error}`, error: true };
+  const said = [];
+  if (result.icons) said.push(`${plural(result.icons.added + result.icons.replaced, 'icon')} restored`);
+  if (result.templates) said.push(`${plural(result.templates.added + result.templates.replaced, 'template')} restored`);
+  if (result.settings) said.push('settings restored');
+  if (result.fonts) said.push(`${plural(result.fonts, 'font')} added`);
+  if (result.history) said.push(`${plural(result.history, 'printed label')} added to the history`);
+  const skipped = (result.icons ? result.icons.skipped : 0) + (result.templates ? result.templates.skipped : 0);
+  if (skipped) said.push(`${skipped} kept as yours`);
+  return { text: said.length ? `Done: ${said.join(', ')}.` : 'Everything in the backup was already here.', error: false };
+}
+
+// The versions in Google Drive and the copy kept here before the last sync, to pick one to restore
+function VersionsSheet({ open, onClose, onPick }) {
   const [files, setFiles] = useState(null);
+  const [before, setBefore] = useState(null);
   const [error, setError] = useState('');
   const load = async () => {
     setError('');
+    beforeSyncFile().then(setBefore, () => setBefore(null));
     try { setFiles(await listDriveBackups()); } catch (err) { setError(errorMessage(err)); }
   };
   useEffect(() => { setFiles(null); if (open && driveReady()) load(); }, [open, driveReady()]);
@@ -187,63 +206,185 @@ function DrivePicker({ open, onClose, onPick }) {
     setError('');
     try { await continueDriveBackup(); } catch (err) { setError(errorMessage(err)); }
   };
-  return html`<${Sheet} open=${open} title="Restore from Google Drive" onClose=${onClose}>
+  const holds = (f) => {
+    const p = f.appProperties || {};
+    const parts = [p.device, p.icons !== undefined && plural(Number(p.icons), 'icon'), p.templates !== undefined && plural(Number(p.templates), 'template')];
+    return parts.filter(Boolean).join(' · ') || f.name;
+  };
+  const rows = [];
+  if (files) {
+    files.forEach((f, i) => rows.push({ key: f.id, when: f.createdTime, what: holds(f), tag: i === 0 ? 'Newest' : i >= 10 ? 'Daily' : '', pick: () => onPick({ drive: f }) }));
+  }
+  if (before) {
+    const at = rows.findIndex((r) => r.when < before.created);
+    const row = { key: 'before', when: before.created, what: 'This device, just before the last sync', tag: 'On this device', pick: () => onPick({ file: before.file }) };
+    if (at < 0) rows.push(row); else rows.splice(at, 0, row);
+  }
+  return html`<${Sheet} open=${open} title="Versions" onClose=${onClose}>
     ${!driveReady()
-      ? html`<p>Sign in to Google again to see your backups.</p>
+      ? html`<p>Sign in to Google again to see the versions in your Drive.</p>
         <div class="sheet-actions"><button class="primary" onClick=${signIn}>Continue with Google</button></div>`
-      : files === null ? html`<p class="hint">${error || 'Looking for backups…'}</p>`
-        : files.length === 0 ? html`<p class="hint">No backups in the ${'"Cube Labeler backups"'} folder yet.</p>`
-          : html`<ul class="drive-files">${files.map((f) => html`<li key=${f.id}>
-              <button class="drive-file" onClick=${() => onPick(f)}>
-                <span>${formatDate(f.createdTime)}</span><span class="hint">${f.name}</span>
-              </button></li>`)}</ul>`}
+      : files === null ? html`<p class="hint">${error || 'Looking in Google Drive…'}</p>`
+        : html`<p class="hint">Pick a version to see what it holds before anything changes.</p>
+          ${rows.length === 0 ? html`<p class="hint">No versions in Google Drive yet.</p>`
+            : html`<ul class="drive-files">${rows.map((r) => html`<li key=${r.key}>
+              <button class="drive-file version-row" onClick=${r.pick}>
+                <span><span>${shortDate(r.when)}</span><span class="hint">${r.what}</span></span>
+                ${r.tag ? html`<span class="tag">${r.tag}</span>` : html`<span></span>`}
+              </button></li>`)}</ul>`}`}
     ${error && files !== null && html`<p class="status-line error">${error}</p>`}
   <//>`;
 }
 
-// Google Drive sync: sign in, see that it works, sync now, sign out. Also opened from the
-// Sync chip in the top bar.
+// The newest syncs, with Undo on the last one from Drive while it can be undone
+function SyncLog({ log, canUndo, busy, onUndo }) {
+  const shown = log.slice(0, 3);
+  if (!shown.length) return null;
+  const undoAt = canUndo ? shown.findIndex((e) => e.undo) : -1;
+  return html`<ul class="sync-log">
+    ${shown.map((e, i) => html`<li key=${`${e.at}-${i}`}>
+      <span class="when">${shortDate(e.at)}</span>
+      <span class="what"><strong>${e.from === 'this device' ? 'From this device' : `From ${e.from}`}</strong> · ${e.what}</span>
+      ${i === undoAt ? html`<button class="link-button" disabled=${busy} onClick=${onUndo}>Undo</button>` : html`<span></span>`}
+    </li>`)}
+  </ul>`;
+}
+
+// Google Drive sync: sign in, see what it did, sync now, versions, sign out. Also opened from
+// the Sync chip in the top bar.
 export function SyncPanel() {
   const ready = useStore(boot).phase === 'ready';
   const d = useStore(drive);
   const auto = useStore(autoBackup);
   const [error, setError] = useState('');
+  const [note, setNote] = useState({ text: '', error: false });
+  const [versions, setVersions] = useState(false);
+  const [opened, setOpened] = useState(null);
   const run = async (action) => {
     setError('');
     try { await action(); } catch (err) { setError(errorMessage(err)); }
   };
-  // Syncing shows only for Sync now; the quiet syncs after changes keep the time
+  // Syncing shows only for Sync now; the quiet syncs after changes keep the line as it is
   const [syncing, setSyncing] = useState(false);
   const syncNow = () => run(async () => { setSyncing(true); try { await backupNow(); } finally { setSyncing(false); } });
-  const lastLine = syncing ? html`<p class="hint last-synced">Syncing…</p>`
-    : auto.driveLast ? html`<p class="hint last-synced">Last synced: ${formatDate(auto.driveLast)}</p>` : null;
-  let state;
+  const pick = async ({ drive: f, file }) => {
+    setVersions(false);
+    try {
+      setOpened(await readBackup(f ? await downloadDriveBackup(f) : file));
+      setNote({ text: '', error: false });
+    } catch (err) {
+      setNote({ text: errorMessage(err), error: true });
+    }
+  };
+  const retention = html`<p class="hint">Google Drive keeps the last 10 versions and one a day for two weeks.</p>`;
+
   if (!d.on) {
-    state = html`<p class="hint">Sign in with Google on each device you use, and your own icons, templates, settings and print history follow you.
-      Changes are saved to a ${'"Cube Labeler backups"'} folder in your Drive and picked up by your other devices when you open the app.
-      The app can only see the files it made there.</p>
-      <div class="button-row"><button class="primary" disabled=${!ready} onClick=${() => run(async () => { await signInToDrive(); await startDriveBackup(); })}>Sign in with Google</button></div>`;
-  } else {
-    const who = d.email ? html`<strong>${d.email}</strong>` : 'Google Drive';
-    const on = driveReady();
-    state = html`
-      ${on
-        ? html`<p class="auto-on"><span class="dot on"></span><span>On, synced with ${who}.</span></p>`
-        : html`<p class="auto-on"><span class="dot"></span><span>${d.helper
-          ? 'Paused: Google asks you to sign in again.' : 'Paused: Google asks you to continue once an hour.'}</span></p>`}
-      ${lastLine}
-      ${auto.driveError && html`<p class="status-line error">${auto.driveError}</p>`}
-      <div class="button-row">
-        ${!on && html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue with Google</button>`}
-        ${on && html`<button class="secondary" disabled=${!ready || auto.busy} onClick=${syncNow}>Sync now</button>`}
-        <button class="secondary" disabled=${auto.busy} onClick=${() => run(signOutOfDrive)}>Sign out</button>
-      </div>`;
+    return html`<div class="sync-panel">
+      <p class="hint">Sign in with Google on each device you use, and your own icons, templates, settings and print history follow you.
+        Changes are saved to a ${'"Cube Labeler backups"'} folder in your Drive and picked up by your other devices when you open the app.
+        The app can only see the files it made there.</p>
+      ${d.signingIn
+        ? html`<p class="auto-on"><span class="dot wait"></span><span>Signing in… Finish in the Google window.</span></p>
+          <div class="button-row"><button class="secondary" onClick=${cancelSignIn}>Cancel</button></div>`
+        : html`<div class="button-row"><button class="primary" disabled=${!ready}
+            onClick=${() => run(async () => { await signInToDrive(); await startDriveBackup(); })}>Sign in with Google</button></div>`}
+      ${error && html`<p class="status-line error">${error}</p>`}
+    </div>`;
   }
+
+  const who = d.email ? html`<strong>${d.email}</strong>` : 'Google Drive';
+  const on = driveReady();
+  let dot = 'on';
+  let line = html`On, synced with ${who}`;
+  let sub = auto.checked ? `Up to date. Checked ${ago(auto.checked)}.` : auto.driveLast ? `Last synced ${formatDate(auto.driveLast)}.` : '';
+  if (!on) {
+    dot = 'wait';
+    line = d.helper ? 'Paused: Google asks you to sign in again.' : 'Paused: Google asks you to continue once an hour.';
+    sub = 'Changes on this device are kept and sync once you continue.';
+  } else if (syncing) {
+    sub = 'Syncing…';
+  } else if (auto.offline) {
+    dot = 'wait';
+    line = 'Waiting for the internet';
+    sub = `Changes on this device sync by themselves when you are back online.${auto.driveLast ? ` Last synced ${shortDate(auto.driveLast)}.` : ''}`;
+  } else if (auto.driveError) {
+    dot = 'error';
+    line = 'Sync has a problem';
+    sub = '';
+  }
+  const undo = () => run(async () => { await undoLastSync(); setNote({ text: 'The last sync is undone here. Your other devices follow at their next sync.', error: false }); });
   return html`<div class="sync-panel">
-    ${state}
+    <p class="auto-on"><span class=${`dot ${dot}`}></span><span>${line}</span></p>
+    ${sub && html`<p class="hint last-synced">${sub}</p>`}
+    ${auto.driveError && !auto.offline && on && html`<p class="status-line error">${auto.driveError}</p>`}
+    <${SyncLog} log=${auto.log} canUndo=${!!auto.undo && on} busy=${auto.busy} onUndo=${undo} />
+    <div class="sync-buttons">
+      ${on
+        ? html`<button class="secondary" disabled=${!ready || auto.busy || auto.offline} onClick=${syncNow}>Sync now</button>`
+        : html`<button class="primary" disabled=${!ready || auto.busy} onClick=${() => run(continueDriveBackup)}>Continue</button>`}
+      <button class="secondary" disabled=${!ready || auto.offline} onClick=${() => setVersions(true)}>Versions</button>
+      <button class="secondary" disabled=${auto.busy} onClick=${() => run(() => signOutOfDrive())}>Sign out</button>
+    </div>
+    ${retention}
+    ${note.text && html`<p class=${`status-line${note.error ? ' error' : ''}`} role="status">${note.text}</p>`}
     ${error && html`<p class="status-line error">${error}</p>`}
+    <p class="hint sync-remove"><button class="link-button" disabled=${auto.busy}
+      title="Signs out every device and takes Cube Labeler off your Google account. Your backups stay in Drive."
+      onClick=${() => run(() => signOutOfDrive({ everywhere: true }))}>Remove access on all devices</button></p>
+    <${VersionsSheet} open=${versions} onClose=${() => setVersions(false)} onPick=${pick} />
+    <${RestoreSheet} opened=${opened} onClose=${() => setOpened(null)}
+      onDone=${(result, err) => { setOpened(null); setNote(restoredMessage(result, err)); }} />
   </div>`;
 }
+
+// Joining sync on a device that has things of its own: what is where, and how to join
+export function JoinSheet() {
+  const auto = useStore(autoBackup);
+  const [how, setHow] = useState('merge');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const join = auto.join;
+  const close = async () => { cancelJoin(); await signOutOfDrive(); };
+  if (!join) return html`<${Sheet} open=${false} title="" onClose=${close} />`;
+  const here = deviceWord();
+  const list = (counts) => [counts.icons && plural(counts.icons, 'icon'), counts.templates && plural(counts.templates, 'template')]
+    .filter(Boolean).join(' and ') || 'nothing';
+  const inDrive = [plural(join.drive.icons, 'icon'), plural(join.drive.templates, 'template'), 'settings',
+    join.drive.history && plural(join.drive.history, 'printed label')].filter(Boolean);
+  const differ = [join.differ.icons && plural(join.differ.icons, 'icon'),
+    join.differ.templates.length && `${plural(join.differ.templates.length, 'template')}: ${join.differ.templates.map((n) => `“${n}”`).join(', ')}`]
+    .filter(Boolean).join('; ');
+  const hints = {
+    merge: `Keeps everything from both. Where both have a different version, Drive's is kept as a copy${join.differ.templates[0] ? `, like “${join.differ.templates[0]} (${join.from || 'Drive'})”` : ''}.`,
+    drive: `This ${here} becomes like Drive: things only here are removed, and Drive's version wins.`,
+    mine: `Drive becomes like this ${here}: things only in Drive are removed there and on your other devices.`,
+  };
+  const go = async () => {
+    setBusy(true);
+    setError('');
+    try { await joinDrive(how); } catch (err) { setError(errorMessage(err)); } finally { setBusy(false); }
+  };
+  return html`<${Sheet} open=${true} title="Join Google Drive sync" onClose=${close}>
+    <p>Your Google Drive already has Cube Labeler things from another device.</p>
+    <dl class="join-facts">
+      <dt>In Drive</dt><dd>${inDrive.slice(0, -1).join(', ')} and ${inDrive[inDrive.length - 1]}<br />
+        <span class="hint">${join.from ? `From ${join.from}, ` : ''}${shortDate(join.newest.createdTime, { time: false }).toLowerCase() === 'today'
+          ? 'today' : shortDate(join.newest.createdTime, { time: false })} at ${new Date(join.newest.createdTime).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span></dd>
+      <dt>Only here</dt><dd>${list(join.onlyHere)}</dd>
+      ${differ && html`<dt>On both, different</dt><dd>${differ}</dd>`}
+    </dl>
+    <${Segmented} label="How to join" value=${how} onChange=${setHow}
+      options=${[['merge', 'Merge both'], ['drive', "Drive's copy"], ['mine', `This ${here}'s`]]} />
+    <p class="hint">${hints[how]}</p>
+    ${error && html`<p class="status-line error">${error}</p>`}
+    <div class="sheet-actions">
+      <button class="secondary" disabled=${busy} onClick=${close}>Cancel</button>
+      <button class="primary" disabled=${busy} onClick=${go}>${busy ? 'Joining…' : 'Join sync'}</button>
+    </div>
+  <//>`;
+}
+
+const deviceWord = () => (/Android|iPhone/i.test(navigator.userAgent) ? 'phone' : /iPad/i.test(navigator.userAgent) ? 'tablet' : 'device');
 
 // Automatic backups to a folder, which can be one that Google Drive, OneDrive or Dropbox syncs
 function AutoBackup({ ready }) {

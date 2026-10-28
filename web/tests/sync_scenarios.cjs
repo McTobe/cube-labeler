@@ -121,6 +121,40 @@ const scenarios = {
     assert.deepEqual((await inPage.state(b)).templates, (await inPage.state(a)).templates);
   },
 
+  async 'joining with Drive\'s copy or this device\'s'(browser) {
+    const { a, b } = await twoDevices(browser, 'join');
+    await inPage.addIcon(a, 'Screws'); await inPage.putTemplate(a, 'Shelf', 'PC shelf');
+    await inPage.signIn(a); await inPage.settle(a);
+    await inPage.addIcon(b, 'Nails'); await inPage.putTemplate(b, 'Shelf', 'Phone shelf');
+    await inPage.signIn(b, null);
+    const join = await b.evaluate(async () => {
+      const { join } = (await import('./js/autobackup.js')).autoBackup.get();
+      return { onlyHere: join.onlyHere, differ: join.differ };
+    });
+    assert.deepEqual(join, { onlyHere: { icons: 1, templates: 0 }, differ: { icons: 0, templates: ['Shelf'] } });
+    await b.evaluate(async () => (await import('./js/autobackup.js')).joinDrive('drive'));
+    await inPage.settle(b);
+    assert.deepEqual(await inPage.state(b), await inPage.state(a));
+    assert.deepEqual((await inPage.state(b)).icons, ['Screws']);
+  },
+
+  async 'undo takes back only what the last sync changed'(browser) {
+    const { a, b } = await twoDevices(browser, 'undo');
+    await inPage.putTemplate(a, 'Shelf', 'Shelf A');
+    await inPage.signIn(a); await inPage.settle(a);
+    await inPage.signIn(b); await inPage.settle(b);
+    await inPage.putTemplate(b, 'Shelf', 'Shelf B'); await inPage.addIcon(b, 'Nails'); await inPage.settle(b);
+    await inPage.comeBack(a);
+    assert.deepEqual(await inPage.state(a), await inPage.state(b));
+    await inPage.addIcon(a, 'Fuse');  // made after the sync, so undo keeps it
+    await inPage.undo(a); await inPage.settle(a);
+    const after = await inPage.state(a);
+    assert.deepEqual(after.icons, ['Fuse']);
+    assert.deepEqual(after.templates, ['Shelf:Shelf A']);
+    await inPage.comeBack(b);
+    assert.deepEqual(await inPage.state(b), after);
+  },
+
   async 'Drive keeps 10 backups and moves older ones to its bin'(browser) {
     const pc = await newDevice(browser, 'PC'); pc.account = 'prune';
     const a = await openTab(pc);

@@ -164,10 +164,19 @@ class FlowTests(unittest.TestCase):
     def test_token_without_sign_in(self):
         self.assertEqual(self.request("POST", "/auth/token").status, 401)
 
-    def test_sign_out_revokes_and_clears(self):
+    def test_sign_out_forgets_only_this_browser(self):
+        # Revoking would remove the app from the Google account and sign out the other devices
+        session = drive_auth.seal(self.config, {"r": "1//r"})
+        google = FakeGoogle([])
+        response = self.request("POST", "/auth/signout", cookies={drive_auth.SESSION_COOKIE: session}, google=google)
+        self.assertEqual(response.status, 200)
+        self.assertEqual(google.calls, [])
+        self.assertIn("Max-Age=0", set_cookies(response)[drive_auth.SESSION_COOKIE][1])
+
+    def test_sign_out_everywhere_revokes_and_clears(self):
         session = drive_auth.seal(self.config, {"r": "1//r"})
         google = FakeGoogle([{}])
-        response = self.request("POST", "/auth/signout", cookies={drive_auth.SESSION_COOKIE: session}, google=google)
+        response = self.request("POST", "/auth/signout?everywhere=1", cookies={drive_auth.SESSION_COOKIE: session}, google=google)
         self.assertEqual(response.status, 200)
         self.assertEqual(google.calls, [(drive_auth.REVOKE_URL, {"token": "1//r"})])
         self.assertIn("Max-Age=0", set_cookies(response)[drive_auth.SESSION_COOKIE][1])
