@@ -124,6 +124,38 @@ BUILTIN_PRESETS: Dict[str, dict] = {
 # More starting points for the web version, which ships these fonts (web/fonts). The desktop
 # app keeps the six above.
 WEB_PRESETS: Dict[str, dict] = {
+    # The web version's Cable flag mode prints the text twice by itself
+    "Cable Flag / Wrap": {
+        "name": "Cable Wrap / Wire Flag",
+        "description": "The text twice, with tape between to fold round a network cable.",
+        "config": {
+            "text": "**ROUTER - ETH 1**",
+            "font_name": "JetBrains Mono",
+            "auto_fit_font": True,
+            "alignment": "center",
+            "line_spacing": 1.0,
+            "h_padding": 16,
+            "tape_width_mm": 12,
+            "tape_bg_color": "#FDD835",
+            "tape_fg_color": "#000000",
+            "layout": "flag",
+            "flag_cable_mm": 6.0,
+        }
+    },
+    "Patch Panel": {
+        "name": "Patch Panel Strip",
+        "description": "Port numbers 1 to 12 that line up with the ports of a patch panel.",
+        "config": {
+            "text": "",
+            "font_name": "Arimo Bold",
+            "text_height_mm": 5,
+            "tape_width_mm": 12,
+            "layout": "ports",
+            "port_count": 12,
+            "port_pitch_mm": 19.0,
+            "port_divider_every": 6,
+        }
+    },
     "Network Port": {
         "name": "Network Port Tag",
         "description": "Switch and port number for patch cables and wall sockets.",

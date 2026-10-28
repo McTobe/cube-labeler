@@ -295,7 +295,8 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
             self.assertEqual(cube_web._web_font("Arial Bold"), "Arimo Bold")
             self.assertEqual(cube_web._web_font("Calibri"), "Arimo")
             presets = cube_web.template_presets()
-        self.assertEqual(len(presets), len(BUILTIN_PRESETS) + len(WEB_PRESETS))
+        # A web preset of the same name replaces the desktop one
+        self.assertEqual(len(presets), len({**BUILTIN_PRESETS, **WEB_PRESETS}))
         for preset in presets:
             self.assertIn(preset["label"]["font_name"], names, preset["key"])
         for preset in WEB_PRESETS.values():

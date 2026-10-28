@@ -86,7 +86,8 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
   // size comes out far too small
   const zoom = wide ? zoomChoice : 'fit';
   // Bin labels and queue strips are on 12 mm tape; a label from the history says its own
-  const tapeMm = stripTapeMm || (strip === undefined && state.mode === 'text' ? Number(label.tape_width_mm) || 12 : 12);
+  const editing = state.mode === 'ports' ? state.ports : label;
+  const tapeMm = stripTapeMm || (strip === undefined && state.mode !== 'bin' ? Number(editing.tape_width_mm) || 12 : 12);
   const box = useStageBox(stageRef);
   const oneRow = [{ from: 0, to: 1 }];
   const lengthMm = render && render.metrics ? render.metrics.print_length_mm : 0;
@@ -115,7 +116,7 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
     </div>`;
   } else {
     // Only the label being edited can show its dots (Advanced > Show print dots)
-    const dots = strip === undefined && state.mode === 'text' && state.previewDots;
+    const dots = strip === undefined && state.mode !== 'bin' && state.previewDots;
     const tape = dots ? '#ffffff' : render.tape_bg_color;
     // Real size draws each dot at its size on paper; a long strip scrolls inside the stage
     const fit = rows.length > 1 ? fitWidth(box, natural, wide, tapeMm, rows)
@@ -148,6 +149,8 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
   }
 
   const m = render && render.metrics;
+  // A port strip says what it lines up with, in place of the print time
+  const ports = strip === undefined && render && render.item.mode === 'text' && render.item.label.layout === 'ports' ? render.item.label : null;
   const { status } = state;
   return html`<section class="card preview" aria-label="Preview">
     <div class="stage-wrap">
@@ -160,7 +163,7 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
       </div>
     </div>
     <div class="preview-bar">
-      <span class="metrics">${m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · about ${Math.max(1, Math.round(m.print_duration_sec))} s` : ''}</span>
+      <span class="metrics">${m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · ${ports ? `lines up with ${ports.port_count} ports` : `about ${Math.max(1, Math.round(m.print_duration_sec))} s`}` : ''}</span>
       <span class="preview-controls">
         ${aids && html`<span class="chip-group" role="group" aria-label="Measuring aid">
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}

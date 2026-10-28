@@ -13,6 +13,7 @@ import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetLabelSettings, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode,
+  updatePorts, PORT_COUNTS, PORT_SPACINGS,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -40,29 +41,42 @@ export function LabelPage() {
   const { mode } = useStore(app);
   // On a wide screen the text sits under the preview, so both stay in view while typing
   const wide = useWide();
-  const textHere = mode === 'text' && wide;
+  // A cable flag is the text label printed twice, so it edits the same text
+  const text = mode === 'text' || mode === 'flag';
+  let options;
+  if (mode === 'bin') {
+    options = html`${!wide && html`<${BinCard} />`}<${BinOptions} />`;
+  } else if (mode === 'ports') {
+    options = html`${!wide && html`<${PortCard} />`}<${PortSection} /><${PortFontSection} />`;
+  } else {
+    options = html`
+      ${!wide && html`<${TextCard} /><section class="card insert-card"><${InsertTabs} /></section>`}
+      ${mode === 'flag' && html`<${FlagSection} />`}
+      <${FontSection} />
+      <${TapeSection} length=${mode !== 'flag'} />
+      <${AdvancedSection} />`;
+  }
   return html`<div class="label-page">
     <div class="label-preview-col">
       <${Preview} />
-      ${textHere && html`<${TextCard} />`}
+      ${text && wide && html`<${TextCard} />`}
       ${mode === 'bin' && wide && html`<${BinCard} />`}
+      ${mode === 'ports' && wide && html`<${PortCard} />`}
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
       <${ModePicker} mode=${mode} />
-      ${mode === 'bin' ? html`${!wide && html`<${BinCard} />`}<${BinOptions} />` : html`
-        ${!wide && html`<${TextCard} /><section class="card insert-card"><${InsertTabs} /></section>`}
-        <${FontSection} />
-        <${TapeSection} />
-        <${AdvancedSection} />`}
+      ${options}
     </div>
   </div>`;
 }
 
-// The kinds of label, as tiles that wrap onto more rows when more kinds are added
+// The kinds of label, as tiles two to a row; more kinds add rows
 const MODES = [
   { id: 'text', name: 'Text label', icon: 'text' },
   { id: 'bin', name: 'Bin label', icon: 'bin' },
+  { id: 'ports', name: 'Port strip', icon: 'ports' },
+  { id: 'flag', name: 'Cable flag', icon: 'flag' },
 ];
 
 function ModePicker({ mode }) {
@@ -253,7 +267,7 @@ function FontSection() {
     <p class="hint">${settings.default_font && fonts.includes(settings.default_font)
       ? `Reset goes back to your default, ${standard}. It goes with your backups and sync.`
       : `Reset goes back to ${standard}. Make a font your default and Reset picks it on every device.`}</p>
-    <${TextSizeField} />
+    <${TextSizeField} label=${label} onChange=${updateLabel} />
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
     <${Segmented} label="Frame" options=${FRAMES} value=${label.frame}
@@ -264,18 +278,20 @@ function FontSection() {
 // Fit fills the tape; a size in mm is the height of a capital letter, the same on every label.
 // The size menu above the text still makes a line bigger or smaller than that. Sizes too tall
 // for the text are left out, and one that stops fitting goes back to Fit (see renderNow).
-function TextSizeField() {
-  const { label, render } = useStore(app);
+function TextSizeField({ label, onChange }) {
+  const { render } = useStore(app);
   const mm = label.text_height_mm;
   const chosen = TEXT_SIZES.includes(mm) ? String(mm) : 'fit';
-  const metrics = render && render.item.mode === 'text' ? render.metrics : null;
+  const ports = label.layout === 'ports';
+  const metrics = render && render.item.mode === 'text' && (render.item.label.layout === 'ports') === ports ? render.metrics : null;
   const max = metrics && metrics.max_text_height_mm;
   const fits = (v) => max == null || v <= max || String(v) === chosen;
   const options = [['fit', 'Fit'], ...TEXT_SIZES.filter(fits).map((v) => [String(v), `${v} mm`])];
   return html`<${Segmented} label="Text size" options=${options} value=${chosen}
-      onChange=${(v) => updateLabel({ text_height_mm: v === 'fit' ? null : Number(v) })} />
+      onChange=${(v) => onChange({ text_height_mm: v === 'fit' ? null : Number(v) })} />
     <p class="hint">${TEXT_SIZES.some((v) => !fits(v))
-      ? `Sizes over ${Math.floor(max * 10) / 10} mm don't fit this text on the tape, so they're left out.`
+      ? `Sizes over ${Math.floor(max * 10) / 10} mm don't fit this text ${ports ? 'between the dividers' : 'on the tape'}, so they're left out.`
+      : ports ? 'Fit makes the text as big as the ports and the tape allow. Every port gets the same size.'
       : 'Fit fills the tape height. A size in mm is the height of a capital letter, the same on every label.'}</p>`;
 }
 
@@ -418,7 +434,8 @@ function PicturePanel() {
   <${Placement} field="image" position=${label.image_position} scale=${label.image_scale} min=${0.3} max=${1.5} />`;
 }
 
-function TapeSection() {
+// length is off for a cable flag, which has a length for each side in its own card
+function TapeSection({ length = true }) {
   const { label, tapeWidths } = useStore(app);
   const [lengthText, setLengthText] = useState(label.fixed_width_mm == null ? '' : String(label.fixed_width_mm));
 
@@ -434,14 +451,131 @@ function TapeSection() {
     updateLabel({ fixed_width_mm: text.trim() !== '' && value > 0 ? value : null });
   };
 
-  return html`<${Section} id="tape" title="Tape and length" summary=${`${label.tape_width_mm} mm${label.fixed_width_mm ? `, ${label.fixed_width_mm} mm long` : ''}`}>
+  return html`<${Section} id="tape" title=${length ? 'Tape and length' : 'Tape'} summary=${`${label.tape_width_mm} mm${length && label.fixed_width_mm ? `, ${label.fixed_width_mm} mm long` : ''}`}>
     <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${label.tape_width_mm}
       onChange=${(tape_width_mm) => updateLabel({ tape_width_mm: Number(tape_width_mm) })} />
-    <${Field} label="Length in mm" hint="Empty fits the content. A length is exact: content that doesn't fit is cut off.">
+    ${length && html`<${Field} label="Length in mm" hint="Empty fits the content. A length is exact: content that doesn't fit is cut off.">
       <input type="text" inputmode="decimal" value=${lengthText} placeholder="Automatic" onInput=${onLength} />
-    <//>
+    <//>`}
     <${Select} label="Tape colour in the preview" value=${`${label.tape_bg_color}/${label.tape_fg_color}`}
       options=${TAPE_COLOURS} onChange=${(v) => { const [bg, fg] = v.split('/'); updateLabel({ tape_bg_color: bg, tape_fg_color: fg }); }} />
+  <//>`;
+}
+
+// --- Port strip ----------------------------------------------------------------------------
+
+const PORT_DIVIDERS = [['0', 'None'], ['6', 'Every 6'], ['8', 'Every 8']];
+const PORT_CONTENT = [['numbers', 'Numbers'], ['names', 'Names']];
+
+// A number typed into a field: the text as typed, and the value it holds (null while it holds none)
+function useNumberText(value, onValue, parse = Number) {
+  const [text, setText] = useState(value == null ? '' : String(value));
+  useEffect(() => {
+    const shown = text.trim() === '' ? null : parse(text.replace(',', '.'));
+    if (shown !== value) setText(value == null ? '' : String(value));
+  }, [value]);
+  const onInput = (e) => {
+    const typed = e.currentTarget.value;
+    setText(typed);
+    const number = parse(typed.replace(',', '.'));
+    onValue(typed.trim() !== '' && Number.isFinite(number) ? number : null);
+  };
+  return [text, onInput];
+}
+
+// What goes over each port, under the preview: numbers with a prefix, or a name for each port
+function PortCard() {
+  const { ports } = useStore(app);
+  const [prefix, setPrefix] = useState(ports.port_prefix);
+  useEffect(() => { if (ports.port_prefix !== prefix) setPrefix(ports.port_prefix); }, [ports.port_prefix]);
+  const names = ports.port_names.split('\n');
+  const extra = names.length > ports.port_count && names.slice(ports.port_count).some((n) => n.trim());
+  return html`<section class="card port-card">
+    <h2 class="card-title">On each port</h2>
+    <${Segmented} ariaLabel="On each port" options=${PORT_CONTENT} value=${ports.port_use_names ? 'names' : 'numbers'}
+      onChange=${(v) => updatePorts({ port_use_names: v === 'names' })} />
+    ${ports.port_use_names ? html`
+      <p class="hint">One name per line, such as NAS, Router, Office. An empty line leaves a port blank.</p>
+      <textarea class="port-names" rows="4" value=${ports.port_names} spellcheck="false" aria-label="Port names"
+        placeholder=${'NAS\nRouter\nOffice'} onInput=${(e) => updatePorts({ port_names: e.currentTarget.value })}></textarea>
+      ${extra && html`<p class="hint">Only the first ${ports.port_count} names fit on ${ports.port_count} ports.</p>`}` : html`
+      <p class="hint">The ports count up from the First number setting.</p>
+      <${Field} label="Before each number">
+        <input type="text" value=${prefix} placeholder="Nothing, or A for A1, A2 ..." spellcheck="false"
+          onInput=${(e) => { setPrefix(e.currentTarget.value); updatePorts({ port_prefix: e.currentTarget.value }); }} />
+      <//>`}
+  </section>`;
+}
+
+function PortSection() {
+  const { ports } = useStore(app);
+  const spacing = PORT_SPACINGS.find(([id]) => id === ports.port_spacing) || PORT_SPACINGS[0];
+  const [pitchText, onPitch] = useNumberText(ports.port_pitch_mm, (v) => { if (v >= 3 && v <= 60) updatePorts({ port_pitch_mm: v }); });
+  const [firstText, onFirst] = useNumberText(ports.port_first, (v) => { if (v != null) updatePorts({ port_first: v }); },
+    (t) => (/^\s*-?\d+\s*$/.test(t) ? parseInt(t, 10) : NaN));
+  const pickSpacing = (id) => {
+    const preset = PORT_SPACINGS.find(([v]) => v === id);
+    updatePorts(preset[2] ? { port_spacing: id, port_pitch_mm: preset[2] } : { port_spacing: id });
+  };
+  const pitch = ports.port_pitch_mm.toFixed(1);
+  return html`<${Section} id="ports" title="Port strip" summary=${`${ports.port_count} ports, ${pitch} mm apart`}>
+    <${Segmented} label="Ports" options=${PORT_COUNTS.map((n) => [n, String(n)])} value=${ports.port_count}
+      onChange=${(port_count) => updatePorts({ port_count: Number(port_count) })} />
+    <${Segmented} label="Port spacing" options=${PORT_SPACINGS.map(([id, name]) => [id, name])} value=${spacing[0]}
+      onChange=${pickSpacing} />
+    ${spacing[2] ? html`<p class="hint">${spacing[1]}: ${pitch} mm from port to port. Measure 6 ports and divide by 6 if yours differ.</p>`
+      : html`<${Field} label="Spacing in mm" hint="From the middle of one port to the next. Measure across 6 ports and divide by 6.">
+        <input type="text" inputmode="decimal" value=${pitchText} placeholder="19.0" onInput=${onPitch} />
+      <//>`}
+    ${!ports.port_use_names && html`<${Field} label="First number">
+      <input type="text" inputmode="numeric" value=${firstText} placeholder="1" onInput=${onFirst} />
+    <//>`}
+    <${Segmented} label="Thicker divider" options=${PORT_DIVIDERS} value=${String(ports.port_divider_every || 0)}
+      onChange=${(v) => updatePorts({ port_divider_every: Number(v) })} />
+  <//>`;
+}
+
+function PortFontSection() {
+  const { ports, fonts, tapeWidths } = useStore(app);
+  const names = fonts.length ? fonts : [ports.font_name];
+  return html`<${Section} id="port-font" title="Font and tape" summary=${`${ports.font_name}, ${ports.tape_width_mm} mm tape`}>
+    <${FontField} label="Font" value=${ports.font_name} fonts=${names} onChange=${(font_name) => updatePorts({ font_name })} />
+    <${TextSizeField} label=${ports} onChange=${updatePorts} />
+    <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${ports.tape_width_mm}
+      onChange=${(tape_width_mm) => updatePorts({ tape_width_mm: Number(tape_width_mm) })} />
+    <${Select} label="Tape colour in the preview" value=${`${ports.tape_bg_color}/${ports.tape_fg_color}`}
+      options=${TAPE_COLOURS} onChange=${(v) => { const [bg, fg] = v.split('/'); updatePorts({ tape_bg_color: bg, tape_fg_color: fg }); }} />
+  <//>`;
+}
+
+// --- Cable flag ----------------------------------------------------------------------------
+
+const CABLES = [4, 6, 8];
+
+function FlagSection() {
+  const { label } = useStore(app);
+  const preset = CABLES.includes(label.flag_cable_mm);
+  const [custom, setCustom] = useState(!preset);
+  const [cableText, onCable] = useNumberText(label.flag_cable_mm, (v) => { if (v >= 1 && v <= 30) updateLabel({ flag_cable_mm: v }); });
+  const [sideText, onSide] = useNumberText(label.flag_side_mm, (v) => updateLabel({ flag_side_mm: v > 0 ? v : null }));
+  const chosen = custom || !preset ? 'custom' : String(label.flag_cable_mm);
+  const pick = (v) => {
+    setCustom(v === 'custom');
+    if (v !== 'custom') updateLabel({ flag_cable_mm: Number(v) });
+  };
+  const wrap = Math.round(Math.PI * label.flag_cable_mm);
+  return html`<${Section} id="flag" title="Cable flag" summary=${`${label.flag_cable_mm} mm cable`}>
+    <${Segmented} label="Cable thickness" options=${[...CABLES.map((v) => [String(v), `${v} mm`]), ['custom', 'Custom']]}
+      value=${chosen} onChange=${pick} />
+    ${chosen === 'custom' ? html`<${Field} label="Thickness in mm">
+        <input type="text" inputmode="decimal" value=${cableText} placeholder="6" onInput=${onCable} />
+      <//>`
+      : html`<p class="hint">USB cables are about 4 mm thick, network cables 6 mm and power cords 8 mm.</p>`}
+    <p class="hint">The text is printed twice, with ${wrap} mm of blank tape between that goes once round the cable. Fold the two ends together and the flag reads from both sides.</p>
+    <${Field} label="Length of each side in mm" hint="Empty fits the text.">
+      <input type="text" inputmode="decimal" value=${sideText} placeholder="Automatic" onInput=${onSide} />
+    <//>
+    <${Toggle} label="Fold marks" checked=${label.flag_fold_marks} onChange=${(flag_fold_marks) => updateLabel({ flag_fold_marks })} />
   <//>`;
 }
 

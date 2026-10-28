@@ -4,6 +4,7 @@ Label rendering engine for Brother PT-P300BT.
 Generates both photorealistic tape previews and 128-dot 1-bit raster payloads for the printer.
 """
 
+import dataclasses
 import io
 import math
 from dataclasses import dataclass, field
@@ -112,10 +113,37 @@ class LabelConfig:
     # Hardware Inventory Design System (V2)
     inventory_config: Optional[object] = None  # FastenerLabelConfig or ComponentLabelConfig
 
+    # Kind of text label: "text"; "ports", one strip with a number or name over each port of a
+    # patch panel or switch; or "flag", the text twice with room between to fold round a cable
+    layout: str = "text"
+
+    # Port strip: the ports are port_pitch_mm apart, exactly, and numbered from port_first
+    port_count: int = 12
+    port_pitch_mm: float = 19.0
+    port_first: int = 1
+    port_prefix: str = ""  # before each number, as A for A1, A2...
+    port_use_names: bool = False  # port_names instead of numbers
+    port_names: str = ""  # one per line; an empty line leaves its port blank
+    port_divider_every: int = 0  # a thicker divider after every this many ports; 0 for none
+
+    # Cable flag: each side is the label's text (flag_side_mm long, or as long as it needs), and
+    # the tape between them goes once round a cable this thick
+    flag_cable_mm: float = 6.0
+    flag_side_mm: Optional[float] = None
+    flag_fold_marks: bool = True
+
 
 # A frame is drawn this thick, with this much space between it and the content
 FRAME_WIDTH_DOTS = 2
 FRAME_GAP_DOTS = 3
+
+# Port strip dividers, and the room kept between a port's text and its dividers
+PORT_DIVIDER_DOTS = 2
+PORT_THICK_DIVIDER_DOTS = 5
+PORT_TEXT_MARGIN_DOTS = 8
+PORT_TEXT_V_MARGIN_DOTS = 4
+# How far the marks where a cable flag folds reach in from the edges of the print
+FLAG_MARK_DOTS = 8
 
 # Tape between labels in a batch; each label gets half of it on both sides (14 dots ≈ 2 mm)
 BATCH_GAP_DOTS = 28
@@ -201,6 +229,9 @@ class LabelRenderer:
         self._text_height_fell_back = False
         self._cut_off_mm = 0.0
         self._barcode_bad_chars = ""
+        self._cut_off_at_mm = config.fixed_width_mm
+        if config.layout == "flag" and not is_inventory:
+            return self._render_cable_flag(config)
         # Hardware inventory layouts are designed for 64 printable dots, so they always use 12 mm tape
         spec = self._get_tape_spec(INVENTORY_TAPE_WIDTH_MM if is_inventory else config.tape_width_mm)
         printable_h = spec["printable_height"]
@@ -219,6 +250,9 @@ class LabelRenderer:
             img_canvas = Image.new("RGB", (inv_w, canvas_h), "white")
             img_canvas.paste(inv_img.convert("RGB"), (0, print_border))
             return img_canvas, spec, print_border, printable_h, canvas_h, 16
+
+        if config.layout == "ports":
+            return self._render_port_strip(config, spec, print_border, printable_h, canvas_h)
 
         # 1. Parse the styled text and leave room for a frame
         doc = rich_text.parse(config.text)
@@ -399,6 +433,103 @@ class LabelRenderer:
             "max_mm": self.MAX_TOTAL_LENGTH_MM,
         }
 
+    def port_texts(self, config: LabelConfig) -> List[str]:
+        """What goes over each port of a port strip: its name, or the prefix and its number."""
+        count = max(1, int(config.port_count))
+        if config.port_use_names:
+            names = (config.port_names or "").split("\n")
+            return [(names[i].strip() if i < len(names) else "") for i in range(count)]
+        first = int(config.port_first)
+        return [f"{config.port_prefix.strip()}{first + i}" for i in range(count)]
+
+    def _render_port_strip(
+        self, config: LabelConfig, spec: dict, print_border: int, printable_h: int, canvas_h: int
+    ) -> Tuple[Image.Image, dict, int, int, int, int]:
+        """
+        A strip with one cell per port, port_pitch_mm wide. Each cell edge is rounded to the
+        nearest dot from the start of the strip, so the error never adds up along it: every
+        port is within half a dot (0.07 mm) of where it should be.
+        """
+        count = max(1, int(config.port_count))
+        pitch = max(float(config.port_pitch_mm), 3.0) / self.DOT_PITCH_MM
+        edges = [int(round(i * pitch)) for i in range(count + 1)]
+        img_canvas = Image.new("RGB", (edges[-1], canvas_h), "white")
+        draw = ImageDraw.Draw(img_canvas)
+
+        every = int(config.port_divider_every or 0)
+        for i in range(1, count):
+            width = PORT_THICK_DIVIDER_DOTS if every > 0 and i % every == 0 else PORT_DIVIDER_DOTS
+            left = edges[i] - width // 2
+            draw.rectangle([left, print_border, left + width - 1, print_border + printable_h - 1], fill="black")
+
+        texts = self.port_texts(config)
+        layouts = {
+            t: rich_text.TextLayout(rich_text.parse(t), config.font_name, config.stroke_width, 1.0, "center")
+            for t in texts if t
+        }
+        room_w = min(b - a for a, b in zip(edges, edges[1:])) - PORT_THICK_DIVIDER_DOTS - 2 * PORT_TEXT_MARGIN_DOTS
+        room_w = max(room_w, 4)
+        room_h = printable_h - 2 * PORT_TEXT_V_MARGIN_DOTS
+
+        def widest(size: int) -> int:
+            return max(layout.render(size).width for layout in layouts.values())
+
+        def fit_width(size: int) -> int:
+            # Text width grows about in step with the size, so one guess and a few steps down
+            w = widest(size)
+            if w > room_w:
+                size = max(int(size * room_w / w), 4)
+                while size > 4 and widest(size) > room_w:
+                    size -= 1
+            return size
+
+        size = 0
+        if layouts:
+            probe = next(iter(layouts.values()))
+            fit = fit_width(min(layout.fit_size(room_h) for layout in layouts.values()))
+            self._max_text_height_mm = probe.cap_height(fit) * self.DOT_PITCH_MM
+            size = fit
+            if config.text_height_mm:
+                wanted = probe.size_for_cap_height(config.text_height_mm / self.DOT_PITCH_MM)
+                if config.text_height_fallback and wanted > fit:
+                    self._text_height_fell_back = True
+                else:
+                    size = wanted
+                    self._last_text_overflow = any(l.height(size) > printable_h for l in layouts.values())
+
+            # Every port's text sits on the same line, with its capital letters centred on the tape
+            cap = probe.cap_height(size)
+            for i, text in enumerate(texts):
+                if not text:
+                    continue
+                layout = layouts[text]
+                line = layout.doc.lines[0]
+                top, _ = layout._line_box(line, size)
+                mask = layout.render_line(line, size)
+                x = (edges[i] + edges[i + 1] - mask.width) // 2
+                y = print_border + (printable_h - cap) // 2 - (-top - cap) + config.v_shift
+                img_canvas.paste("black", (x, y), mask)
+
+        return img_canvas, spec, print_border, printable_h, canvas_h, size
+
+    def _render_cable_flag(self, config: LabelConfig) -> Tuple[Image.Image, dict, int, int, int, int]:
+        """The label drawn twice, with a blank stretch between that goes once round the cable."""
+        side_config = dataclasses.replace(
+            config, layout="text", fixed_width_mm=config.flag_side_mm, cut_line=False
+        )
+        side, spec, print_border, printable_h, canvas_h, size = self._render_base_canvas(side_config)
+        wrap = max(int(round(math.pi * max(float(config.flag_cable_mm), 1.0) / self.DOT_PITCH_MM)), 1)
+        img_canvas = Image.new("RGB", (2 * side.width + wrap, canvas_h), "white")
+        img_canvas.paste(side, (0, 0))
+        img_canvas.paste(side, (side.width + wrap, 0))
+        if config.flag_fold_marks:
+            draw = ImageDraw.Draw(img_canvas)
+            bottom = print_border + printable_h - 1
+            for x in (side.width, side.width + wrap - 1):
+                draw.line([(x, print_border), (x, print_border + FLAG_MARK_DOTS - 1)], fill="black")
+                draw.line([(x, bottom - FLAG_MARK_DOTS + 1), (x, bottom)], fill="black")
+        return img_canvas, spec, print_border, printable_h, canvas_h, size
+
     def render(
         self, config: LabelConfig
     ) -> Tuple[Image.Image, Image.Image, bytes, LabelMetrics]:
@@ -465,8 +596,8 @@ class LabelRenderer:
         if total_used_mm > self.MAX_TOTAL_LENGTH_MM:
             warning = "Label exceeds maximum print length (49.9 cm / 19.6 in)"
         elif self._cut_off_mm >= 0.5:
-            warning = (f"The content needs {config.fixed_width_mm + self._cut_off_mm:.0f} mm, so the end is cut off "
-                       f"at {config.fixed_width_mm:g} mm.")
+            warning = (f"The content needs {self._cut_off_at_mm + self._cut_off_mm:.0f} mm, so the end is cut off "
+                       f"at {self._cut_off_at_mm:g} mm.")
         elif getattr(self, "_barcode_bad_chars", ""):
             warning = (f"A barcode can't hold {self._barcode_bad_chars}. Use plain letters, numbers "
                        "and symbols.")
