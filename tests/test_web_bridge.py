@@ -446,6 +446,38 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         same = dict(contents, templates=[{"name": "A", "json": json.dumps({"font_scale": 100}, indent=2)}])
         self.assertEqual(cube_web.backup_digest(contents), cube_web.backup_digest(same))
 
+    def test_sync_fingerprints_match_after_a_round_trip(self):
+        # Sync compares what a device has with what it last synced: an icon or template that went
+        # to Drive and back unchanged must keep its fingerprint, or it would look edited
+        cells = bytearray(64 * 64)
+        cells[7] = 1
+        contents = {
+            "created": "",
+            "icons": [{"file": "Washer.png", "favourite": False, "icon": self._png(), "original": self._png("white"),
+                       "touch": bytes(cells), "meta": {"title": "Washer", "category": "My Icons", "keywords": [], "edit": {"cutoff": 128.0}}}],
+            "settings": {"web_theme": "dark", "web_default_tape_mm": 12.0, "icon_favourites": ["user/Washer.png"]},
+            "templates": [{"name": "Shelf A", "json": cube_web.template_to_desktop({"mode": "text", "label": {"text": "A"}})}],
+        }
+        mine = cube_web.backup_item_digests(contents)
+        self.assertEqual(list(mine["icons"]), ["washer.png"])
+        self.assertEqual(mine["templates"]["shelf a"]["name"], "Shelf A")
+        self.assertEqual(mine["settings"]["web_default_tape_mm"], "12")
+        opened = cube_web.open_backup(cube_web.make_backup(contents))
+        self.assertEqual(opened["digests"], dict(mine, templates={"shelf a": {"hash": mine["templates"]["shelf a"]["hash"], "name": "Shelf A"}}))
+        # What the other device keeps after restoring it gives the same fingerprints again
+        again = {
+            "created": "",
+            "icons": [dict(i, touch=i["touch"]) for i in opened["icons"]],
+            "settings": opened["settings"],
+            "templates": [{"name": t["name"], "json": cube_web.template_to_desktop(t["item"])} for t in opened["templates"]],
+        }
+        self.assertEqual(cube_web.backup_item_digests(again), mine)
+        # A change shows only on the thing that changed
+        edited = dict(contents, templates=[{"name": "Shelf A", "json": cube_web.template_to_desktop({"mode": "text", "label": {"text": "B"}})}])
+        changed = cube_web.backup_item_digests(edited)
+        self.assertNotEqual(changed["templates"], mine["templates"])
+        self.assertEqual(changed["icons"], mine["icons"])
+
     def test_desktop_backup_opens_in_the_web_version(self):
         from core import backup
         layer = Image.new("L", (64, 64), 0)

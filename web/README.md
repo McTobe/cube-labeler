@@ -20,7 +20,8 @@ It has everything the desktop app has:
   stays in the browser and is sent only to that service.
 - **Templates**, your own and the starting points, as the desktop app's `.json` files.
 - **Backups** as `.cubebackup` files that restore here or in the desktop app, and **Google Drive
-  sync** to your own Drive (the newest 3 backups are kept).
+  sync** to your own Drive. Sync merges each device's changes one by one, and keeps the newest
+  10 backups and one a day for two weeks (older ones go to Drive's bin).
 - **The printer panel**: connect, status, battery and tape, feed tape. Labels can also be saved
   as a picture.
 - **The tape counter**: say which roll is in the printer (8 m, 4 m or another length) and the

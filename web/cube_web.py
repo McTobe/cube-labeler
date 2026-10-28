@@ -770,6 +770,72 @@ def make_backup(data: Any) -> bytes:
     return out.getvalue()
 
 
+def _same_numbers(value):
+    # 100.0 from a desktop file and 100 from the page are the same setting
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, dict):
+        return {k: _same_numbers(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_same_numbers(v) for v in value]
+    return value
+
+
+def _item_digests(manifest: Dict[str, Any], members: Dict[str, bytes], files: Dict[str, bytes]) -> Dict[str, Any]:
+    """
+    A fingerprint of each thing in a backup, for sync to tell what changed on which side:
+    {"icons": {file in lower case: hash}, "templates": {file stem in lower case: {"hash", "name"}},
+     "settings": {key: the value as JSON}}. Two backups that hold the same icon, template or
+    setting give it the same fingerprint, whichever device or app made them.
+    """
+    import hashlib
+    import json
+
+    def sha(*parts: bytes) -> str:
+        h = hashlib.sha256()
+        for part in parts:
+            h.update(hashlib.sha256(part).digest())
+        return h.hexdigest()[:32]
+
+    icons = {}
+    for item in manifest.get("icons") or []:
+        file = item["file"]
+        stem = os.path.splitext(file)[0]
+        meta = json.dumps(_same_numbers(item.get("meta") or {}), sort_keys=True).encode("utf-8")
+        icons[file.lower()] = sha(meta, members.get(f"icons/{file}", b""), members.get(f"originals/{stem}.png", b""),
+                                  members.get(f"originals/{stem}{TOUCH_SUFFIX}", b""))
+    templates = {}
+    for path, content in files.items():
+        if not path.startswith(TEMPLATES_FOLDER + "/"):
+            continue
+        try:
+            # Read and written again the way a restore does, so the defaults a template gains on
+            # the way in never make it look changed
+            content = template_to_desktop(template_from_desktop(content))
+            content = json.dumps(_same_numbers(json.loads(content)), sort_keys=True).encode("utf-8")
+        except ValueError:
+            pass
+        stem = os.path.splitext(path.split("/")[-1])[0]
+        templates[stem.lower()] = {"hash": sha(content), "name": stem}
+    settings = {k: json.dumps(_same_numbers(v), sort_keys=True, default=str)
+                for k, v in (manifest.get("settings") or {}).items()}
+    return {"icons": icons, "templates": templates, "settings": settings}
+
+
+def backup_item_digests(data: Any) -> Dict[str, Any]:
+    """The fingerprints (see _item_digests) of a backup made from what the page keeps, with each
+    template's own name: {"templates": {stem: {"hash", "name"}}} names the template on the page."""
+    manifest, members, files = _backup_parts(data)
+    digests = _item_digests(manifest, members, files)
+    for template in _to_dict(data).get("templates") or []:
+        template = _to_dict(template)
+        name = str(template.get("name") or "My template")
+        stem = os.path.splitext(template_file_name(name))[0].lower()
+        if stem in digests["templates"]:
+            digests["templates"][stem]["name"] = name
+    return digests
+
+
 def backup_digest(data: Any) -> str:
     """
     Fingerprint of what a backup made from `data` would hold, leaving out when it was made
@@ -780,21 +846,11 @@ def backup_digest(data: Any) -> str:
     manifest, members, files = _backup_parts(data)
     manifest.pop("created", None)
 
-    def same_numbers(value):
-        # 100.0 from a desktop file and 100 from the page are the same setting
-        if isinstance(value, float) and value.is_integer():
-            return int(value)
-        if isinstance(value, dict):
-            return {k: same_numbers(v) for k, v in value.items()}
-        if isinstance(value, list):
-            return [same_numbers(v) for v in value]
-        return value
-
     for name, content in list(files.items()):
         if name.startswith(FONTS_FOLDER + "/"):
             continue
         try:
-            files[name] = json.dumps(same_numbers(json.loads(content)), sort_keys=True).encode("utf-8")
+            files[name] = json.dumps(_same_numbers(json.loads(content)), sort_keys=True).encode("utf-8")
         except ValueError:
             pass
     manifest["settings"] = {k: v for k, v in manifest["settings"].items() if k != "icon_recent"}
@@ -810,7 +866,8 @@ def open_backup(data: Any) -> Dict[str, Any]:
     Reads a .cubebackup (or an older .cubeicons) file from the desktop app or the web version:
     {"created", "icons": [{"file", "meta", "favourite", "icon", "original", "touch" as cells}],
      "settings": {...} or None, "templates": [{"name", "item"}], "skipped_templates": [names],
-     "fonts": [{"filename", "data"}], "history": the web version's print history as JSON text or None}.
+     "fonts": [{"filename", "data"}], "history": the web version's print history as JSON text or None,
+     "digests": a fingerprint of each icon, template and setting, as backup_item_digests gives them}.
     Raises ValueError with a readable message when it is not a backup this version can read.
     """
     import json
@@ -844,7 +901,7 @@ def open_backup(data: Any) -> Dict[str, Any]:
         if not isinstance(listed, list) or len(listed) > BACKUP_MAX_ICONS:
             raise ValueError("The backup's list of contents is damaged.")
 
-        icons, seen = [], set()
+        icons, seen, raw, raw_files = [], set(), {}, {}
         for item in listed:
             if not isinstance(item, dict) or not _safe_icon_file(item.get("file")) or item["file"].lower() in seen:
                 continue
@@ -861,10 +918,16 @@ def open_backup(data: Any) -> Dict[str, Any]:
             touch = member(f"originals/{stem}{TOUCH_SUFFIX}") if original is not None else None
             if original is None:
                 meta.pop("edit", None)
+            touch = touch if touch and _is_png(touch) else None
             icons.append({
                 "file": file, "meta": meta, "favourite": bool(item.get("favourite")), "icon": icon,
-                "original": original, "touch": touch_cells(touch) if touch and _is_png(touch) else None,
+                "original": original, "touch": touch_cells(touch) if touch else None,
             })
+            raw[f"icons/{file}"] = icon
+            if original is not None:
+                raw[f"originals/{stem}.png"] = original
+            if touch:
+                raw[f"originals/{stem}{TOUCH_SUFFIX}"] = touch
 
         settings, templates, skipped, fonts, history = None, [], [], [], None
         if manifest["format"] == BACKUP_FORMAT:
@@ -893,10 +956,14 @@ def open_backup(data: Any) -> Dict[str, Any]:
                     continue
                 try:
                     templates.append({"name": name, "item": template_from_desktop(content)})
+                    raw_files[path] = content
                 except ValueError:
                     skipped.append(name)
+    digests = _item_digests({"icons": [{"file": i["file"], "meta": i["meta"]} for i in icons], "settings": settings},
+                            raw, raw_files)
     return {"created": str(manifest.get("created") or ""), "icons": icons, "settings": settings,
-            "templates": templates, "skipped_templates": skipped, "fonts": fonts, "history": history}
+            "templates": templates, "skipped_templates": skipped, "fonts": fonts, "history": history,
+            "digests": digests}
 
 
 # --- AI icons: the page sends the request itself, straight from the browser with the key

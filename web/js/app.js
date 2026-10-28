@@ -232,6 +232,22 @@ export async function start() {
   app.get().queue.forEach(makeThumb);
 }
 
+// Another tab changed the settings or added a font
+export async function reloadSettings() {
+  const settings = { ...DEFAULT_SETTINGS, ...(await storage.load('settings', {})) };
+  app.set({ settings });
+  applyTheme(settings.theme);
+}
+
+export async function reloadFonts() {
+  if (!py) return;
+  for (const font of await storage.load('fonts', [])) {
+    try { await py.add_font(font.filename, font.data); } catch (err) { console.warn(err); }
+  }
+  const names = await py.font_names();
+  if (names.join('\n') !== app.get().fonts.join('\n')) app.set({ fonts: names });
+}
+
 export function applyTheme(theme) {
   if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
   else delete document.documentElement.dataset.theme;
@@ -560,6 +576,7 @@ export const templateFromDesktop = (data) => py.template_from_desktop(data);
 export const templateToDesktop = (item) => py.template_to_desktop(item);
 export const makeBackup = (data) => py.make_backup(data);
 export const backupDigest = (data) => py.backup_digest(data);
+export const backupItemDigests = (data) => py.backup_item_digests(data);
 export const openBackup = (data) => py.open_backup(data);
 export const pythonReady = () => py !== null;
 
