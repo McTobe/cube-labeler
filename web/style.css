@@ -443,11 +443,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 @media (max-width: 899px) {
   body.typing .nav, body.typing .action-bar { display: none; }
   /* Only typing the label text needs the room of the size line and Rulers */
-  body.typing:has(#label-text:focus) .preview-bar { display: none; }
+  body.typing:has(#label-text:focus) .preview-bar,
+  body.typing:has(#label-text:focus) .settings-head,
+  body.typing:has(#label-text:focus) .mode-switch { display: none; }
   body.typing .toast-slot { bottom: 72px; }
   .wide-text { display: none; }
   .format-bar { gap: 4px; }
   .format-bar .fmt { min-width: 38px; padding: 4px 8px; }
+  /* The toolbar only shows while the label text is being edited */
+  .text-card:not(:has(#label-text:focus)) .format-tools { display: none; }
   /* The toolbar docks on top of the keyboard while the label text is being typed */
   body.typing .text-card:focus-within .format-tools {
     position: fixed; z-index: 25; left: 0; right: 0; bottom: 0;
@@ -833,6 +837,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
 /* The kinds of label as tiles, two to a row; more kinds add rows */
+/* The line over the settings column: what the picker is for, and Reset for every kind of label */
+.settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -4px 2px 6px; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.settings-head .reset-settings { display: inline-flex; align-items: center; gap: 6px; padding: 4px 2px; color: var(--muted); font-size: 0.85rem; }
+.settings-head .reset-settings:not(:disabled):hover { color: var(--accent); }
 .mode-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;
