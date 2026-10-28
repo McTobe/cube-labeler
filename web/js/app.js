@@ -217,6 +217,7 @@ export async function start() {
     py.tape_widths(), py.font_names(), py.bin_name_suggestions(lang), py.label_languages(), py.bin_defaults(lang),
   ]);
   const current = app.get().label;
+  binStart = binDefaults;
   const binState = app.get().bin || { kind: 'fastener', ...binDefaults };
   app.set({
     tapeWidths,
@@ -297,9 +298,33 @@ export function labelDefaults() {
   };
 }
 
-export function resetLabelSettings() {
-  updateLabel({ ...DEFAULT_LABEL, ...labelDefaults(), text: app.get().label.text });
-  say('Settings reset. Your text is kept.');
+// The starting bin labels, for Reset
+let binStart = null;
+
+// What Reset settings puts back in each kind of label; what goes on the label is kept
+export const RESET_NOTES = {
+  text: 'Reset font, size, QR code, picture and tape settings? Your text is kept.',
+  flag: 'Reset the cable, font, size, QR code, picture and tape settings? Your text is kept.',
+  ports: 'Reset ports, spacing, font, size and tape? Your numbers and names are kept.',
+  bin: 'Reset the label length and drive icon? What is on the label is kept.',
+};
+
+export function resetSettings() {
+  const { mode, label, ports, bin, settings } = app.get();
+  if (mode === 'ports') {
+    const { port_use_names, port_names, port_prefix } = ports;
+    updatePorts({ ...DEFAULT_PORTS, tape_width_mm: labelDefaults().tape_width_mm, port_use_names, port_names, port_prefix });
+    say('Settings reset. Your numbers and names are kept.');
+  } else if (mode === 'bin') {
+    const start = binStart ? binStart[bin.kind] : {};
+    const change = { label_width_mm: settings.bin_label_mm || start.label_width_mm || 32 };
+    if ('simple_drive_icon' in start) change.simple_drive_icon = start.simple_drive_icon;
+    updateBin(change);
+    say('Settings reset. What is on the label is kept.');
+  } else {
+    updateLabel({ ...DEFAULT_LABEL, ...labelDefaults(), text: label.text });
+    say('Settings reset. Your text is kept.');
+  }
 }
 
 // A label saved before barcodes has no barcode fields

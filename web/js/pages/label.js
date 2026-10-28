@@ -11,7 +11,7 @@ import { Preview } from '../preview.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
-  app, boot, printer, updateLabel, resetLabelSettings, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
+  app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode,
   updatePorts, PORT_COUNTS, PORT_SPACINGS,
 } from '../app.js';
@@ -65,6 +65,7 @@ export function LabelPage() {
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
+      <${SettingsHead} mode=${mode} />
       <${ModePicker} mode=${mode} />
       ${options}
     </div>
@@ -78,6 +79,17 @@ const MODES = [
   { id: 'ports', name: 'Port strip', icon: 'ports' },
   { id: 'flag', name: 'Cable flag', icon: 'flag' },
 ];
+
+// A slim line over the settings with Reset, which works the same for every kind of label
+function SettingsHead({ mode }) {
+  const { phase } = useStore(boot);
+  return html`<div class="settings-head">
+    <span>Kind of label</span>
+    <button class="link-button reset-settings" disabled=${phase !== 'ready'}
+      onClick=${() => { if (confirm(RESET_NOTES[mode])) resetSettings(); }}>
+      <${Icon} name="undo" size=${16} /> Reset settings</button>
+  </div>`;
+}
 
 function ModePicker({ mode }) {
   return html`<div class="mode-switch" role="tablist" aria-label="Kind of label">
@@ -181,7 +193,7 @@ function TextCard() {
         <span class="fmt-group">
           <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text wide-text">Column</span></button>
         </span>
-        <button class="fmt help" title="How styling works" aria-label="How styling works" onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+        <button class="fmt help" title="How styling works" aria-label="How styling works" onPointerDown=${keepFocus} onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
       </div>
     </div>
     <textarea id="label-text" ref=${ref} rows="3" value=${label.text} spellcheck="false"
@@ -596,7 +608,6 @@ function AdvancedSection() {
     <${Toggle} label="Show print dots in the preview" checked=${previewDots}
       onChange=${(on) => app.set({ previewDots: on })} />
 
-    <button class="secondary" onClick=${() => { if (confirm('Reset font, size, QR code, picture and tape settings? Your text is kept.')) resetLabelSettings(); }}>Reset settings</button>
   <//>`;
 }
 
