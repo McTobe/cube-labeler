@@ -56,7 +56,7 @@ Other Brother models are not tested. The printing code and the CLI also run on m
 
 Since 2.0 the web version is the main way to use Cube Labeler. It runs the same Python label code in the browser and prints over Bluetooth from Chrome or Edge on Android, Windows, macOS and Linux (iPhone and iPad can't, as Safari has no Web Serial). It has the same features as the desktop app, and can back up to Google Drive.
 
-- **Use it:** open <https://print.tobezone.com>, pair the printer in your phone's or computer's Bluetooth settings and choose **Connect printer**. Labels, icons and settings stay in your browser, and after the first visit it also starts offline. See [About](https://print.tobezone.com/about.html) and the [privacy policy](https://print.tobezone.com/privacy.html).
+- **Use it:** open <https://print.tobezone.com>, pair the printer in your phone's or computer's Bluetooth settings and choose **Connect printer**. Labels, icons and settings stay in your browser, and after the first visit it also starts offline. The [web usage guide](docs/web-guide.md) walks through the rest. See [About](https://print.tobezone.com/about.html) and the [privacy policy](https://print.tobezone.com/privacy.html).
 - **Try it locally:** double-click `run_web.bat` (or run `python web/serve.py`). It opens the page and prints the address to open on your phone.
 - **Host your own:** every release publishes a Docker image (`ghcr.io/mctobe/cube-labeler-web`) that serves the site on port 80, behind a reverse proxy that adds HTTPS. See [docker-compose.yml](docker-compose.yml) and, for Google Drive sync without signing in every hour, [docs/google-sign-in.md](docs/google-sign-in.md).
 
@@ -82,9 +82,9 @@ In the web version, choose **Connect printer** and pick the printer in the brows
 
 ## Usage
 
-This section describes the desktop app; the web version works the same way, with its pages in a sidebar or, on a phone, in tabs.
+For the web version, see the **[web usage guide](docs/web-guide.md)**: connecting the printer, making labels, the kinds of label, the queue, history, the tape counter, sync and using it on a phone, step by step with pictures.
 
-The window has a **left rail** for switching views, the **tape preview** in the middle and the **printer chip** at the top right.
+The rest of this section is about the desktop app. Its window has a **left rail** for switching views, the **tape preview** in the middle and the **printer chip** at the top right.
 
 | View | What it's for |
 |---|---|
@@ -163,6 +163,16 @@ python -m unittest discover tests
 ```
 
 The tests run on Windows and Linux in CI. On machines without tkinter the GUI tests are skipped.
+
+### Updating the guide's screenshots
+
+`tools/screenshots.js` opens the web app in a headless Chrome, fakes a connected printer and takes every picture in [docs/web-guide.md](docs/web-guide.md) again, into `docs/images/guide/`. Run it after a change to the pages it shows:
+
+```bash
+python web/build.py
+npm install --no-save playwright && npx playwright install chromium   # once
+node tools/screenshots.js
+```
 
 ### Project layout
 
