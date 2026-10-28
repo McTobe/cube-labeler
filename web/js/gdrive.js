@@ -175,20 +175,34 @@ async function call(url, options = {}, again = true) {
 const json = async (url, options) => (await call(url, options)).json();
 const quoted = (text) => `'${text.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
-// The backups folder: the one made before if it is still there, otherwise a new one
+// The backups folder carries this tag, so every device finds the same one even after it is
+// renamed or moved in Drive. Folders made by older versions are found by name and tagged.
+const FOLDER_TAG = { cubeLabeler: 'backups' };
+const tagQuery = `appProperties has { key='cubeLabeler' and value='backups' } and mimeType = '${FOLDER_TYPE}' and trashed = false`;
+
+// The backups folder: the one made before if it is still there, otherwise the oldest tagged
+// one (two devices that signed in at the same moment may each have made one), otherwise a new one
 async function folderId() {
   const known = drive.get().folderId;
   if (known) {
     const folder = await json(`${API}/files/${known}?fields=id,trashed`).catch(() => null);
     if (folder && !folder.trashed) return known;
   }
-  const q = `name = ${quoted(FOLDER_NAME)} and mimeType = '${FOLDER_TYPE}' and trashed = false`;
-  const found = await json(`${API}/files?q=${encodeURIComponent(q)}&fields=files(id)&spaces=drive`);
-  const id = found.files.length ? found.files[0].id
+  const search = async (q) => (await json(`${API}/files?q=${encodeURIComponent(q)}&orderBy=createdTime&fields=files(id)&spaces=drive`)).files;
+  let [found] = await search(tagQuery);
+  if (!found) {
+    [found] = await search(`name = ${quoted(FOLDER_NAME)} and mimeType = '${FOLDER_TYPE}' and trashed = false`);
+    if (found) {
+      await call(`${API}/files/${found.id}?fields=id`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appProperties: FOLDER_TAG }),
+      }).catch(() => {});
+    }
+  }
+  const id = found ? found.id
     : (await json(`${API}/files?fields=id`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_TYPE }),
+      body: JSON.stringify({ name: FOLDER_NAME, mimeType: FOLDER_TYPE, appProperties: FOLDER_TAG }),
     })).id;
   drive.set({ folderId: id });
   await storage.save('driveFolderId', id);
@@ -208,22 +222,29 @@ export async function downloadDriveBackup(file) {
   return new File([data], file.name, { type: 'application/zip' });
 }
 
-// Uploads a backup and keeps the newest `keep` of the ones the app put there; returns its id.
-// The fingerprint of what it holds goes along, so other devices can tell what they have.
-export async function uploadDriveBackup(name, data, keep, digest) {
+// Uploads a backup and returns its id. about goes along as the file's app properties: the
+// fingerprint of what it holds (digest), the backup it was made on top of (parent), the device
+// and how many icons and templates it holds, so other devices can tell what they have.
+export async function uploadDriveBackup(name, data, about) {
   const parent = await folderId();
+  const appProperties = Object.fromEntries(Object.entries(about).filter(([, v]) => v !== null && v !== undefined).map(([k, v]) => [k, String(v)]));
   const boundary = `cube-${Math.random().toString(36).slice(2)}`;
   const body = new Blob([
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`,
-    JSON.stringify({ name, parents: [parent], mimeType: 'application/zip', appProperties: { digest } }),
+    JSON.stringify({ name, parents: [parent], mimeType: 'application/zip', appProperties }),
     `\r\n--${boundary}\r\nContent-Type: application/zip\r\n\r\n`,
     data,
     `\r\n--${boundary}--`,
   ]);
   const { id } = await (await call(UPLOAD, { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body })).json();
-  const all = await listDriveBackups();
-  for (const old of all.slice(keep)) await call(`${API}/files/${old.id}`, { method: 'DELETE' }).catch(() => {});
   return id;
+}
+
+// Moves a backup to Drive's bin, where the user can still get it back for 30 days
+export async function trashDriveBackup(id) {
+  await call(`${API}/files/${id}?fields=id`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }),
+  });
 }
 
 // Forgets the token when it runs out, so the page shows that syncing waits for a click
@@ -268,7 +289,11 @@ export async function signOutOfDrive() {
   if (helper) await fetch('/auth/signout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
   else if (token && window.google) window.google.accounts.oauth2.revoke(token.value, () => {});
   drive.set({ on: false, email: '', token: null, kept: false });
-  await Promise.all([storage.save('driveOn', false), storage.save('driveToken', null), storage.save('driveEmail', ''), storage.save('driveKept', false)]);
+  // What this device last synced belongs to that account: the next sign-in starts afresh, so
+  // signing in with another account only ever adds to this device
+  await Promise.all([storage.save('driveOn', false), storage.save('driveToken', null), storage.save('driveEmail', ''), storage.save('driveKept', false),
+    storage.save('driveSyncBase', null), storage.save('driveSyncedId', null), storage.save('driveFolderId', null)]);
+  drive.set({ folderId: null });
 }
 
 export async function loadDrive() {

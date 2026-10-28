@@ -5,6 +5,22 @@
 const DB_NAME = 'cube-labeler';
 const STORE = 'kv';
 
+// Tabs of the app share this storage but each keeps its own copy in memory. When one saves
+// something that backups and sync carry, it tells the others, which read it again, so an
+// older tab never saves or syncs over a newer change.
+const SHARED_KEYS = new Set([
+  'userIcons', 'iconFavourites', 'iconRecent', 'templates', 'settings', 'history', 'fonts', 'desktopSettings',
+  'driveOn', 'driveEmail', 'driveKept',
+]);
+const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('cube-labeler-storage') : null;
+const listeners = [];
+
+// fn(key) runs when another tab saved key
+export function onOtherTabSaved(fn) {
+  listeners.push(fn);
+}
+if (channel) channel.onmessage = ({ data }) => { if (data && SHARED_KEYS.has(data.key)) listeners.forEach((fn) => fn(data.key)); };
+
 let dbPromise = null;
 
 function openDb() {
@@ -43,6 +59,7 @@ export async function load(key, fallback = undefined) {
 export async function save(key, value) {
   try {
     await run('readwrite', (store) => store.put(value, key));
+    if (channel && SHARED_KEYS.has(key)) channel.postMessage({ key });
   } catch (err) {
     console.warn(`Could not save ${key}:`, err);
   }

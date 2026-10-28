@@ -34,6 +34,16 @@ export async function loadLibrary() {
   library.set({ ready: true, categories: data.categories, builtIn: data.icons, user, favourites, recent });
 }
 
+// Another tab changed the user's icons, favourites or recently used
+export async function reloadUserIcons() {
+  if (!library.get().ready) return;
+  const [user, favourites, recent] = await Promise.all([
+    storage.load('userIcons', []), storage.load('iconFavourites', []), storage.load('iconRecent', []),
+  ]);
+  for (const key of [...userUrls.keys()]) forgetUrl(key);
+  library.set({ user, favourites, recent });
+}
+
 export const views = () => [ALL, FAVOURITES, RECENT, ...library.get().categories, USER_CATEGORY];
 
 function allIcons() {

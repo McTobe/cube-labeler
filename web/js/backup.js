@@ -73,8 +73,8 @@ export async function readBackup(file) {
 }
 
 // Restores the chosen parts ({icons, settings, templates, fonts, history}) of a read backup.
-// historyGone: the history entries this device had at the last sync, for Drive sync
-export async function restoreBackup(opened, parts, onConflict, historyGone = null) {
+// historySynced: the history entries both sides had at the last sync, for Drive sync
+export async function restoreBackup(opened, parts, onConflict, historySynced = null) {
   const result = { icons: null, templates: null, settings: false, fonts: null, history: null };
   // Fonts first, so restored labels and templates find them
   if (parts.fonts && opened.fonts && opened.fonts.length) result.fonts = await restoreFonts(opened.fonts);
@@ -129,6 +129,6 @@ export async function restoreBackup(opened, parts, onConflict, historyGone = nul
     result.settings = true;
     if ('history_keep' in change) historySizeChanged();
   }
-  if (parts.history && opened.history) result.history = await restoreHistory(opened.history, historyGone);
+  if (parts.history && opened.history) result.history = await restoreHistory(opened.history, historySynced);
   return result;
 }

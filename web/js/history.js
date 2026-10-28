@@ -181,10 +181,11 @@ export function readBackupHistory(text) {
   }
 }
 
-// Adds a backup's history to this one. An entry on both sides keeps the newer change; with
-// gone (ids that were here at the last sync), entries the other device removed go here too.
-// Returns how many entries were added or changed.
-export async function restoreHistory(incoming, gone = null) {
+// Adds a backup's history to this one. An entry on both sides keeps the newer change. With
+// synced (the ids both sides had at the last sync), entries the other device removed go here
+// too, and entries removed here are not brought back. Returns how many entries were added,
+// changed or removed.
+export async function restoreHistory(incoming, synced = null) {
   await loadHistory();
   const mine = new Map(history.get().entries.map((e) => [e.id, e]));
   const theirs = new Map(incoming.map((e) => [e.id, e]));
@@ -192,6 +193,7 @@ export async function restoreHistory(incoming, gone = null) {
   const merged = [];
   for (const e of incoming) {
     const here = mine.get(e.id);
+    if (!here && synced && synced.includes(e.id)) continue;
     if (here && (here.changed || here.printed) >= (e.changed || e.printed)) merged.push(here);
     else {
       merged.push({ ...e, thumb: here && sameLabel(here, e) ? here.thumb : null, noThumb: false });
@@ -200,7 +202,7 @@ export async function restoreHistory(incoming, gone = null) {
   }
   for (const e of mine.values()) {
     if (theirs.has(e.id)) continue;
-    if (gone && gone.includes(e.id)) { count++; continue; }
+    if (synced && synced.includes(e.id)) { count++; continue; }
     merged.push(e);
   }
   // Newest first, and the same label printed on two devices kept once
@@ -216,3 +218,10 @@ export async function restoreHistory(incoming, gone = null) {
 }
 
 export const historyIds = () => history.get().entries.map((e) => e.id);
+
+// Another tab changed the history
+export async function reloadHistory() {
+  if (!history.get().ready) return;
+  show(await storage.load('history', []));
+  makeThumbs();
+}

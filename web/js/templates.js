@@ -12,6 +12,17 @@ export async function loadTemplates() {
   templates.set({ ready: true, mine, presets });
 }
 
+// Another tab changed the user's templates
+export async function reloadTemplates() {
+  if (!templates.get().ready) return;
+  const mine = await storage.load('templates', []);
+  const thumbs = { ...templates.get().thumbs };
+  for (const key of Object.keys(thumbs)) {
+    if (key.startsWith('mine:')) { URL.revokeObjectURL(thumbs[key]); delete thumbs[key]; }
+  }
+  templates.set({ mine, thumbs });
+}
+
 const sameName = (a, b) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 export function findTemplate(name) {
