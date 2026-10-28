@@ -19,8 +19,10 @@ nginx, which passes `/auth/` to it.
 3. Whenever the app needs to talk to Drive and its one-hour token is about to run out, it
    POSTs to `/auth/token`. The helper uses the refresh token to get a new one from Google and
    hands it to the page. No click is needed.
-4. **Sign out** POSTs to `/auth/signout`, which asks Google to cancel the refresh token and
-   removes the cookie.
+4. **Sign out** POSTs to `/auth/signout`, which removes the cookie, so only this browser is
+   signed out. **Remove access on all devices** adds `?everywhere=1`, and the helper also asks
+   Google to cancel the refresh token, which takes Cube Labeler off the Google account and
+   signs out every device.
 
 The helper stores nothing on the server, so there is no database or volume, and any number
 of people can sign in. Backups still go straight from the browser to Google Drive. Without

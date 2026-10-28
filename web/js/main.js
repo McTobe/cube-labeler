@@ -5,7 +5,7 @@ import { html } from './html.js';
 import { Icon } from './icons.js';
 import { PrinterChip } from './printer-ui.js';
 import { LabelPage } from './pages/label.js';
-import { SettingsPage, SyncPanel } from './pages/settings.js';
+import { SettingsPage, SyncPanel, JoinSheet } from './pages/settings.js';
 import { Sheet } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
@@ -49,8 +49,9 @@ function currentPage() {
   return PAGES.find((p) => p.id === id) || PAGES[0];
 }
 
-// Google Drive sync at a glance: green when syncing works, amber when Google wants a click
-// (every hour, or once more when the server keeps people signed in), red after an error, grey when it is off. Clicking it opens the sync box.
+// Google Drive sync at a glance: green when syncing works, amber when offline or when Google
+// wants a click (every hour, or once more when the server keeps people signed in), red after
+// an error, grey when it is off. Clicking it opens the sync box.
 function SyncChip() {
   const d = useStore(drive);
   const auto = useStore(autoBackup);
@@ -60,6 +61,9 @@ function SyncChip() {
   if (d.on && !driveReady()) {
     state = 'paused';
     title = d.helper ? 'Sync is paused: Google asks you to sign in again.' : 'Sync is paused: Google asks you to continue once an hour.';
+  } else if (d.on && auto.offline) {
+    state = 'wait';
+    title = 'Offline: changes sync by themselves when the internet is back.';
   } else if (d.on && auto.driveError) {
     state = 'error';
     title = `Sync failed: ${auto.driveError}`;
@@ -72,7 +76,8 @@ function SyncChip() {
     </button>
     <${Sheet} open=${open} title="Sync with Google Drive" onClose=${() => setOpen(false)}>
       <${SyncPanel} />
-    <//>`;
+    <//>
+    <${JoinSheet} />`;
 }
 
 function App() {

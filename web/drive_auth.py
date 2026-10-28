@@ -299,7 +299,10 @@ def handle(config, method, target, headers, post=post_form, now=time.time):
     if path == "/auth/signout" and method == "POST":
         if not same_origin(headers, url):
             return json_response({"error": "origin"}, 403)
-        if session and session.get("r"):
+        # Google takes revoking as removing the app from the account, which signs out every
+        # device, so only "everywhere" does it; otherwise only this browser forgets the sign-in
+        everywhere = (query.get("everywhere") or [""])[0] == "1"
+        if everywhere and session and session.get("r"):
             try:
                 post(REVOKE_URL, {"token": session["r"]})
             except GoogleError:

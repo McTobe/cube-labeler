@@ -30,6 +30,7 @@ export const drive = createStore({
   folderId: null,
   helper: false,  // the server can keep people signed in
   kept: false,  // signed in through the helper, so new tokens come without a click
+  signingIn: false,  // the Google window is open
 });
 
 const fresh = (token) => !!token && token.expires > Date.now() + 60000;
@@ -91,6 +92,12 @@ async function setKept(kept) {
 // Signing in happens in a small window, so the label being made and the printer connection
 // stay as they are. Opens the window right away, so it must run from a click.
 let signingIn = null;
+let cancelSigningIn = null;
+
+// Stops waiting for the Google window (the user closed it, or changed their mind)
+export function cancelSignIn() {
+  if (cancelSigningIn) cancelSigningIn();
+}
 function signInWithHelper(hint) {
   const params = hint ? `?login_hint=${encodeURIComponent(hint)}` : '';
   const popup = window.open(`/auth/start${params}`, 'cube-google-sign-in', 'popup,width=500,height=650');
@@ -103,9 +110,13 @@ function signInWithHelper(hint) {
       clearTimeout(timeout);
       window.removeEventListener('focus', onFocus);
       signingIn = null;
+      cancelSigningIn = null;
+      drive.set({ signingIn: false });
       if (error) reject(error);
       else resolve();
     };
+    cancelSigningIn = () => finish(new Error('Sign-in was cancelled.'));
+    drive.set({ signingIn: true });
     channel.onmessage = ({ data }) => finish(data && data.ok ? null : new Error((data && data.error) || 'Google sign-in failed.'));
     // In case the message is missed (the window was closed by hand after signing in)
     const onFocus = () => setTimeout(async () => {
@@ -284,10 +295,12 @@ export async function continueDrive() {
   }
 }
 
-export async function signOutOfDrive() {
+// Signs this device out. Google treats taking back a token as removing Cube Labeler from the
+// account, which would sign out every device, so that only happens with everywhere.
+export async function signOutOfDrive({ everywhere = false } = {}) {
   const { token, helper } = drive.get();
-  if (helper) await fetch('/auth/signout', { method: 'POST', credentials: 'same-origin' }).catch(() => {});
-  else if (token && window.google) window.google.accounts.oauth2.revoke(token.value, () => {});
+  if (helper) await fetch(`/auth/signout${everywhere ? '?everywhere=1' : ''}`, { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+  else if (everywhere && token && window.google) window.google.accounts.oauth2.revoke(token.value, () => {});
   drive.set({ on: false, email: '', token: null, kept: false });
   // What this device last synced belongs to that account: the next sign-in starts afresh, so
   // signing in with another account only ever adds to this device
