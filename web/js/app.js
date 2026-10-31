@@ -485,6 +485,9 @@ export const toggleStyle = (text, start, end, style) => py.toggle_style(text, st
 export const restyleLines = (text, start, end, changes) => py.restyle_lines(text, start, end, changes);
 export const lineStyleAt = (text, pos) => (py ? py.line_style_at(text, pos) : Promise.resolve(['normal', null]));
 
+// How dense a QR code of data prints on a tape (see qr_fit in cube_web.py)
+export const qrFit = (data, tapeWidth, scale) => (py ? py.qr_fit(data, tapeWidth, scale) : Promise.resolve(null));
+
 // Font menus show each font in its own face. The files come from Python, each loaded once.
 const fontFaces = new Map();
 let fontFaceCount = 0;

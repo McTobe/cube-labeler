@@ -9,12 +9,13 @@ import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
 import { markerHtml, stylesAt } from '../marker-view.js';
+import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel } from '../qr-helpers.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode,
-  updatePorts, PORT_COUNTS, PORT_SPACINGS,
+  updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -385,34 +386,6 @@ function TextSizeField({ label, onChange }) {
       : 'Fit fills the tape height. A size in mm is the height of a capital letter, the same on every label.'}</p>`;
 }
 
-function wifiCode({ ssid, password, security, hidden }) {
-  const esc = (s) => s.replace(/([\;,:"])/g, '\\$1');
-  let code = `WIFI:T:${security};S:${esc(ssid)};`;
-  if (security !== 'nopass') code += `P:${esc(password)};`;
-  if (hidden) code += 'H:true;';
-  return `${code};`;
-}
-
-function WifiForm({ onDone }) {
-  const [wifi, setWifi] = useState({ ssid: '', password: '', security: 'WPA', hidden: false });
-  const set = (change) => setWifi({ ...wifi, ...change });
-  const submit = (e) => {
-    e.preventDefault();
-    updateLabel({ qr_enabled: true, qr_data: wifiCode(wifi) });
-    onDone();
-  };
-  return html`<form class="wifi-form" onSubmit=${submit}>
-    <${Field} label="Network name"><input required value=${wifi.ssid} autocomplete="off" onInput=${(e) => set({ ssid: e.currentTarget.value })} /><//>
-    <${Segmented} label="Security" value=${wifi.security} options=${[['WPA', 'WPA/WPA2/WPA3'], ['WEP', 'WEP'], ['nopass', 'None']]}
-      onChange=${(security) => set({ security })} />
-    ${wifi.security !== 'nopass' && html`<${Field} label="Password">
-      <input value=${wifi.password} autocomplete="off" onInput=${(e) => set({ password: e.currentTarget.value })} /><//>`}
-    <${Toggle} label="Hidden network" checked=${wifi.hidden} onChange=${(hidden) => set({ hidden })} />
-    <p class="hint">Phones that scan the code join the network. Anyone who sees the label can read the password.</p>
-    <div class="button-row"><button class="primary" type="submit">Use this network</button></div>
-  </form>`;
-}
-
 // --- Extras next to the text ---------------------------------------------------------------
 
 // The things that can go next to the text, as tabs; a dot marks the ones on the label.
@@ -453,22 +426,102 @@ function Placement({ position, scale, min, max, field }) {
 
 function QrPanel() {
   const { label } = useStore(app);
-  const [wifiOpen, setWifiOpen] = useState(false);
+  const [helper, setHelper] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const data = label.qr_data || '';
+  const open = (h) => setHelper(h);
   return html`<div class="insert-group">
       <${Toggle} label="Add a QR code" checked=${label.qr_enabled} onChange=${(qr_enabled) => updateLabel({ qr_enabled })} />
-      <div class="row icon-row">
-        <${Field} label="Content: a link or text">
-          <input type="text" value=${label.qr_data} placeholder="https://example.com"
-            onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: e.currentTarget.value !== '' })} />
-        <//>
-        <button class="secondary" title="Make a code that joins a Wi-Fi network" onClick=${() => setWifiOpen(true)}>
-          <${Icon} name="wifi" size=${18} /> Wi-Fi</button>
+      <div class="field">
+        <div class="field-label-row"><label class="field-label" for="qr-data">Content: a link or text</label>
+          ${label.qr_enabled && html`<${QrFitLine} short data=${data} tape=${label.tape_width_mm} scale=${label.qr_scale} />`}</div>
+        <input id="qr-data" type="text" value=${data} placeholder="https://example.com"
+          onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: e.currentTarget.value !== '' })} />
       </div>
+      <div class="qr-helpers" role="group" aria-label="Make the content">
+        ${QR_HELPERS.slice(0, QR_ROW).map((h) => html`<button class="secondary" onClick=${() => open(h)}>
+          <${Icon} name=${h.icon} size=${18} /><span>${h.name}</span></button>`)}
+        <span class="menu-anchor">
+          <button class="secondary" aria-haspopup="menu" aria-expanded=${moreOpen} onClick=${() => setMoreOpen(true)}>
+            <span>More</span><span class="caret" aria-hidden="true">▾</span></button>
+          <${Menu} open=${moreOpen} onClose=${() => setMoreOpen(false)}
+            items=${QR_HELPERS.slice(QR_ROW).map((h) => ({ label: h.name, icon: h.icon, action: () => open(h) }))} />
+        </span>
+      </div>
+      ${looksLikeSite(data) && html`<p class="hint qr-site">Phones show this as text. <button class="link-button"
+        onClick=${() => updateLabel({ qr_data: `https://${data.trim()}`, qr_enabled: true })}>Add https://</button> to make it a link.</p>`}
     </div>
     <${Placement} field="qr" position=${label.qr_position} scale=${label.qr_scale} min=${0.6} max=${1.1} />
-    <${Sheet} open=${wifiOpen} title="Wi-Fi QR code" onClose=${() => setWifiOpen(false)}>
-      <${WifiForm} onDone=${() => setWifiOpen(false)} />
-    <//>`;
+    ${helper && html`<${Sheet} open=${true} title=${helper.title} onClose=${() => setHelper(null)}>
+      <${HelperForm} helper=${helper} onDone=${() => setHelper(null)} />
+    <//>`}`;
+}
+
+// Whether phones will read the code at this tape width and size
+function QrFitLine({ data, tape, scale, short = false }) {
+  const [fit, setFit] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const timer = setTimeout(async () => {
+      const result = data.trim() ? await qrFit(data, tape, scale) : null;
+      if (live) setFit(result);
+    }, 150);
+    return () => { live = false; clearTimeout(timer); };
+  }, [data, tape, scale]);
+  const level = fit && fitLevel(fit.dots_per_module);
+  if (!level) return null;
+  const brief = { ok: 'Scans well', small: 'Hard to scan', dense: 'Too dense' }[level];
+  const text = {
+    ok: `Should scan well on ${tape} mm tape.`,
+    small: `Small squares on ${tape} mm tape: it may need a steady phone. Shorter content helps.`,
+    dense: `Too dense for ${tape} mm tape: phones may not read it. Use shorter content, or a bigger size or tape.`,
+  }[level];
+  return html`<p class=${`qr-fit ${level}`} title=${short ? text : undefined}><span class="qr-fit-dot" aria-hidden="true"></span>${short ? brief : text}</p>`;
+}
+
+// A helper's form in a sheet, with the code it makes and how well that scans on this tape
+function HelperForm({ helper, onDone }) {
+  const { label } = useStore(app);
+  const [values, setValues] = useState(() => helperDefaults(helper));
+  const [locating, setLocating] = useState(false);
+  const set = (change) => setValues({ ...values, ...change });
+  const code = helperCode(helper, values);
+  const submit = (e) => {
+    e.preventDefault();
+    if (!code) return;
+    updateLabel({ qr_enabled: true, qr_data: code });
+    onDone();
+  };
+  const locate = (key) => {
+    if (!navigator.geolocation) { say("This browser can't tell where you are."); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setLocating(false); set({ [key]: `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}` }); },
+      () => { setLocating(false); say("Couldn't get your location. Paste coordinates or a map link instead."); },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  };
+  const field = (f) => {
+    if (f.when && !f.when(values)) return null;
+    const value = values[f.key];
+    const onInput = (e) => set({ [f.key]: e.currentTarget.value });
+    if (f.type === 'segmented') return html`<${Segmented} label=${f.label} value=${value} options=${f.options} onChange=${(v) => set({ [f.key]: v })} />`;
+    if (f.type === 'select') return html`<${Select} label=${f.label} value=${value} options=${f.options} onChange=${(v) => set({ [f.key]: v })} />`;
+    if (f.type === 'toggle') return html`<${Toggle} label=${f.label} checked=${value} onChange=${(v) => set({ [f.key]: v })} />`;
+    if (f.type === 'textarea') return html`<${Field} label=${f.label}><textarea rows="2" value=${value} onInput=${onInput}></textarea><//>`;
+    const input = html`<input type=${f.type || 'text'} value=${value} required=${f.required} placeholder=${f.placeholder || ''}
+      autocomplete="off" onInput=${onInput} />`;
+    if (!f.locate) return html`<${Field} label=${f.label}>${input}<//>`;
+    return html`<div class="row icon-row"><${Field} label=${f.label}>${input}<//>
+      <button type="button" class="secondary" disabled=${locating} onClick=${() => locate(f.key)}>
+        <${Icon} name="locate" size=${18} /> ${locating ? 'Finding...' : 'Here'}</button></div>`;
+  };
+  return html`<form class="helper-form" onSubmit=${submit}>
+    ${helper.fields.map(field)}
+    <p class="hint">${helper.note}</p>
+    ${code && html`<${QrFitLine} data=${code} tape=${label.tape_width_mm} scale=${label.qr_scale} />`}
+    <div class="button-row"><button class="primary" type="submit" disabled=${!code}>${helper.button}</button></div>
+  </form>`;
 }
 
 // Code 128, which holds plain letters, numbers and symbols; the bars keep a width scanners read,

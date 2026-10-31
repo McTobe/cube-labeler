@@ -265,7 +265,7 @@ a.primary, a.secondary { text-decoration: none; box-sizing: border-box; }
 
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
 
-input[type="text"], input:not([type]), input[inputmode], select, textarea {
+input[type="text"], input:not([type]), input[inputmode], input[type="tel"], input[type="email"], input[type="datetime-local"], select, textarea {
   width: 100%;
   font: inherit;
   color: var(--text);
@@ -876,7 +876,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .settings-page .toggle { margin-top: 16px; }
 
 
-.wifi-form .toggle { margin-bottom: 12px; }
+.helper-form .toggle { margin: 14px 0 12px; }
+.helper-form textarea { min-height: 64px; }
+.helper-form > .hint { margin: 12px 0 0; }
+.helper-form .qr-fit { margin-top: 10px; }
 
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
@@ -918,6 +921,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .length-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .length-grid.one { grid-template-columns: 1fr 2fr; }
 .icon-row { align-items: flex-end; }
+/* QR code helpers: one even row under the content field, the rest in More */
+.qr-helpers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.qr-helpers .menu-anchor { display: flex; }
+.qr-helpers button { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; font-size: 0.92rem; min-height: 40px; white-space: nowrap; }
+.qr-helpers button span { overflow: hidden; text-overflow: ellipsis; }
+.qr-helpers .caret { font-size: 0.65rem; color: var(--muted); }
+@container (max-width: 440px) { .qr-helpers button svg { display: none; } }
+.qr-site { margin: 10px 0 0; }
+.qr-site .link-button { padding: 0; }
+.qr-fit { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 0; font-size: 0.88rem; color: var(--muted); }
+/* Next to the content field's name, the short form */
+.field-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.field-label-row .qr-fit { margin: 0; font-size: 0.82rem; white-space: nowrap; }
+.qr-fit-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); transform: translateY(-1px); }
+.qr-fit.small .qr-fit-dot { background: var(--warn); }
+.qr-fit.dense { color: var(--error); }
+.qr-fit.dense .qr-fit-dot { background: var(--error); }
 .icon-row > .secondary { flex: none; }
 .picture-thumb.small { width: 44px; height: 44px; }
 

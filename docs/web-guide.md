@@ -28,7 +28,7 @@ The chip then shows the tape width and how much tape is left. Choose it again an
 Type in **Label text** and the preview shows the label on the tape, with its length, the tape it uses and the print time underneath. Then choose **Print**, or **Add to queue** to print it later together with others.
 
 - **Font and layout** on the right sets the font, weight, text size, alignment and a frame.
-- The tabs next to the text add a **QR code** (with a Wi-Fi helper), a **Barcode** or a **Picture**.
+- The tabs next to the text add a **QR code**, a **Barcode** or a **Picture**. Under the QR code content, **Wi-Fi**, **Contact**, **Location** and **More** (phone call, email, text message, WhatsApp, calendar event, social profile) fill it in for you, and a dot says whether the code will scan at this tape width.
 - **Fit** shows the whole label; **Real size** shows it at its printed size.
 
 ### Styling text
