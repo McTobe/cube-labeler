@@ -11,6 +11,12 @@ how far the cut landed from the dotted line. About 8 cm of tape in all.
 
 First run (2026-10-31, head 25 mm, no start feed) cut 2.6, 5.0 and 5.3 mm past the lines: the
 cutter is about 22.4 mm from the head, and each chained job feeds about 2.5 mm before printing.
+Second run (22.5 mm, 2.5 mm) cut on the lines, but the start feed left a 2.5 mm blank band
+wherever a job began, through the middle of C.
+
+This third run looks for what causes that band. The port stays open throughout, and the jobs
+start differently: step 2 sends no reset (ESC @) at all, step 3 sends one, as the app does now.
+A line runs along both edges of the strip, so any band shows as a break in it.
 """
 
 import argparse
@@ -59,6 +65,9 @@ def test_strip(tape_width_mm: float):
             draw.line([(tx, top), (tx, top + h)], fill=0)
             draw.line([(tx, top + printable - 1 - h), (tx, top + printable - 1)], fill=0)
 
+    draw.line([(0, top), (length - 1, top)], fill=0)
+    draw.line([(0, top + printable - 1), (length - 1, top + printable - 1)], fill=0)
+
     cuts = []
     x = EDGE_DOTS
     for n, letter in enumerate(LETTERS):
@@ -71,6 +80,34 @@ def test_strip(tape_width_mm: float):
     # The same turn as the label renderer: along the tape becomes down the raster
     raster = ImageOps.mirror(ImageOps.invert(img).rotate(-90, expand=True)).point(lambda p: 255 if p > 128 else 0).convert("1")
     return raster.tobytes(), cuts
+
+
+def send_job(printer, part: bytes, chain: bool, reset: bool, width: float):
+    """One print job on the printer's open port, with or without a reset before it."""
+    if isinstance(printer, MockBrotherPrinter):
+        return printer.print_raster_data(part, no_feed=chain, required_tape_width_mm=width).completion_confirmed
+    ser = printer._ser
+    ser.reset_input_buffer()
+    if reset:
+        ser.write(protocol.init_sequence())
+    ser.write(protocol.status_request())
+    ser.flush()
+    raw = ser.read(protocol.STATUS_PACKET_SIZE)
+    if len(raw) != protocol.STATUS_PACKET_SIZE:
+        raise TimeoutError("The printer did not answer the status request.")
+    status = protocol.parse_status(raw)
+    protocol.check_ready(status, width)
+    lines = protocol.validate_raster(part)
+    ser.write(protocol.job_configuration(lines, protocol.tape_dim(status), chaining=chain))
+    ser.write(protocol.raster_lines(part))
+    ser.write(protocol.PRINT_COMMAND)
+    ser.flush()
+    return printer._wait_for_completion(protocol.completion_timeout(lines), fallback=status).completion_confirmed
+
+
+# Whether each job starts with a reset: the first one does, step 2 none, step 3 one, the feed none
+RESETS = [True, False, True, False]
+HOW = ["with a reset, as today", "WITHOUT a reset", "with a reset", "without a reset"]
 
 
 def pick_port(given):
@@ -104,6 +141,8 @@ def main() -> int:
     print(f"Test strip: {lines * DOT_PITCH_MM:.0f} mm, labels A to D. Print head to cutter: {args.head_mm:g} mm, "
           f"start feed: {args.start_feed_mm:g} mm.\n")
     input("Press Enter to start (or close this window to cancel)... ")
+    if not args.virtual:
+        printer.connect()
 
     start = 0
     job = 0
@@ -119,9 +158,8 @@ def main() -> int:
         part = raster[start * protocol.LINE_BYTES : stop * protocol.LINE_BYTES]
         if stop > lines:  # the stop lies past the strip's end: blank tape up to it
             part += bytes(protocol.LINE_BYTES * (stop - lines))
-        print(f"Step {n}: printing up to the cut line after {LETTERS[n - 1]}, then stopping...")
-        done = printer.print_raster_data(part, no_feed=True, required_tape_width_mm=width)
-        if not done.completion_confirmed:
+        print(f"Step {n} ({HOW[n - 1]}): printing up to the cut line after {LETTERS[n - 1]}, then stopping...")
+        if not send_job(printer, part, True, RESETS[n - 1], width):
             print("  (the printer did not confirm this step)")
         print(f"  The dotted line between {LETTERS[n - 1]} and {LETTERS[n]} should now be at the cutter.")
         input("  Press the cutter lever, take the piece, then press Enter... ")
@@ -129,9 +167,11 @@ def main() -> int:
 
     print(f"Step {len(cuts) + 1}: feeding out label {LETTERS[-1]}...")
     blank = bytes(protocol.LINE_BYTES * protocol.feed_dots(0))
-    printer.print_raster_data(raster[start * protocol.LINE_BYTES :] + blank if start < lines else blank, required_tape_width_mm=width)
+    send_job(printer, raster[start * protocol.LINE_BYTES :] + blank if start < lines else blank, False, RESETS[-1], width)
+    if not args.virtual:
+        printer.disconnect()
     print("  Cut it off as usual.\n")
-    print("Done. For each cut, count the ticks between the dotted line and the cut edge, and on which side it fell.")
+    print("Done. Please photograph the pieces: the cuts, and any break in the lines along the edges (in C and in D).")
     input("Press Enter to close. ")
     return 0
 
