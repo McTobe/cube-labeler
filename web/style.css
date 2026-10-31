@@ -447,9 +447,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   body.typing:has(#label-text:focus) .settings-head,
   body.typing:has(#label-text:focus) .mode-switch { display: none; }
   body.typing .toast-slot { bottom: 72px; }
-  .wide-text { display: none; }
-  .format-bar { gap: 4px; }
-  .format-bar .fmt { min-width: 38px; padding: 4px 8px; }
+  /* Bigger buttons for thumbs */
+  .format-bar .fmt { min-height: 44px; }
   /* The toolbar only shows while the label text is being edited */
   .text-card:not(:has(#label-text:focus)) .format-tools { display: none; }
   /* The toolbar docks on top of the keyboard while the label text is being typed */
@@ -457,8 +456,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
     position: fixed; z-index: 25; left: 0; right: 0; bottom: 0;
     padding: 0 12px 8px; background: var(--bar); border-top: 1px solid var(--border);
   }
-  body.typing .text-card:focus-within .format-bar { margin: 8px 0 0; padding: 0; }
+  body.typing .text-card:focus-within .format-bar { margin: 8px 0 0; }
   body.typing .text-card:focus-within .fmt-picker { order: 0; margin-top: 8px; }
+  body.typing .text-card:focus-within .dock-actions { display: flex; }
   body.typing .text-card:focus-within textarea { resize: none; }
 }
 /* On a phone the stage is small, so messages float just above the buttons instead */
@@ -591,52 +591,96 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 .menu button:not(:disabled):hover { background: var(--raised); }
 
-.text-card textarea { margin-top: 8px; }
-
-.format-bar {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  margin-left: -16px;
-  margin-right: -16px;
-  padding: 0 16px 2px;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
+/* The label text box. The editor font has no bold or italic file of its own, so the browser
+   slants italic itself and every letter keeps its width in the styled layer behind the box */
+@font-face {
+  font-family: "Cube Editor";
+  src: url("vendor/arimo-editor.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
+.text-box { position: relative; display: flex; flex-direction: column; margin-top: 8px; border-radius: 10px; background: var(--card); }
+.text-box textarea, .marker-view {
+  font-family: "Cube Editor", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  word-spacing: 0;
+  tab-size: 4;
+}
+/* The styled view: the box's own text is see-through over a layer with the same characters,
+   styled, and the markers faded */
+.marker-view {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  padding: 10px 12px; border: 1px solid transparent; border-radius: 10px;
+  white-space: pre-wrap; overflow-wrap: break-word; word-break: normal;
+  color: var(--text);
+}
+.text-box.styled textarea {
+  position: relative; z-index: 1; background: transparent;
+  color: transparent; caret-color: var(--text);
+}
+.text-box.styled textarea::selection { color: transparent; background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.marker-view .mk { color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.marker-view .st-bold:not(.mk) { -webkit-text-stroke: 0.045em currentColor; }
+.marker-view .st-italic { font-style: italic; font-synthesis: style; }
+.marker-view .st-underline:not(.mk) { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.marker-view .st-invert { background: var(--text); color: var(--card); border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.marker-view .st-invert.mk { color: color-mix(in srgb, var(--card) 55%, transparent); }
+
+.text-card .card-head-buttons { display: inline-flex; gap: 8px; }
+.text-card .card-head-buttons .icon-only { display: inline-flex; align-items: center; padding: 8px 10px; color: var(--muted); }
+
+/* The toolbar: one even row of equal buttons, styles | line | view, split by thin lines */
+.format-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 1px repeat(3, minmax(0, 1fr)) 1px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.fmt-sep { width: 1px; height: 24px; background: var(--border); }
 
 .fmt {
-  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 40px;
-  min-height: 38px;
-  padding: 4px 10px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--card);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
 }
-.fmt:not(:disabled):hover { background: var(--raised); }
-.fmt.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.inv-mark { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; background: var(--text); color: var(--card); font-weight: 700; font-size: 0.85rem; }
+.format-bar .fmt { border-color: transparent; background: none; }
+.fmt:not(:disabled):hover, .format-bar .fmt:not(:disabled):hover { background: var(--raised); }
+.fmt.on, .format-bar .fmt.on { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+.fmt-picker .fmt.on { border-color: var(--accent); }
+.italic-mark { font-family: Georgia, "Times New Roman", serif; font-size: 1.15rem; }
+.inv-mark { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; background: var(--text); color: var(--card); font-weight: 700; font-size: 0.9rem; }
+.fmt.on .inv-mark { background: var(--accent); color: var(--accent-soft); }
 .size-mark { font-weight: 700; font-size: 1rem; }
 .size-mark small { font-size: 0.7rem; }
+.fmt .caret { font-size: 0.6rem; color: var(--muted); }
+.fmt.on .caret { color: inherit; }
+.view-toggle { font-weight: 700; letter-spacing: 1px; color: var(--muted); }
 .format-tools { display: flex; flex-direction: column; }
 /* The size and alignment choices open under the toolbar, or above it when it sits on the keyboard */
 .fmt-picker { order: 2; display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
-.fmt-picker .fmt { flex: 1 0 auto; }
-/* The toolbar is groups of buttons of one height, split by thin lines */
-.fmt-group { flex: none; display: inline-flex; border: 1px solid var(--border); border-radius: 9px; background: var(--card); overflow: hidden; }
-.fmt-group .fmt { min-height: 36px; border: none; border-radius: 0; background: none; }
-.fmt-group .fmt + .fmt { border-left: 1px solid var(--border); }
-.fmt-group .fmt:not(:disabled):hover { background: var(--raised); }
-.fmt-group .fmt.on { background: var(--accent-soft); }
-.format-bar .fmt.help { margin: 0 0 0 auto; border-color: transparent; background: none; color: var(--muted); }
-.format-bar .fmt.help:hover { color: var(--text); }
+.fmt-picker .fmt { flex: 1 0 auto; font-size: 0.95rem; }
+/* Print and Add, docked under the toolbar while typing on a phone */
+.dock-actions { display: none; order: 3; gap: 8px; margin-top: 8px; }
+.dock-actions > :first-child { flex: 1; }
+.dock-actions > * { min-height: 46px; }
 .marker-tips { margin: 8px 0 0; font-size: 0.8rem; line-height: 1.8; }
 .marker-tips code { padding: 1px 6px; border-radius: 5px; background: var(--raised); font-size: 0.78rem; white-space: nowrap; }
 .text-card .card-head { gap: 12px; }
@@ -714,7 +758,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .action-bar { position: static; padding: 0; background: none; border: none; }
   .action-bar .status-line { margin: 8px 2px 0; white-space: normal; }
   .action-bar { display: flex; flex-direction: column-reverse; }
-  .format-bar { flex-wrap: wrap; overflow: visible; margin-left: 0; margin-right: 0; padding: 0; }
   /* The text and bin cards share one fixed height (what the fastener editor needs), so the preview keeps its size when
      switching kinds of label; on a short or narrow window the card scrolls, never the column */
   .label-preview-col .text-card, .label-preview-col .bin-card, .label-preview-col .port-card {
@@ -723,6 +766,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .label-preview-col .text-card, .label-preview-col .port-card { display: flex; flex-direction: column; }
   .label-preview-col .port-names { flex: 1; min-height: calc(4 * 1.5em + 22px); resize: none; }
   /* The text box takes the room down to the marker tips, at least about four lines */
+  .label-preview-col .text-card .text-box { flex: 1; min-height: 0; }
   .label-preview-col .text-card textarea { flex: 1; min-height: calc(4 * 1.5em + 22px); resize: none; }
   .label-preview-col .length-grid.quad { grid-template-columns: repeat(4, 1fr); }
   /* The text card splits in half: the text, a thin line, then the extras in tabs */
@@ -735,8 +779,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 /* With half the card for the text, the marker tips only fit on a big window; the help button has them too */
 @media (min-width: 900px) and (max-width: 1599px) {
-  .text-col .marker-tips, .text-col .wide-text, .text-col .size-mark + .fmt-text { display: none; }
-  .text-col .format-bar { gap: 4px; }
+  .text-col .marker-tips { display: none; }
+  .text-col .format-bar { gap: 2px; }
 }
 
 /* --- Sheets (dialogs) ---------------------------------------------------------------------- */

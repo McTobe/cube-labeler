@@ -4,7 +4,7 @@
   "description": "Tests for the Cube Labeler web app",
   "type": "module",
   "scripts": {
-    "test": "node tests/test_tape.mjs && node tests/test_sync.mjs && node tests/test_printer.mjs"
+    "test": "node tests/test_markers.mjs && node tests/test_tape.mjs && node tests/test_sync.mjs && node tests/test_printer.mjs"
   },
   "devDependencies": {
     "pyodide": "0.29.5"

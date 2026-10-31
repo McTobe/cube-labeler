@@ -8,6 +8,7 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
+import { markerHtml, stylesAt } from '../marker-view.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
@@ -100,21 +101,40 @@ function ModePicker({ mode }) {
 
 // --- Text ----------------------------------------------------------------------------------
 
+// The styled view of the text box (faded markers) is on unless this device turned it off
+const STYLED_KEY = 'cube-labeler-styled-text';
+function loadStyled() {
+  try { return localStorage.getItem(STYLED_KEY) !== 'off'; } catch { return true; }
+}
+function saveStyled(on) {
+  try { localStorage.setItem(STYLED_KEY, on ? 'on' : 'off'); } catch { /* forgets on reload */ }
+}
+
+// On a phone the box grows with the text, up to eight lines, so short labels show whole
+const textRows = (text) => Math.min(8, Math.max(3, text.split('\n').length));
+
+const NO_STYLES = { bold: false, italic: false, underline: false, invert: false };
+
 function TextCard() {
   const { label } = useStore(app);
   const { phase } = useStore(boot);
   const ref = useRef(null);
+  const viewRef = useRef(null);
   const [lineStyle, setLineStyle] = useState(['normal', null]);
+  const [styles, setStyles] = useState(NO_STYLES);
+  const [styled, setStyled] = useState(loadStyled);
   const [helpOpen, setHelpOpen] = useState(false);
   // The size or alignment picker open above the toolbar
   const [picker, setPicker] = useState(null);
   const ready = phase === 'ready';
   const wide = useWide();
   useTypingRoom(ref, wide);
+  useMarkerView(ref, viewRef, styled, label.text);
 
   const syncLineStyle = async () => {
     const area = ref.current;
     if (!area) return;
+    setStyles(stylesAt(area.value, area.selectionStart));
     setLineStyle(await lineStyleAt(area.value, area.selectionStart));
   };
 
@@ -152,6 +172,12 @@ function TextCard() {
     setText(text, at + 5, at + 5);
   };
 
+  const switchView = () => {
+    setStyled(!styled);
+    saveStyled(!styled);
+    say(styled ? 'The text box shows the plain markers.' : 'The text box shows the styles, with the markers faded.');
+  };
+
   const onKeyDown = (e) => {
     const key = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && STYLE_KEYS[key] && ready) {
@@ -160,11 +186,20 @@ function TextCard() {
     }
   };
 
+  // One even row: the four styles, the line's size, alignment and a new column, then the view
+  const styleButton = (style, title, mark) => html`<button class=${`fmt${styles[style] ? ' on' : ''}`} title=${title}
+    aria-label=${title.replace(/ \(.*/, '')} aria-pressed=${styles[style]} disabled=${!ready}
+    onPointerDown=${keepFocus} onClick=${() => toggle(style)}>${mark}</button>`;
+
   // On a wide screen the card splits in two: the text, and the extras in tabs beside it
   return html`<section class="card text-card"><div class="text-split"><div class="text-col">
     <div class="card-head">
       <label class="card-title" for="label-text">Label text</label>
-      <button class="secondary" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
+      <span class="card-head-buttons">
+        <button class="secondary icon-only" title="How styling works" aria-label="How styling works"
+          onPointerDown=${keepFocus} onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${20} /></button>
+        <button class="secondary" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
+      </span>
     </div>
     <div class="format-tools">
       ${picker && html`<div class="fmt-picker" role="group" aria-label=${picker === 'size' ? 'Line size' : 'Line alignment'}>
@@ -176,36 +211,77 @@ function TextCard() {
         })}
       </div>`}
       <div class="format-bar" role="toolbar" aria-label="Text style">
-        <span class="fmt-group">
-          <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('bold')}><b>B</b></button>
-          <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('italic')}><i>I</i></button>
-          <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('underline')}><u>U</u></button>
-          <button class="fmt" title="White text on black" aria-label="Inverted" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('invert')}><span class="inv-mark">A</span></button>
-        </span>
-        <span class="fmt-group">
-          <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title="Size of this line" aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
-            disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
-            <span class="size-mark">A<small>a</small></span><span class="fmt-text">${wide ? LINE_SIZES.find(([v]) => v === lineStyle[0])[1] : SIZE_MARKS[lineStyle[0]]}</span></button>
-          <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
-            disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
-            <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${18} /></button>
-        </span>
-        <span class="fmt-group">
-          <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text wide-text">Column</span></button>
-        </span>
-        <button class="fmt help" title="How styling works" aria-label="How styling works" onPointerDown=${keepFocus} onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+        ${styleButton('bold', 'Bold (Ctrl+B)', html`<b>B</b>`)}
+        ${styleButton('italic', 'Italic (Ctrl+I)', html`<i class="italic-mark">I</i>`)}
+        ${styleButton('underline', 'Underline (Ctrl+U)', html`<u>U</u>`)}
+        ${styleButton('invert', 'Inverted: white text on black', html`<span class="inv-mark">A</span>`)}
+        <span class="fmt-sep" aria-hidden="true"></span>
+        <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title=${`Size of this line: ${LINE_SIZES.find(([v]) => v === lineStyle[0])[1]}`}
+          aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
+          <span class="size-mark">A<small>a</small></span><span class="caret" aria-hidden="true">▾</span></button>
+        <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
+          <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${20} /><span class="caret" aria-hidden="true">▾</span></button>
+        <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}>
+          <${Icon} name="column" size=${20} /></button>
+        <span class="fmt-sep" aria-hidden="true"></span>
+        <button class=${`fmt view-toggle${styled ? ' on' : ''}`} aria-pressed=${styled}
+          title=${styled ? 'Styled view: tap to show the plain markers' : 'Plain markers: tap to show the styles'}
+          aria-label="Show the styles in the text box" onPointerDown=${keepFocus} onClick=${switchView}>**</button>
       </div>
+      ${!wide && html`<${DockActions} />`}
     </div>
-    <textarea id="label-text" ref=${ref} rows="3" value=${label.text} spellcheck="false"
-      placeholder="Type your label"
-      onInput=${(e) => { updateLabel({ text: e.currentTarget.value }); syncLineStyle(); }}
-      onKeyDown=${onKeyDown} onKeyUp=${syncLineStyle} onClick=${syncLineStyle} onFocus=${syncLineStyle}></textarea>
+    <div class=${`text-box${styled ? ' styled' : ''}`}>
+      ${styled && html`<div class="marker-view" ref=${viewRef} aria-hidden="true"></div>`}
+      <textarea id="label-text" ref=${ref} rows=${wide ? 3 : textRows(label.text)} value=${label.text} spellcheck="false"
+        placeholder="Type your label"
+        onInput=${(e) => { updateLabel({ text: e.currentTarget.value }); syncLineStyle(); }}
+        onKeyDown=${onKeyDown} onKeyUp=${syncLineStyle} onClick=${syncLineStyle} onFocus=${syncLineStyle}
+        onSelect=${syncLineStyle}></textarea>
+    </div>
     <p class="hint marker-tips">Or type: <code>**bold**</code> <code>*italic*</code> <code>__underline__</code>
       <code>==inverted==</code> <code># big</code> <code>---</code> new column</p>
     <${Sheet} open=${helpOpen} title="Styling label text" onClose=${() => setHelpOpen(false)}>
       <${StylingHelp} />
     <//>
   </div>${wide && html`<div class="insert-col"><${InsertTabs} /></div>`}</div></section>`;
+}
+
+// Keeps the styled layer behind the text box in step with it: the same text, the same width
+// (less a scroll bar, if the box has one) and the same scroll position
+function useMarkerView(ref, viewRef, styled, text) {
+  useEffect(() => {
+    const area = ref.current;
+    const view = viewRef.current;
+    if (!area || !view) return undefined;
+    const fit = () => {
+      const bar = area.offsetWidth - area.clientWidth - 2;  // the scroll bar, less the two borders
+      view.style.paddingRight = `${12 + Math.max(0, Math.round(bar))}px`;
+      view.scrollTop = area.scrollTop;
+    };
+    const paint = () => {
+      view.innerHTML = markerHtml(area.value);
+      fit();
+    };
+    paint();
+    // Typing shows at once, before the label is drawn again
+    area.addEventListener('input', paint);
+    area.addEventListener('scroll', fit);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    if (observer) observer.observe(area);
+    return () => {
+      area.removeEventListener('input', paint);
+      area.removeEventListener('scroll', fit);
+      if (observer) observer.disconnect();
+    };
+  }, [styled, text]);
+}
+
+// Print (or Connect) and Add, docked under the toolbar while typing on a phone, so a label prints
+// without closing the keyboard first
+function DockActions() {
+  return html`<div class="dock-actions"><${PrimaryAction} keepKeyboard /><${AddButton} keepKeyboard /></div>`;
 }
 
 // On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
@@ -256,6 +332,8 @@ function StylingHelp() {
       <code>&lt;&lt;</code> left, <code>&gt;&lt;</code> centre, <code>&gt;&gt;</code> right.</p>
     <p>A line with only <code>---</code> starts a new column with a divider line.</p>
     <p>Put a backslash before a marker to print it as it is, as in <code>M3 \\* 8</code>.</p>
+    <p>The text box shows the styles, with the markers in pale grey. The <code>**</code> button at the
+      end of the toolbar switches it to the plain markers and back. Sizes and alignment only show on the label.</p>
   </div>`;
 }
 
@@ -634,23 +712,11 @@ function ActionBar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [ready, p.transport, p.busy]);
 
-  const needsPrinter = p.supported && !p.transport;
-  // With labels waiting in the queue, the next step is printing them together
   const queued = queueLabelCount(queue);
   return html`<div class="action-bar">
     <div class="action-buttons">
-      ${queued > 0
-        ? html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
-            <${Icon} name="queue" size=${20} /> <span>Go to queue (${queued})</span></a>`
-        : needsPrinter
-        ? html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
-            <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`
-        : html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
-            title="Print (Ctrl+P)" onClick=${printLabel}>
-            <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`}
-      <button class="secondary big" disabled=${!ready} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
-        <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Add</span>
-      </button>
+      <${PrimaryAction} />
+      <${AddButton} />
       <span class="menu-anchor">
         <button class="secondary big icon-only" aria-label="More actions" onClick=${() => setMenuOpen(true)}>
           <${Icon} name="more" /></button>
@@ -663,4 +729,35 @@ function ActionBar() {
       </span>
     </div>
   </div>`;
+}
+
+// The main button: Go to queue while labels wait there, Connect without a printer, or Print
+function PrimaryAction({ keepKeyboard = false }) {
+  const { render, queue } = useStore(app);
+  const p = useStore(printer);
+  const { phase } = useStore(boot);
+  const ready = phase === 'ready';
+  const needsPrinter = p.supported && !p.transport;
+  // With labels waiting in the queue, the next step is printing them together
+  const queued = queueLabelCount(queue);
+  const down = keepKeyboard ? keepFocus : undefined;
+  if (queued > 0) {
+    return html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
+      <${Icon} name="queue" size=${20} /> <span>Go to queue (${queued})</span></a>`;
+  }
+  if (needsPrinter) {
+    return html`<button class="primary big" disabled=${!ready || p.busy} onPointerDown=${down} onClick=${connectPrinter}>
+      <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`;
+  }
+  return html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
+    title="Print (Ctrl+P)" onPointerDown=${down} onClick=${printLabel}>
+    <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`;
+}
+
+function AddButton({ keepKeyboard = false }) {
+  const { phase } = useStore(boot);
+  return html`<button class="secondary big" disabled=${phase !== 'ready'} title="Add to queue (Ctrl+Enter)"
+    onPointerDown=${keepKeyboard ? keepFocus : undefined} onClick=${addToQueue}>
+    <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Add</span>
+  </button>`;
 }

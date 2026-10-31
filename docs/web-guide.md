@@ -42,6 +42,11 @@ Select text and use the buttons above the editor, or type the markers yourself:
 | `<< `, `>< `, `>> ` at the start of a line | Left, centred or right line |
 | `---` on its own line | A new column with a divider line |
 
+The text box shows the styles as you type: bold, italic, underlined and inverted words look that way,
+and the markers turn pale grey. Sizes and alignment only show on the label. The buttons light up for
+the style under the cursor, and **\*\*** at the end of the toolbar switches the box to the plain
+markers and back. The **?** next to **Clear** explains the markers.
+
 ## 3. Pick the kind of label
 
 **Kind of label** at the top right switches between four editors.
@@ -87,7 +92,7 @@ Without Google, **Settings › Backups and sync** can save everything to one `.c
 
 ## 9. On a phone
 
-The same pages sit in tabs at the bottom, and **Print** and **Add** stay in reach above them. The styling buttons show up while you type. In Chrome's menu, **Add to Home screen** gives the app its own icon and window.
+The same pages sit in tabs at the bottom, and **Print** and **Add** stay in reach above them. The styling buttons show up while you type, docked on top of the keyboard with **Print** and **Add** under them, so a label prints without closing the keyboard. In Chrome's menu, **Add to Home screen** gives the app its own icon and window.
 
 <img src="images/guide/phone.png" alt="The Label page on an Android phone" width="300">
 
