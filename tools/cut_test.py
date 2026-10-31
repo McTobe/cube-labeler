@@ -7,7 +7,10 @@ can check where it lands, cut, and carry on. The last step feeds the strip out.
 Around every cut line there are 1 mm ticks (five on each side), so after cutting you can count
 how far the cut landed from the dotted line. About 8 cm of tape in all.
 
-    python tools/cut_test.py [COM port] [--head-mm 25]
+    python tools/cut_test.py [COM port] [--head-mm 22.5] [--start-feed-mm 2.5]
+
+First run (2026-10-31, head 25 mm, no start feed) cut 2.6, 5.0 and 5.3 mm past the lines: the
+cutter is about 22.4 mm from the head, and each chained job feeds about 2.5 mm before printing.
 """
 
 import argparse
@@ -82,7 +85,9 @@ def pick_port(given):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("port", nargs="?", help="COM port of the printer (found automatically if left out)")
-    parser.add_argument("--head-mm", type=float, default=25.0, help="distance from print head to cutter (default 25)")
+    parser.add_argument("--head-mm", type=float, default=22.5, help="distance from print head to cutter (default 22.5)")
+    parser.add_argument("--start-feed-mm", type=float, default=2.5,
+                        help="tape a chained job feeds before it prints (default 2.5)")
     parser.add_argument("--virtual", action="store_true", help="use the simulated printer")
     args = parser.parse_args()
 
@@ -95,12 +100,22 @@ def main() -> int:
     raster, cuts = test_strip(width)
     lines = len(raster) // protocol.LINE_BYTES
     head = dots(args.head_mm)
-    print(f"Test strip: {lines * DOT_PITCH_MM:.0f} mm, labels A to D. Print head to cutter: {args.head_mm:g} mm.\n")
+    feed = dots(args.start_feed_mm)
+    print(f"Test strip: {lines * DOT_PITCH_MM:.0f} mm, labels A to D. Print head to cutter: {args.head_mm:g} mm, "
+          f"start feed: {args.start_feed_mm:g} mm.\n")
     input("Press Enter to start (or close this window to cancel)... ")
 
     start = 0
+    job = 0
+    printed_in = {}  # cut -> the job that printed it
     for n, cut in enumerate(cuts, 1):
-        stop = cut + head
+        job += 1
+        # A cut line printed by an earlier job moves out with every later job's start feed
+        later_starts = job - printed_in.get(cut, job)
+        stop = max(cut + head - feed * later_starts, start + 1)
+        for c in cuts:
+            if start <= c < stop:
+                printed_in[c] = job
         part = raster[start * protocol.LINE_BYTES : stop * protocol.LINE_BYTES]
         if stop > lines:  # the stop lies past the strip's end: blank tape up to it
             part += bytes(protocol.LINE_BYTES * (stop - lines))
