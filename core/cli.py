@@ -233,7 +233,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--no-cut-guide",
         action="store_true",
-        help="Leave out the dotted cut line at the start of the label.",
+        help="Leave out the cut mark at the start of the label.",
     )
     parser.add_argument(
         "--cut-guide",

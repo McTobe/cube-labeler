@@ -788,7 +788,7 @@ class PrintLabelApp(ctk.CTk):
             ctk.CTkLabel(
                 empty_frame,
                 text="Design a label, then choose Add to queue or press Ctrl+Enter.\n"
-                     "Queued labels print as one strip with dotted cut lines between them.",
+                     "Queued labels print as one strip with cut marks between them.",
                 text_color=MUTED_TEXT,
                 justify="center",
             ).pack(pady=4)
