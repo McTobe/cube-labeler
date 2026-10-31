@@ -177,11 +177,22 @@ class TestLabelRenderer(unittest.TestCase):
         self.assertFalse(config.auto_cut_hardware)
         _, rast, rbytes, _ = self.renderer.render(config)
         line = LabelRenderer.PRINTHEAD_DOTS // 8
-        # The first raster line is the dotted cut line; the end stops at the cutter, so it has none
+        # The first raster line is the cut line; the end stops at the cutter, so it has none
         self.assertTrue(any(rbytes[:line]))
         self.assertFalse(any(rbytes[-line:]))
         _, _, plain, _ = self.renderer.render(LabelConfig(text="CUT TEST", cut_line=False))
         self.assertFalse(any(plain[:line]))
+
+    def test_cut_marks_leave_the_middle_blank(self):
+        # Ticks mark only the edges of the printable area, so a slightly-off cut leaves no shadow
+        line = LabelRenderer.PRINTHEAD_DOTS // 8
+        for rbytes in (
+            self.renderer.render(LabelConfig(text="CUT TEST"))[2],
+            self.renderer.render_batch([LabelConfig(text="A"), LabelConfig(text="B")])[2],
+        ):
+            first = rbytes[:line]
+            self.assertTrue(any(first))
+            self.assertFalse(any(first[line // 2 - 2 : line // 2 + 2]))
 
     def test_cut_line_rendering(self):
         config = LabelConfig(

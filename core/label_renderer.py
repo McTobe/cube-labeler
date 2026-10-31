@@ -103,10 +103,10 @@ class LabelConfig:
     show_guides: bool = False  # Show printable area and tape guides
     show_rulers: bool = False  # Show mm/inch rulers
 
-    # Cut lines: the app prints its own dotted cut lines at both ends of every label,
+    # Cut lines: the app prints its own cut marks at both ends of every label,
     # in place of the ":" cut mark the printer adds when it gets the auto-cut flag
     cut_line: bool = True  # Print vertical cut lines on the tape
-    cut_line_style: str = "dotted"  # "dotted", "solid", "ticks"
+    cut_line_style: str = "ticks"  # "ticks" (marks at the top and bottom edges only), "dotted", "solid"
     cut_line_position: str = "start"  # "start", "end", "both"; the end needs none, it lines up with the cutter
     auto_cut_hardware: bool = False  # Hardware auto-cut flag; the PT-P300BT only prints a ":" mark for it
 
@@ -144,6 +144,25 @@ PORT_TEXT_MARGIN_DOTS = 8
 PORT_TEXT_V_MARGIN_DOTS = 4
 # How far the marks where a cable flag folds reach in from the edges of the print
 FLAG_MARK_DOTS = 8
+
+# Length of the marks of a "ticks" cut line at the top and bottom of the printable area (about 0.85 mm)
+CUT_TICK_DOTS = 6
+
+
+def draw_cut_line(draw: ImageDraw.ImageDraw, x: int, top: int, height: int, style: str = "ticks") -> None:
+    """
+    Draws a cut line at column x of the printable area. Ticks only mark its two edges, so a cut
+    that misses the line by a little leaves no shadow down the side of the label.
+    """
+    if style == "dotted":
+        for y in range(top, top + height, 4):
+            draw.line([(x, y), (x, y + 1)], fill="black", width=1)
+    elif style == "solid":
+        draw.line([(x, top), (x, top + height - 1)], fill="black", width=1)
+    else:
+        draw.line([(x, top), (x, top + CUT_TICK_DOTS - 1)], fill="black", width=1)
+        draw.line([(x, top + height - CUT_TICK_DOTS), (x, top + height - 1)], fill="black", width=1)
+
 
 # Tape between labels in a batch; each label gets half of it on both sides (14 dots ≈ 2 mm)
 BATCH_GAP_DOTS = 28
@@ -557,15 +576,7 @@ class LabelRenderer:
                 cut_positions.append(img_canvas.width - 1)
 
             for cx in cut_positions:
-                if config.cut_line_style == "dotted":
-                    for cy in range(print_border, print_border + printable_h, 4):
-                        draw.line([(cx, cy), (cx, cy + 1)], fill="black", width=1)
-                elif config.cut_line_style == "solid":
-                    draw.line([(cx, print_border), (cx, print_border + printable_h - 1)], fill="black", width=1)
-                elif config.cut_line_style == "ticks":
-                    tlen = 8
-                    draw.line([(cx, print_border), (cx, print_border + tlen)], fill="black", width=1)
-                    draw.line([(cx, print_border + printable_h - tlen), (cx, print_border + printable_h - 1)], fill="black", width=1)
+                draw_cut_line(draw, cx, print_border, printable_h, config.cut_line_style)
 
         # 7. Generate 128-dot 1-bit binary raster image
         rotated = ImageOps.invert(
@@ -630,7 +641,7 @@ class LabelRenderer:
         spans: Optional[List[Tuple[int, int]]] = None,
     ) -> Tuple[Image.Image, Image.Image, bytes, LabelMetrics]:
         """
-        Renders a continuous batch chain of multiple labels with dotted cut lines in between,
+        Renders a continuous batch chain of multiple labels with cut lines in between,
         eliminating the ~25mm wasted tape between consecutive individual prints.
         Every label gets the same half-gap of tape on both sides, first and last included.
         The strip starts with a cut line; its end needs none, since it stops at the cutter.
@@ -672,8 +683,7 @@ class LabelRenderer:
         draw = ImageDraw.Draw(batch_canvas)
 
         def cut_line(x: int):
-            for cy in range(print_border, print_border + printable_h, 4):
-                draw.line([(x, cy), (x, cy + 1)], fill="black", width=1)
+            draw_cut_line(draw, x, print_border, printable_h, configs[0].cut_line_style)
 
         cut_line(0)
         cur_x = margin
