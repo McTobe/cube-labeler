@@ -444,7 +444,7 @@ function QrPanel() {
         <span class="menu-anchor">
           <button class="secondary" aria-haspopup="menu" aria-expanded=${moreOpen} onClick=${() => setMoreOpen(true)}>
             <span>More</span><span class="caret" aria-hidden="true">▾</span></button>
-          <${Menu} open=${moreOpen} onClose=${() => setMoreOpen(false)}
+          <${Menu} variant="tiles" open=${moreOpen} onClose=${() => setMoreOpen(false)}
             items=${QR_HELPERS.slice(QR_ROW).map((h) => ({ label: h.name, icon: h.icon, action: () => open(h) }))} />
         </span>
       </div>

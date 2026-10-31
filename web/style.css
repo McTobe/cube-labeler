@@ -590,6 +590,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   text-align: left;
 }
 .menu button:not(:disabled):hover { background: var(--raised); }
+.menu-icon { display: inline-flex; }
+/* A menu of choices that are all alike, as an even grid of tiles: icon over name */
+.menu.tiles { display: grid; grid-template-columns: repeat(3, 104px); gap: 4px; padding: 8px; min-width: 0; }
+.menu.tiles button { flex-direction: column; justify-content: flex-start; white-space: nowrap; gap: 8px; padding: 12px 6px 10px; text-align: center; font-size: 0.86rem; line-height: 1.2; }
+.menu.tiles .menu-icon { width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.menu.tiles .menu-icon svg { width: 20px; height: 20px; }
 
 /* The label text box. The editor font has no bold or italic file of its own, so the browser
    slants italic itself and every letter keeps its width in the styled layer behind the box */
@@ -924,10 +930,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* QR code helpers: one even row under the content field, the rest in More */
 .qr-helpers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .qr-helpers .menu-anchor { display: flex; }
-.qr-helpers button { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; font-size: 0.92rem; min-height: 40px; white-space: nowrap; }
-.qr-helpers button span { overflow: hidden; text-overflow: ellipsis; }
+.qr-helpers > button, .qr-helpers > .menu-anchor > button { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; font-size: 0.92rem; min-height: 40px; white-space: nowrap; }
+.qr-helpers > button span, .qr-helpers > .menu-anchor > button span { overflow: hidden; text-overflow: ellipsis; }
 .qr-helpers .caret { font-size: 0.65rem; color: var(--muted); }
-@container (max-width: 440px) { .qr-helpers button svg { display: none; } }
+@container (max-width: 440px) { .qr-helpers > button svg { display: none; } }
 .qr-site { margin: 10px 0 0; }
 .qr-site .link-button { padding: 0; }
 .qr-fit { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 0; font-size: 0.88rem; color: var(--muted); }

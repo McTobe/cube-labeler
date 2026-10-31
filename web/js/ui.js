@@ -100,7 +100,7 @@ export function Sheet({ open, title, onClose, children, wide = false }) {
 
 // A small menu of actions next to its button. It is placed in the window, not in the page,
 // so it never sticks out of a scrolling panel: under the button when there is room, else above.
-export function Menu({ open, onClose, items }) {
+export function Menu({ open, onClose, items, variant = '' }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     const menu = ref.current;
@@ -121,10 +121,10 @@ export function Menu({ open, onClose, items }) {
   }, [open]);
   if (!open) return null;
   return html`<div class="menu-backdrop" onClick=${onClose} onWheel=${onClose}></div>
-    <div ref=${ref} class="menu" role="menu" onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); }}>
+    <div ref=${ref} class=${variant ? `menu ${variant}` : 'menu'} role="menu" onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); }}>
       ${items.filter(Boolean).map((item) => html`<button role="menuitem" disabled=${item.disabled}
         onClick=${() => { onClose(); item.action(); }}>
-        ${item.icon && html`<${Icon} name=${item.icon} />`}<span>${item.label}</span>
+        ${item.icon && html`<span class="menu-icon"><${Icon} name=${item.icon} /></span>`}<span>${item.label}</span>
       </button>`)}
     </div>`;
 }

@@ -68,24 +68,6 @@ export const QR_HELPERS = [
     note: 'Scanning offers to add the contact. Every field makes the code denser, so leave out what the label does not need.',
   },
   {
-    id: 'location', name: 'Location', icon: 'pin', title: 'Location', button: 'Use this place',
-    fields: [
-      { key: 'place', label: 'Coordinates, a Google Maps link or an address', required: true, placeholder: '59.3294, 18.0686', locate: true },
-    ],
-    build: (v) => {
-      const at = parseLocation(v.place);
-      if (at) return `https://maps.google.com/?q=${at[0].toFixed(6).replace(/\.?0+$/, '')},${at[1].toFixed(6).replace(/\.?0+$/, '')}`;
-      return `https://maps.google.com/?q=${encodeURIComponent(v.place.trim())}`;
-    },
-    note: 'Scanning opens the spot in a map app. Handy for a shed, a fuse box or a water valve.',
-  },
-  {
-    id: 'phone', name: 'Phone call', icon: 'phone', title: 'Phone call', button: 'Use this number',
-    fields: [{ key: 'phone', label: 'Phone number', type: 'tel', required: true, placeholder: '+46 70 123 45 67' }],
-    build: (v) => `tel:${digits(v.phone)}`,
-    note: 'Scanning offers to call the number. Start with + and the country code so it works from abroad too.',
-  },
-  {
     id: 'email', name: 'Email', icon: 'mail', title: 'Email', button: 'Use this email',
     fields: [
       { key: 'to', label: 'Email address', type: 'email', required: true },
@@ -100,6 +82,24 @@ export const QR_HELPERS = [
     note: 'Scanning opens a new email, ready to send.',
   },
   {
+    id: 'phone', name: 'Phone call', icon: 'phone', title: 'Phone call', button: 'Use this number',
+    fields: [{ key: 'phone', label: 'Phone number', type: 'tel', required: true, placeholder: '+46 70 123 45 67' }],
+    build: (v) => `tel:${digits(v.phone)}`,
+    note: 'Scanning offers to call the number. Start with + and the country code so it works from abroad too.',
+  },
+  {
+    id: 'location', name: 'Location', icon: 'pin', title: 'Location', button: 'Use this place',
+    fields: [
+      { key: 'place', label: 'Coordinates, a Google Maps link or an address', required: true, placeholder: '59.3294, 18.0686', locate: true },
+    ],
+    build: (v) => {
+      const at = parseLocation(v.place);
+      if (at) return `https://maps.google.com/?q=${at[0].toFixed(6).replace(/\.?0+$/, '')},${at[1].toFixed(6).replace(/\.?0+$/, '')}`;
+      return `https://maps.google.com/?q=${encodeURIComponent(v.place.trim())}`;
+    },
+    note: 'Scanning opens the spot in a map app. Handy for a shed, a fuse box or a water valve.',
+  },
+  {
     id: 'sms', name: 'Text message', icon: 'message', title: 'Text message', button: 'Use this message',
     fields: [
       { key: 'phone', label: 'Phone number', type: 'tel', required: true },
@@ -109,7 +109,7 @@ export const QR_HELPERS = [
     note: 'Scanning opens a text message to the number, ready to send.',
   },
   {
-    id: 'whatsapp', name: 'WhatsApp', icon: 'message', title: 'WhatsApp message', button: 'Use this chat',
+    id: 'whatsapp', name: 'WhatsApp', icon: 'chat', title: 'WhatsApp message', button: 'Use this chat',
     fields: [
       { key: 'phone', label: 'Phone number with country code', type: 'tel', required: true, placeholder: '+46 70 123 45 67' },
       { key: 'text', label: 'Message', type: 'textarea' },
@@ -118,7 +118,7 @@ export const QR_HELPERS = [
     note: 'Scanning opens a WhatsApp chat with the number.',
   },
   {
-    id: 'event', name: 'Calendar event', icon: 'calendar', title: 'Calendar event', button: 'Use this event',
+    id: 'event', name: 'Calendar', icon: 'calendar', title: 'Calendar event', button: 'Use this event',
     fields: [
       { key: 'title', label: 'What', required: true, placeholder: 'Replace the water filter' },
       { key: 'start', label: 'Starts', type: 'datetime-local', required: true },
