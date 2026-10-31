@@ -607,6 +607,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .menu.tiles button { flex-direction: column; justify-content: flex-start; white-space: nowrap; gap: 8px; padding: 12px 6px 10px; text-align: center; font-size: 0.86rem; line-height: 1.2; }
 .menu.tiles .menu-icon { width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
 .menu.tiles .menu-icon svg { width: 20px; height: 20px; }
+/* The kinds of label, from the Label button in the phone's page tabs */
+.menu.tiles.kinds { grid-template-columns: repeat(2, 132px); }
+.menu.tiles.kinds button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.menu.tiles.kinds button.on .menu-icon { background: var(--accent); color: var(--accent-text); }
+.nav .nav-label { flex: 1; display: flex; }
+.nav .nav-label > a { flex: 1; }
 
 /* The label text box. The editor font has no bold or italic file of its own, so the browser
    slants italic itself and every letter keeps its width in the styled layer behind the box */

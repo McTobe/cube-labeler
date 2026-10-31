@@ -67,25 +67,28 @@ export function LabelPage() {
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
-      ${!(text && !wide) && html`<${SettingsHead} mode=${mode} /><${ModePicker} mode=${mode} />`}
+      ${wide ? html`<${SettingsHead} mode=${mode} /><${ModePicker} mode=${mode} />`
+        : !text && html`<${SettingsHead} mode=${mode} phone />`}
       ${options}
     </div>
   </div>`;
 }
 
-// The kinds of label, as tiles two to a row; more kinds add rows
-const MODES = [
+// The kinds of label, as tiles two to a row; more kinds add rows. On a phone they are picked
+// from the Label button in the page tabs instead (main.js).
+export const MODES = [
   { id: 'text', name: 'Text label', icon: 'text' },
   { id: 'bin', name: 'Bin label', icon: 'bin' },
   { id: 'ports', name: 'Port strip', icon: 'ports' },
   { id: 'flag', name: 'Cable flag', icon: 'flag' },
 ];
 
-// A slim line over the settings with Reset, which works the same for every kind of label
-function SettingsHead({ mode }) {
+// A slim line over the settings with Reset, which works the same for every kind of label. On a
+// phone it names the kind of label, which the Label button changes.
+function SettingsHead({ mode, phone = false }) {
   const { phase } = useStore(boot);
   return html`<div class="settings-head">
-    <span>Kind of label</span>
+    <span>${phone ? `${MODES.find((m) => m.id === mode).name} settings` : 'Kind of label'}</span>
     <button class="link-button reset-settings" disabled=${phase !== 'ready'}
       onClick=${() => { if (confirm(RESET_NOTES[mode])) resetSettings(); }}>
       <${Icon} name="undo" size=${16} /> Reset settings</button>
@@ -332,12 +335,11 @@ function useFitBetween(ref) {
   }, []);
 }
 
-// The Options tab: the kind of label and its settings, which scroll inside the card
+// The Settings tab: the label's settings, which scroll inside the card
 function PhoneOptionsPanel() {
   const { mode } = useStore(app);
   return html`<div class="phone-options">
-    <${SettingsHead} mode=${mode} />
-    <${ModePicker} mode=${mode} />
+    <${SettingsHead} mode=${mode} phone />
     ${mode === 'flag' && html`<${FlagSection} />`}
     <${FontSection} />
     <${TapeSection} length=${mode !== 'flag'} />
@@ -356,7 +358,7 @@ function CodePanel() {
   </div>`;
 }
 const CODE_TAB = { id: 'code', name: 'Code', icon: 'qr', on: (label) => hasQr(label) || hasBarcode(label), Panel: CodePanel };
-const OPTIONS_TAB = { id: 'options', name: 'Options', icon: 'settings', on: () => false, Panel: PhoneOptionsPanel };
+const OPTIONS_TAB = { id: 'options', name: 'Settings', icon: 'settings', on: () => false, Panel: PhoneOptionsPanel };
 
 // On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
 // label kind and the text card in view) and the text box stretches down to the toolbar docked on
@@ -472,7 +474,7 @@ let lastInsert = INSERTS[0].id;
 
 const TEXT_TAB = { id: 'text', name: 'Text', icon: 'text', on: () => false, Panel: TextEditor };
 let lastPhoneTab = 'text';
-// On a phone: Text, Code, Picture and Options
+// On a phone: Text, Code, Picture and Settings
 const PHONE_TABS = [TEXT_TAB, CODE_TAB, INSERTS.find((t) => t.id === 'picture'), OPTIONS_TAB];
 
 function InsertTabs({ phone = false }) {

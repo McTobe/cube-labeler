@@ -122,7 +122,8 @@ export function Menu({ open, onClose, items, variant = '' }) {
   if (!open) return null;
   return html`<div class="menu-backdrop" onClick=${onClose} onWheel=${onClose}></div>
     <div ref=${ref} class=${variant ? `menu ${variant}` : 'menu'} role="menu" onKeyDown=${(e) => { if (e.key === 'Escape') onClose(); }}>
-      ${items.filter(Boolean).map((item) => html`<button role="menuitem" disabled=${item.disabled}
+      ${items.filter(Boolean).map((item) => html`<button role=${item.on === undefined ? 'menuitem' : 'menuitemradio'}
+        aria-checked=${item.on} class=${item.on ? 'on' : undefined} disabled=${item.disabled}
         onClick=${() => { onClose(); item.action(); }}>
         ${item.icon && html`<span class="menu-icon"><${Icon} name=${item.icon} /></span>`}<span>${item.label}</span>
       </button>`)}
