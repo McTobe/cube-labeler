@@ -51,8 +51,8 @@ export function LabelPage() {
   } else if (mode === 'ports') {
     options = html`${!wide && html`<${PortCard} />`}<${PortSection} /><${PortFontSection} />`;
   } else {
-    options = html`
-      ${!wide && html`<${TextCard} /><section class="card insert-card"><${InsertTabs} /></section>`}
+    // On a phone the text, codes, picture and these options are tabs of one card
+    options = !wide ? html`<${PhoneTextCard} />` : html`
       ${mode === 'flag' && html`<${FlagSection} />`}
       <${FontSection} />
       <${TapeSection} length=${mode !== 'flag'} />
@@ -67,8 +67,7 @@ export function LabelPage() {
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
-      <${SettingsHead} mode=${mode} />
-      <${ModePicker} mode=${mode} />
+      ${!(text && !wide) && html`<${SettingsHead} mode=${mode} /><${ModePicker} mode=${mode} />`}
       ${options}
     </div>
   </div>`;
@@ -116,7 +115,7 @@ const textRows = (text) => Math.min(8, Math.max(3, text.split('\n').length));
 
 const NO_STYLES = { bold: false, italic: false, underline: false, invert: false };
 
-function TextCard() {
+function TextEditor() {
   const { label } = useStore(app);
   const { phase } = useStore(boot);
   const ref = useRef(null);
@@ -193,7 +192,7 @@ function TextCard() {
     onPointerDown=${keepFocus} onClick=${() => toggle(style)}>${mark}</button>`;
 
   // On a wide screen the card splits in two: the text, and the extras in tabs beside it
-  return html`<section class="card text-card"><div class="text-split"><div class="text-col">
+  return html`<div class="text-editor">
     <div class="card-head">
       <label class="card-title" for="label-text">Label text</label>
       <span class="card-head-buttons">
@@ -246,7 +245,7 @@ function TextCard() {
     <${Sheet} open=${helpOpen} title="Styling label text" onClose=${() => setHelpOpen(false)}>
       <${StylingHelp} />
     <//>
-  </div>${wide && html`<div class="insert-col"><${InsertTabs} /></div>`}</div></section>`;
+  </div>`;
 }
 
 // Keeps the styled layer behind the text box in step with it: the same text, the same width
@@ -284,6 +283,44 @@ function useMarkerView(ref, viewRef, styled, text) {
 function DockActions() {
   return html`<div class="dock-actions"><${PrimaryAction} keepKeyboard /><${AddButton} keepKeyboard /></div>`;
 }
+
+// On a wide screen the card splits in two: the text, and the extras in tabs beside it
+function TextCard() {
+  return html`<section class="card text-card"><div class="text-split"><div class="text-col"><${TextEditor} /></div>
+    <div class="insert-col"><${InsertTabs} /></div></div></section>`;
+}
+
+// On a phone the text is the first tab of one card, with the codes, the picture and the options,
+// so the page stays put: one panel at a time under the pinned preview
+function PhoneTextCard() {
+  return html`<section class="card insert-card text-card phone-tabs"><${InsertTabs} phone /></section>`;
+}
+
+// The Options tab: the kind of label and its settings, which scroll inside the card
+function PhoneOptionsPanel() {
+  const { mode } = useStore(app);
+  return html`<div class="phone-options">
+    <${SettingsHead} mode=${mode} />
+    <${ModePicker} mode=${mode} />
+    ${mode === 'flag' && html`<${FlagSection} />`}
+    <${FontSection} />
+    <${TapeSection} length=${mode !== 'flag'} />
+    <${AdvancedSection} />
+  </div>`;
+}
+// The Code tab: a QR code or a barcode, one switch apart, since a label rarely has both
+let lastCode = null;
+function CodePanel() {
+  const { label } = useStore(app);
+  const [kind, setCode] = useState(lastCode || (hasBarcode(label) && !label.qr_enabled ? 'barcode' : 'qr'));
+  const setKind = (k) => { lastCode = k; setCode(k); };
+  return html`<div class="code-panel">
+    <${Segmented} ariaLabel="Kind of code" options=${[['qr', 'QR code'], ['barcode', 'Barcode']]} value=${kind} onChange=${setKind} />
+    ${kind === 'qr' ? html`<${QrPanel} />` : html`<${BarcodePanel} />`}
+  </div>`;
+}
+const CODE_TAB = { id: 'code', name: 'Code', icon: 'qr', on: (label) => label.qr_enabled || hasBarcode(label), Panel: CodePanel };
+const OPTIONS_TAB = { id: 'options', name: 'Options', icon: 'settings', on: () => false, Panel: PhoneOptionsPanel };
 
 // On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
 // label kind and the text card in view) and the text box stretches down to the toolbar docked on
@@ -397,14 +434,32 @@ const INSERTS = [
 ];
 let lastInsert = INSERTS[0].id;
 
-function InsertTabs() {
+const TEXT_TAB = { id: 'text', name: 'Text', icon: 'text', on: () => false, Panel: TextEditor };
+let lastPhoneTab = 'text';
+// On a phone: Text, Code, Picture and Options
+const PHONE_TABS = [TEXT_TAB, CODE_TAB, INSERTS.find((t) => t.id === 'picture'), OPTIONS_TAB];
+
+function InsertTabs({ phone = false }) {
   const { label } = useStore(app);
-  const [tab, setTab] = useState(lastInsert);
-  const pick = (id) => { lastInsert = id; setTab(id); };
-  const current = INSERTS.find((t) => t.id === tab) || INSERTS[0];
-  return html`<div class="insert-tabs">
-    <div class="insert-tab-bar" role="tablist" aria-label="Add to the label">
-      ${INSERTS.map((t) => html`<button role="tab" id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
+  const tabs = phone ? PHONE_TABS : INSERTS;
+  const [tab, setTab] = useState(phone ? lastPhoneTab : lastInsert);
+  const ref = useRef(null);
+  const pick = (id) => {
+    if (phone) lastPhoneTab = id; else lastInsert = id;
+    // While typing, the cursor moves into the new tab's field, so the keyboard stays up
+    const typing = document.body.classList.contains('typing');
+    setTab(id);
+    if (typing) {
+      requestAnimationFrame(() => {
+        const field = ref.current && ref.current.querySelector('#insert-panel textarea, #insert-panel input[type="text"]');
+        if (field) field.focus({ preventScroll: true });
+      });
+    }
+  };
+  const current = tabs.find((t) => t.id === tab) || tabs[0];
+  return html`<div class="insert-tabs" ref=${ref}>
+    <div class="insert-tab-bar" role="tablist" aria-label=${phone ? 'Label content' : 'Add to the label'}>
+      ${tabs.map((t) => html`<button role="tab" onPointerDown=${keepFocus} id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
         aria-controls="insert-panel" aria-label=${t.name} title=${t.name} class=${t.id === current.id ? 'on' : ''} onClick=${() => pick(t.id)}>
         <${Icon} name=${t.icon} size=${18} /><span class="tab-name">${t.name}</span>${t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
     </div>

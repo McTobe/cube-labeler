@@ -443,9 +443,20 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 @media (max-width: 899px) {
   body.typing .nav, body.typing .action-bar { display: none; }
   /* Only typing the label text needs the room of the size line and Rulers */
-  body.typing:has(#label-text:focus) .preview-bar,
-  body.typing:has(#label-text:focus) .settings-head,
-  body.typing:has(#label-text:focus) .mode-switch { display: none; }
+  body.typing:has(.phone-tabs :focus) .preview-bar,
+  body.typing:has(.phone-tabs :focus) .settings-head,
+  body.typing:has(.phone-tabs :focus) .mode-switch { display: none; }
+  /* Typing in the QR code or barcode tab: Print and Add stay docked on the keyboard */
+  body.typing:has(.phone-tabs input:focus) .action-bar { display: block; bottom: 0; }
+  /* The text, QR code, barcode and picture take turns in one card of one height, so
+     switching tabs never moves the page */
+  /* The card fills the screen down to Print, and its panels scroll inside it */
+  .phone-tabs .insert-panel { height: max(300px, calc(100dvh - 520px)); overflow-y: auto; }
+  body.typing .phone-tabs .insert-panel { height: auto; overflow: visible; }
+  .phone-tabs .text-editor { display: flex; flex-direction: column; min-height: 100%; }
+  .phone-tabs .text-editor .card-head { margin-top: 12px; }
+  .phone-tabs .text-editor .text-box { flex: 1; }
+  .phone-tabs .text-editor textarea { flex: 1; }
   body.typing .toast-slot { bottom: 72px; }
   /* Bigger buttons for thumbs */
   .format-bar .fmt { min-height: 44px; }
@@ -707,6 +718,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .insert-tab-bar button.on { background: var(--card); box-shadow: var(--shadow); font-weight: 600; color: var(--accent); }
 /* Three names don't fit a narrow half card on one line each, so the tabs show just their icons */
 @container (max-width: 300px) { .insert-tab-bar .tab-name { display: none; } }
+@container (max-width: 300px) { .phone-tabs .insert-tab-bar .tab-name { display: inline; } }
 .tab-name { white-space: nowrap; }
 .on-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .insert-panel { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
@@ -778,6 +790,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   /* The text card splits in half: the text, a thin line, then the extras in tabs */
   .text-split { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; }
   .text-col, .insert-col { display: flex; flex-direction: column; min-width: 0; }
+  .text-col > .text-editor { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .text-col { padding-right: 20px; }
   .insert-col { padding-left: 20px; border-left: 1px solid var(--border); }
   .insert-tabs, .insert-panel { flex: 1; display: flex; flex-direction: column; }
@@ -1533,3 +1546,8 @@ input.tape-number { width: 160px; }
   /* Room for three buttons: the two secondary ones keep their size, Print again takes the rest */
   .history-page .action-buttons > .secondary { min-width: 140px; }
 }
+/* Four phone tabs: the icon over the name */
+.phone-tabs .insert-tab-bar button { flex-direction: column; gap: 2px; min-height: 48px; font-size: 0.78rem; }
+.phone-tabs .insert-tab-bar .tab-name { display: inline; }
+.phone-options > :first-child { margin-top: 14px; }
+.code-panel > .field:first-child { margin-top: 14px; }
