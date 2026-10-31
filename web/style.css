@@ -613,6 +613,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .menu.tiles.kinds button.on .menu-icon { background: var(--accent); color: var(--accent-text); }
 .nav .nav-label { flex: 1; display: flex; }
 .nav .nav-label > a { flex: 1; }
+.nav-caret { margin-left: 3px; font-size: 0.7rem; }
 
 /* The label text box. The editor font has no bold or italic file of its own, so the browser
    slants italic itself and every letter keeps its width in the styled layer behind the box */

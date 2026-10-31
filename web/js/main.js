@@ -106,14 +106,15 @@ function App() {
       ${PAGES.map((p) => {
         const link = html`<a href=${`#/${p.id}`} class=${p.id === page.id ? 'active' : ''}
           aria-current=${p.id === page.id ? 'page' : undefined}
-          onClick=${p.id === 'label' && !wide ? (e) => { e.preventDefault(); setKinds(true); } : undefined}>
-          <${Icon} name=${p.icon} /><span>${p.title}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`;
+          onClick=${p.id === 'label' && !wide && page.id === 'label' ? (e) => { e.preventDefault(); setKinds(true); } : undefined}>
+          <${Icon} name=${p.icon} /><span>${p.title}${p.id === 'label' && !wide && html`<span class="nav-caret" aria-hidden="true">▴</span>`}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`;
         if (p.id !== 'label' || wide) return link;
-        // On a phone the Label button asks which kind of label to edit
+        // On a phone the Label button goes back to the label, and on the Label page it asks
+        // which kind of label to edit
         return html`<span class="menu-anchor nav-label">${link}
           <${Menu} variant="tiles kinds" open=${kinds} onClose=${() => setKinds(false)}
-            items=${MODES.map((m) => ({ label: m.name, icon: m.icon, on: page.id === 'label' && mode === m.id,
-              action: () => { setMode(m.id); if (page.id !== 'label') location.hash = '#/label'; } }))} /></span>`;
+            items=${MODES.map((m) => ({ label: m.name, icon: m.icon, on: mode === m.id,
+              action: () => setMode(m.id) }))} /></span>`;
       })}
     </nav>
     <div class="main-col">

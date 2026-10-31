@@ -92,7 +92,7 @@ Without Google, **Settings › Backups and sync** can save everything to one `.c
 
 ## 9. On a phone
 
-The same pages sit in tabs at the bottom, and **Print** and **Add** stay in reach above them. Tapping **Label** there asks which kind of label to edit: a text label, bin label, port strip or cable flag. On the Label page the editor is one card under the preview with four tabs: **Text**, **Code** (a QR code or a barcode), **Picture** and **Settings**, so the page stays put. The styling buttons show up while you type, docked on top of the keyboard. In Chrome's menu, **Add to Home screen** gives the app its own icon and window.
+The same pages sit in tabs at the bottom, and **Print** and **Add** stay in reach above them. On the Label page, tapping **Label** again asks which kind of label to edit: a text label, bin label, port strip or cable flag. On the Label page the editor is one card under the preview with four tabs: **Text**, **Code** (a QR code or a barcode), **Picture** and **Settings**, so the page stays put. The styling buttons show up while you type, docked on top of the keyboard. In Chrome's menu, **Add to Home screen** gives the app its own icon and window.
 
 <img src="images/guide/phone.png" alt="The Label page on an Android phone" width="300">
 
