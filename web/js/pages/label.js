@@ -459,7 +459,7 @@ function QrPanel() {
       <div class="row icon-row">
         <${Field} label="Content: a link or text">
           <input type="text" value=${label.qr_data} placeholder="https://example.com"
-            onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: label.qr_enabled || e.currentTarget.value !== '' })} />
+            onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: e.currentTarget.value !== '' })} />
         <//>
         <button class="secondary" title="Make a code that joins a Wi-Fi network" onClick=${() => setWifiOpen(true)}>
           <${Icon} name="wifi" size=${18} /> Wi-Fi</button>
@@ -480,7 +480,7 @@ function BarcodePanel() {
       <${Toggle} label="Add a barcode" checked=${!!label.barcode_enabled} onChange=${(barcode_enabled) => updateLabel({ barcode_enabled })} />
       <${Field} label="Content: a number or code">
         <input type="text" value=${data} placeholder="PN-10432" autocomplete="off" spellcheck="false"
-          onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: label.barcode_enabled || e.currentTarget.value !== '' })} />
+          onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: e.currentTarget.value !== '' })} />
       <//>
       <${Toggle} label="Number under the bars" checked=${label.barcode_show_text !== false}
         onChange=${(barcode_show_text) => updateLabel({ barcode_show_text })} />
