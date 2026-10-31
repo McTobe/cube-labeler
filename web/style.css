@@ -720,7 +720,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 @container (max-width: 300px) { .insert-tab-bar .tab-name { display: none; } }
 @container (max-width: 300px) { .phone-tabs .insert-tab-bar .tab-name { display: inline; } }
 .tab-name { white-space: nowrap; }
-.on-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .insert-panel { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
 .insert-group > :first-child { margin-top: 14px; }
 .insert-group .row > .secondary { flex: none; display: inline-flex; align-items: center; gap: 6px; }

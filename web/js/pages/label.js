@@ -425,7 +425,7 @@ function TextSizeField({ label, onChange }) {
 
 // --- Extras next to the text ---------------------------------------------------------------
 
-// The things that can go next to the text, as tabs; a dot marks the ones on the label.
+// The things that can go next to the text, as tabs.
 // More kinds are added here.
 const INSERTS = [
   { id: 'qr', name: 'QR code', icon: 'qr', on: (label) => label.qr_enabled, Panel: QrPanel },
@@ -440,28 +440,20 @@ let lastPhoneTab = 'text';
 const PHONE_TABS = [TEXT_TAB, CODE_TAB, INSERTS.find((t) => t.id === 'picture'), OPTIONS_TAB];
 
 function InsertTabs({ phone = false }) {
-  const { label } = useStore(app);
   const tabs = phone ? PHONE_TABS : INSERTS;
   const [tab, setTab] = useState(phone ? lastPhoneTab : lastInsert);
-  const ref = useRef(null);
   const pick = (id) => {
     if (phone) lastPhoneTab = id; else lastInsert = id;
-    // While typing, the cursor moves into the new tab's field, so the keyboard stays up
-    const typing = document.body.classList.contains('typing');
+    // Switching tabs closes the phone keyboard, so each tab opens at rest
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     setTab(id);
-    if (typing) {
-      requestAnimationFrame(() => {
-        const field = ref.current && ref.current.querySelector('#insert-panel textarea, #insert-panel input[type="text"]');
-        if (field) field.focus({ preventScroll: true });
-      });
-    }
   };
   const current = tabs.find((t) => t.id === tab) || tabs[0];
-  return html`<div class="insert-tabs" ref=${ref}>
+  return html`<div class="insert-tabs">
     <div class="insert-tab-bar" role="tablist" aria-label=${phone ? 'Label content' : 'Add to the label'}>
-      ${tabs.map((t) => html`<button role="tab" onPointerDown=${keepFocus} id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
+      ${tabs.map((t) => html`<button role="tab" id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
         aria-controls="insert-panel" aria-label=${t.name} title=${t.name} class=${t.id === current.id ? 'on' : ''} onClick=${() => pick(t.id)}>
-        <${Icon} name=${t.icon} size=${18} /><span class="tab-name">${t.name}</span>${t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
+        <${Icon} name=${t.icon} size=${18} /><span class="tab-name">${t.name}</span></button>`)}
     </div>
     <div class="insert-panel" id="insert-panel" role="tabpanel" aria-labelledby=${`insert-tab-${current.id}`}>
       <${current.Panel} />
