@@ -230,7 +230,6 @@ function TextEditor() {
           title=${styled ? 'Styled view: tap to show the plain markers' : 'Plain markers: tap to show the styles'}
           aria-label="Show the styles in the text box" onPointerDown=${keepFocus} onClick=${switchView}>**</button>
       </div>
-      ${!wide && html`<${DockActions} />`}
     </div>
     <div class=${`text-box${styled ? ' styled' : ''}`}>
       ${styled && html`<div class="marker-view" ref=${viewRef} aria-hidden="true"></div>`}
@@ -278,12 +277,6 @@ function useMarkerView(ref, viewRef, styled, text) {
   }, [styled, text]);
 }
 
-// Print (or Connect) and Add, docked under the toolbar while typing on a phone, so a label prints
-// without closing the keyboard first
-function DockActions() {
-  return html`<div class="dock-actions"><${PrimaryAction} keepKeyboard /><${AddButton} keepKeyboard /></div>`;
-}
-
 // On a wide screen the card splits in two: the text, and the extras in tabs beside it
 function TextCard() {
   return html`<section class="card text-card"><div class="text-split"><div class="text-col"><${TextEditor} /></div>
@@ -293,7 +286,44 @@ function TextCard() {
 // On a phone the text is the first tab of one card, with the codes, the picture and the options,
 // so the page stays put: one panel at a time under the pinned preview
 function PhoneTextCard() {
-  return html`<section class="card insert-card text-card phone-tabs"><${InsertTabs} phone /></section>`;
+  const ref = useRef(null);
+  useFitBetween(ref);
+  return html`<section class="card insert-card text-card phone-tabs" ref=${ref}><${InsertTabs} phone /></section>`;
+}
+
+// Sizes the phone card to fill the room between the pinned preview and the Print bar on any
+// screen, so the page never scrolls; the tab's panel scrolls inside the card instead. While
+// typing the keyboard takes the room and the text box sizes itself (see useTypingRoom).
+function useFitBetween(ref) {
+  useEffect(() => {
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const card = ref.current;
+        const panel = card && card.querySelector('.insert-panel');
+        if (!panel) return;
+        if (document.body.classList.contains('typing')) { panel.style.height = ''; return; }
+        const bar = document.querySelector('.action-bar');
+        const bottom = bar && bar.getClientRects().length ? bar.getBoundingClientRect().top : window.innerHeight;
+        const top = card.getBoundingClientRect().top + window.scrollY;
+        const chrome = card.offsetHeight - panel.offsetHeight;
+        panel.style.height = `${Math.max(200, Math.floor(bottom - top - chrome - 12))}px`;
+      });
+    };
+    fit();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    const col = document.querySelector('.label-preview-col');
+    if (observer && col) observer.observe(col);
+    window.addEventListener('resize', fit);
+    document.addEventListener('focusout', fit);
+    return () => {
+      cancelAnimationFrame(frame);
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', fit);
+      document.removeEventListener('focusout', fit);
+    };
+  }, []);
 }
 
 // The Options tab: the kind of label and its settings, which scroll inside the card
@@ -832,7 +862,7 @@ function ActionBar() {
 }
 
 // The main button: Go to queue while labels wait there, Connect without a printer, or Print
-function PrimaryAction({ keepKeyboard = false }) {
+function PrimaryAction() {
   const { render, queue } = useStore(app);
   const p = useStore(printer);
   const { phase } = useStore(boot);
@@ -840,24 +870,22 @@ function PrimaryAction({ keepKeyboard = false }) {
   const needsPrinter = p.supported && !p.transport;
   // With labels waiting in the queue, the next step is printing them together
   const queued = queueLabelCount(queue);
-  const down = keepKeyboard ? keepFocus : undefined;
   if (queued > 0) {
     return html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
       <${Icon} name="queue" size=${20} /> <span>Go to queue (${queued})</span></a>`;
   }
   if (needsPrinter) {
-    return html`<button class="primary big" disabled=${!ready || p.busy} onPointerDown=${down} onClick=${connectPrinter}>
+    return html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
       <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`;
   }
   return html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
-    title="Print (Ctrl+P)" onPointerDown=${down} onClick=${printLabel}>
+    title="Print (Ctrl+P)" onClick=${printLabel}>
     <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`;
 }
 
-function AddButton({ keepKeyboard = false }) {
+function AddButton() {
   const { phase } = useStore(boot);
-  return html`<button class="secondary big" disabled=${phase !== 'ready'} title="Add to queue (Ctrl+Enter)"
-    onPointerDown=${keepKeyboard ? keepFocus : undefined} onClick=${addToQueue}>
+  return html`<button class="secondary big" disabled=${phase !== 'ready'} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
     <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Add</span>
   </button>`;
 }

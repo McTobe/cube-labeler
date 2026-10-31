@@ -446,17 +446,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   body.typing:has(.phone-tabs :focus) .preview-bar,
   body.typing:has(.phone-tabs :focus) .settings-head,
   body.typing:has(.phone-tabs :focus) .mode-switch { display: none; }
-  /* Typing in the QR code or barcode tab: Print and Add stay docked on the keyboard */
-  body.typing:has(.phone-tabs input:focus) .action-bar { display: block; bottom: 0; }
   /* The text, QR code, barcode and picture take turns in one card of one height, so
      switching tabs never moves the page */
-  /* The card fills the screen down to Print, and its panels scroll inside it */
-  .phone-tabs .insert-panel { height: max(300px, calc(100dvh - 520px)); overflow-y: auto; }
+  /* The card fills the screen down to Print (useFitBetween), and its panels scroll inside it */
+  .phone-tabs .insert-panel { height: 340px; overflow-y: auto; }
   body.typing .phone-tabs .insert-panel { height: auto; overflow: visible; }
-  .phone-tabs .text-editor { display: flex; flex-direction: column; min-height: 100%; }
+  /* The text box takes the room the panel has left, on small screens too */
+  .phone-tabs .text-editor { display: flex; flex-direction: column; height: 100%; }
+  body.typing .phone-tabs .text-editor { height: auto; }
   .phone-tabs .text-editor .card-head { margin-top: 12px; }
-  .phone-tabs .text-editor .text-box { flex: 1; }
-  .phone-tabs .text-editor textarea { flex: 1; }
+  .phone-tabs .text-editor .text-box { flex: 1 1 0; min-height: 96px; }
+  .phone-tabs .text-editor textarea { flex: 1; min-height: 0; }
+  body.typing .phone-tabs .text-editor .text-box { flex: none; }
   body.typing .toast-slot { bottom: 72px; }
   /* Bigger buttons for thumbs */
   .format-bar .fmt { min-height: 44px; }
@@ -469,7 +470,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   }
   body.typing .text-card:focus-within .format-bar { margin: 8px 0 0; }
   body.typing .text-card:focus-within .fmt-picker { order: 0; margin-top: 8px; }
-  body.typing .text-card:focus-within .dock-actions { display: flex; }
   body.typing .text-card:focus-within textarea { resize: none; }
 }
 /* On a phone the stage is small, so messages float just above the buttons instead */
@@ -694,10 +694,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* The size and alignment choices open under the toolbar, or above it when it sits on the keyboard */
 .fmt-picker { order: 2; display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
 .fmt-picker .fmt { flex: 1 0 auto; font-size: 0.95rem; }
-/* Print and Add, docked under the toolbar while typing on a phone */
-.dock-actions { display: none; order: 3; gap: 8px; margin-top: 8px; }
-.dock-actions > :first-child { flex: 1; }
-.dock-actions > * { min-height: 46px; }
 .marker-tips { margin: 8px 0 0; font-size: 0.8rem; line-height: 1.8; }
 .marker-tips code { padding: 1px 6px; border-radius: 5px; background: var(--raised); font-size: 0.78rem; white-space: nowrap; }
 .text-card .card-head { gap: 12px; }
