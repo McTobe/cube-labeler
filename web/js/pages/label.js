@@ -14,7 +14,7 @@ import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
-  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode,
+  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
   updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit,
 } from '../app.js';
 
@@ -303,12 +303,16 @@ function useFitBetween(ref) {
         const card = ref.current;
         const panel = card && card.querySelector('.insert-panel');
         if (!panel) return;
-        if (document.body.classList.contains('typing')) { panel.style.height = ''; return; }
+        const main = card.closest('main');
+        if (document.body.classList.contains('typing')) { panel.style.height = ''; main.style.paddingBottom = ''; return; }
         const bar = document.querySelector('.action-bar');
         const bottom = bar && bar.getClientRects().length ? bar.getBoundingClientRect().top : window.innerHeight;
         const top = card.getBoundingClientRect().top + window.scrollY;
         const chrome = card.offsetHeight - panel.offsetHeight;
         panel.style.height = `${Math.max(200, Math.floor(bottom - top - chrome - 12))}px`;
+        // Leave room below the card for just the Print bar and the page tabs, so the page itself
+        // has nothing to scroll
+        main.style.paddingBottom = `${Math.floor(window.innerHeight - bottom)}px`;
       });
     };
     fit();
@@ -319,6 +323,8 @@ function useFitBetween(ref) {
     document.addEventListener('focusout', fit);
     return () => {
       cancelAnimationFrame(frame);
+      const main = document.querySelector('main');
+      if (main) main.style.paddingBottom = '';
       if (observer) observer.disconnect();
       window.removeEventListener('resize', fit);
       document.removeEventListener('focusout', fit);
@@ -342,14 +348,14 @@ function PhoneOptionsPanel() {
 let lastCode = null;
 function CodePanel() {
   const { label } = useStore(app);
-  const [kind, setCode] = useState(lastCode || (hasBarcode(label) && !label.qr_enabled ? 'barcode' : 'qr'));
+  const [kind, setCode] = useState(lastCode || (hasBarcode(label) && !hasQr(label) ? 'barcode' : 'qr'));
   const setKind = (k) => { lastCode = k; setCode(k); };
   return html`<div class="code-panel">
     <${Segmented} ariaLabel="Kind of code" options=${[['qr', 'QR code'], ['barcode', 'Barcode']]} value=${kind} onChange=${setKind} />
     ${kind === 'qr' ? html`<${QrPanel} />` : html`<${BarcodePanel} />`}
   </div>`;
 }
-const CODE_TAB = { id: 'code', name: 'Code', icon: 'qr', on: (label) => label.qr_enabled || hasBarcode(label), Panel: CodePanel };
+const CODE_TAB = { id: 'code', name: 'Code', icon: 'qr', on: (label) => hasQr(label) || hasBarcode(label), Panel: CodePanel };
 const OPTIONS_TAB = { id: 'options', name: 'Options', icon: 'settings', on: () => false, Panel: PhoneOptionsPanel };
 
 // On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
@@ -458,7 +464,7 @@ function TextSizeField({ label, onChange }) {
 // The things that can go next to the text, as tabs.
 // More kinds are added here.
 const INSERTS = [
-  { id: 'qr', name: 'QR code', icon: 'qr', on: (label) => label.qr_enabled, Panel: QrPanel },
+  { id: 'qr', name: 'QR code', icon: 'qr', on: hasQr, Panel: QrPanel },
   { id: 'barcode', name: 'Barcode', icon: 'barcode', on: hasBarcode, Panel: BarcodePanel },
   { id: 'picture', name: 'Picture', icon: 'image', on: (label) => !!label.image, Panel: PicturePanel },
 ];
@@ -508,10 +514,9 @@ function QrPanel() {
   const data = label.qr_data || '';
   const open = (h) => setHelper(h);
   return html`<div class="insert-group">
-      <${Toggle} label="Add a QR code" checked=${label.qr_enabled} onChange=${(qr_enabled) => updateLabel({ qr_enabled })} />
       <div class="field">
         <div class="field-label-row"><label class="field-label" for="qr-data">Content: a link or text</label>
-          ${label.qr_enabled && html`<${QrFitLine} short data=${data} tape=${label.tape_width_mm} scale=${label.qr_scale} />`}</div>
+          ${hasQr(label) && html`<${QrFitLine} short data=${data} tape=${label.tape_width_mm} scale=${label.qr_scale} />`}</div>
         <input id="qr-data" type="text" value=${data} placeholder="https://example.com"
           onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: e.currentTarget.value !== '' })} />
       </div>
@@ -607,7 +612,6 @@ function BarcodePanel() {
   const { label } = useStore(app);
   const data = label.barcode_data || '';
   return html`<div class="insert-group">
-      <${Toggle} label="Add a barcode" checked=${!!label.barcode_enabled} onChange=${(barcode_enabled) => updateLabel({ barcode_enabled })} />
       <${Field} label="Content: a number or code">
         <input type="text" value=${data} placeholder="PN-10432" autocomplete="off" spellcheck="false"
           onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: e.currentTarget.value !== '' })} />

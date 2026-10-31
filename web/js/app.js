@@ -344,12 +344,15 @@ export function resetSettings() {
 }
 
 // A label saved before barcodes has no barcode fields
-export const hasBarcode = (label) => !!(label.barcode_enabled && (label.barcode_data || '').trim());
+// A QR code or barcode is on the label when its field has something in it. The *_enabled flags
+// follow the fields and are kept for saved labels and the desktop app.
+export const hasQr = (label) => !!(label.qr_data || '').trim();
+export const hasBarcode = (label) => !!(label.barcode_data || '').trim();
 
 // What Python's LabelConfig gets: the label minus the app's own fields
 export function renderOptions(label) {
   const { image, ...options } = label;
-  options.qr_enabled = label.qr_enabled && label.qr_data.trim() !== '';
+  options.qr_enabled = hasQr(label);
   options.barcode_enabled = hasBarcode(label);
   options.image_data = image ? image.data : null;
   // The web app fits text to the tape unless text_height_mm sets a letter height, so a label
@@ -421,7 +424,7 @@ export function itemTitle(item) {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
   }
-  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : hasBarcode(item.label) ? 'Barcode' : item.label.image ? 'Picture' : 'Label');
+  return textLines(item.label)[0] || (hasQr(item.label) ? 'QR code' : hasBarcode(item.label) ? 'Barcode' : item.label.image ? 'Picture' : 'Label');
 }
 
 // A text size preset that is too tall for the text (say 7 mm with two lines) was drawn fitted,
@@ -821,7 +824,7 @@ export function queueItem(label) {
       say('Give at least one port a name first.', true);
       return false;
     }
-  } else if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !hasBarcode(item.label) && !item.label.image) {
+  } else if (item.mode === 'text' && !item.label.text.trim() && !hasQr(item.label) && !hasBarcode(item.label) && !item.label.image) {
     say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
   }
