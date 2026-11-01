@@ -604,7 +604,7 @@ function HelperForm({ helper, onDone }) {
     if (f.type === 'segmented') return html`<${Segmented} label=${f.label} value=${value} options=${f.options} onChange=${(v) => set({ [f.key]: v })} />`;
     if (f.type === 'select') return html`<${Select} label=${f.label} value=${value} options=${f.options} onChange=${(v) => set({ [f.key]: v })} />`;
     if (f.type === 'toggle') return html`<${Toggle} label=${f.label} checked=${value} onChange=${(v) => set({ [f.key]: v })} />`;
-    if (f.type === 'textarea') return html`<${Field} label=${f.label}><textarea rows="2" value=${value} onInput=${onInput}></textarea><//>`;
+    if (f.type === 'textarea') return html`<${Field} label=${f.label}><textarea rows="2" value=${value} placeholder=${f.placeholder || ''} onInput=${onInput}></textarea><//>`;
     const input = html`<input type=${f.type || 'text'} value=${value} required=${f.required} placeholder=${f.placeholder || ''}
       autocomplete="off" onInput=${onInput} />`;
     if (!f.locate) return html`<${Field} label=${f.label}>${input}<//>`;

@@ -37,9 +37,9 @@ export const QR_HELPERS = [
   {
     id: 'wifi', name: 'Wi-Fi', icon: 'wifi', title: 'Wi-Fi QR code', button: 'Use this network',
     fields: [
-      { key: 'ssid', label: 'Network name', required: true },
+      { key: 'ssid', label: 'Network name', required: true, placeholder: 'Home-WiFi' },
       { key: 'security', label: 'Security', type: 'segmented', options: [['WPA', 'WPA/WPA2/WPA3'], ['WEP', 'WEP'], ['nopass', 'None']], value: 'WPA' },
-      { key: 'password', label: 'Password', when: (v) => v.security !== 'nopass' },
+      { key: 'password', label: 'Password', placeholder: 'The Wi-Fi password', when: (v) => v.security !== 'nopass' },
       { key: 'hidden', label: 'Hidden network', type: 'toggle', value: false },
     ],
     build: (v) => {
@@ -55,8 +55,8 @@ export const QR_HELPERS = [
     fields: [
       { key: 'name', label: 'Name', required: true, placeholder: 'Alex Smith' },
       { key: 'phone', label: 'Phone', type: 'tel', placeholder: '+46 70 123 45 67' },
-      { key: 'email', label: 'Email', type: 'email' },
-      { key: 'org', label: 'Company' },
+      { key: 'email', label: 'Email', type: 'email', placeholder: 'alex@example.com' },
+      { key: 'org', label: 'Company', placeholder: 'Example Ltd' },
     ],
     build: (v) => {
       let code = `MECARD:N:${mecard(v.name.trim())};`;
@@ -70,9 +70,9 @@ export const QR_HELPERS = [
   {
     id: 'email', name: 'Email', icon: 'mail', title: 'Email', button: 'Use this email',
     fields: [
-      { key: 'to', label: 'Email address', type: 'email', required: true },
+      { key: 'to', label: 'Email address', type: 'email', required: true, placeholder: 'orders@example.com' },
       { key: 'subject', label: 'Subject', placeholder: 'Reorder M4 screws' },
-      { key: 'body', label: 'Message', type: 'textarea' },
+      { key: 'body', label: 'Message', type: 'textarea', placeholder: 'Please send 100 M4 screws.' },
     ],
     build: (v) => {
       const params = [['subject', v.subject], ['body', v.body]].filter(([, x]) => x)
@@ -102,8 +102,8 @@ export const QR_HELPERS = [
   {
     id: 'sms', name: 'Text message', icon: 'message', title: 'Text message', button: 'Use this message',
     fields: [
-      { key: 'phone', label: 'Phone number', type: 'tel', required: true },
-      { key: 'text', label: 'Message', type: 'textarea' },
+      { key: 'phone', label: 'Phone number', type: 'tel', required: true, placeholder: '+46 70 123 45 67' },
+      { key: 'text', label: 'Message', type: 'textarea', placeholder: 'The shed is unlocked.' },
     ],
     build: (v) => `SMSTO:${digits(v.phone)}:${v.text || ''}`,
     note: 'Scanning opens a text message to the number, ready to send.',
@@ -112,7 +112,7 @@ export const QR_HELPERS = [
     id: 'whatsapp', name: 'WhatsApp', icon: 'chat', title: 'WhatsApp message', button: 'Use this chat',
     fields: [
       { key: 'phone', label: 'Phone number with country code', type: 'tel', required: true, placeholder: '+46 70 123 45 67' },
-      { key: 'text', label: 'Message', type: 'textarea' },
+      { key: 'text', label: 'Message', type: 'textarea', placeholder: 'Hi! I found your bike.' },
     ],
     build: (v) => `https://wa.me/${digits(v.phone).replace('+', '')}${v.text ? `?text=${encodeURIComponent(v.text)}` : ''}`,
     note: 'Scanning opens a WhatsApp chat with the number.',
@@ -123,7 +123,7 @@ export const QR_HELPERS = [
       { key: 'title', label: 'What', required: true, placeholder: 'Replace the water filter' },
       { key: 'start', label: 'Starts', type: 'datetime-local', required: true },
       { key: 'end', label: 'Ends', type: 'datetime-local' },
-      { key: 'where', label: 'Where' },
+      { key: 'where', label: 'Where', placeholder: 'Basement' },
     ],
     build: (v) => [
       'BEGIN:VEVENT', `SUMMARY:${icalText(v.title.trim())}`, `DTSTART:${icalTime(v.start)}`,
