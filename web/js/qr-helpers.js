@@ -53,7 +53,7 @@ export const QR_HELPERS = [
   {
     id: 'contact', name: 'Contact', icon: 'user', title: 'Contact card', button: 'Use this contact',
     fields: [
-      { key: 'name', label: 'Name', required: true, placeholder: 'Tobe Kejonen' },
+      { key: 'name', label: 'Name', required: true, placeholder: 'Alex Smith' },
       { key: 'phone', label: 'Phone', type: 'tel', placeholder: '+46 70 123 45 67' },
       { key: 'email', label: 'Email', type: 'email' },
       { key: 'org', label: 'Company' },
@@ -135,7 +135,7 @@ export const QR_HELPERS = [
     id: 'social', name: 'Social profile', icon: 'at', title: 'Social profile', button: 'Use this profile',
     fields: [
       { key: 'site', label: 'Site', type: 'select', options: Object.entries(SOCIAL).map(([k, [n]]) => [k, n]), value: 'instagram' },
-      { key: 'handle', label: 'Username', required: true, placeholder: 'thetobek' },
+      { key: 'handle', label: 'Username', required: true, placeholder: 'yourname' },
     ],
     build: (v) => SOCIAL[v.site][1](v.handle.trim().replace(/^@/, '')),
     note: 'Scanning opens the profile.',
