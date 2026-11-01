@@ -344,12 +344,15 @@ export function resetSettings() {
 }
 
 // A label saved before barcodes has no barcode fields
-export const hasBarcode = (label) => !!(label.barcode_enabled && (label.barcode_data || '').trim());
+// A QR code or barcode is on the label when its field has something in it. The *_enabled flags
+// follow the fields and are kept for saved labels and the desktop app.
+export const hasQr = (label) => !!(label.qr_data || '').trim();
+export const hasBarcode = (label) => !!(label.barcode_data || '').trim();
 
 // What Python's LabelConfig gets: the label minus the app's own fields
 export function renderOptions(label) {
   const { image, ...options } = label;
-  options.qr_enabled = label.qr_enabled && label.qr_data.trim() !== '';
+  options.qr_enabled = hasQr(label);
   options.barcode_enabled = hasBarcode(label);
   options.image_data = image ? image.data : null;
   // The web app fits text to the tape unless text_height_mm sets a letter height, so a label
@@ -421,7 +424,7 @@ export function itemTitle(item) {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
   }
-  return textLines(item.label)[0] || (item.label.qr_enabled ? 'QR code' : hasBarcode(item.label) ? 'Barcode' : item.label.image ? 'Picture' : 'Label');
+  return textLines(item.label)[0] || (hasQr(item.label) ? 'QR code' : hasBarcode(item.label) ? 'Barcode' : item.label.image ? 'Picture' : 'Label');
 }
 
 // A text size preset that is too tall for the text (say 7 mm with two lines) was drawn fitted,
@@ -434,6 +437,8 @@ function fitTooTallPreset(item, metrics) {
   (ports ? updatePorts : updateLabel)({ text_height_mm: null });
   say(`${item.label.text_height_mm} mm is too big for this text ${ports ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
 }
+
+const SAMPLE_TEXT = 'Your text here';
 
 // Renders the current label. Calls made while one runs fold into a single follow-up render.
 export async function renderNow() {
@@ -452,6 +457,9 @@ export async function renderNow() {
         // here and not in its queue item
         const options = itemOptions(item);
         if (item.mode === 'bin' || item.label.layout === 'ports') options.show_rulers = app.get().label.show_rulers;
+        // An empty text label shows faded sample text, not a blank piece of tape (it can't print)
+        const sample = item.mode === 'text' && item.label.layout !== 'ports' && options.text === ' ';
+        if (sample) options.text = SAMPLE_TEXT;
         const result = await py.render_label(options);
         const old = app.get().render;
         if (old) { URL.revokeObjectURL(old.previewUrl); URL.revokeObjectURL(old.dotsUrl); }
@@ -464,6 +472,7 @@ export async function renderNow() {
             tape_width_mm: itemTapeWidth(item),
             item,
             tape_bg_color: item.mode === 'bin' ? '#FFFFFF' : item.label.tape_bg_color,
+            sample,
           },
           renderError: null,
         });
@@ -484,6 +493,9 @@ export async function renderNow() {
 export const toggleStyle = (text, start, end, style) => py.toggle_style(text, start, end, style);
 export const restyleLines = (text, start, end, changes) => py.restyle_lines(text, start, end, changes);
 export const lineStyleAt = (text, pos) => (py ? py.line_style_at(text, pos) : Promise.resolve(['normal', null]));
+
+// How dense a QR code of data prints on a tape (see qr_fit in cube_web.py)
+export const qrFit = (data, tapeWidth, scale) => (py ? py.qr_fit(data, tapeWidth, scale) : Promise.resolve(null));
 
 // Font menus show each font in its own face. The files come from Python, each loaded once.
 const fontFaces = new Map();
@@ -690,6 +702,10 @@ export async function printLabel() {
   await renderNow();  // print exactly what the editor shows, even mid-typing
   const current = app.get().render;
   if (!current || !printer.get().transport || tooLong(current.metrics)) return;
+  if (current.sample) {
+    say('Add some text, a QR code, a barcode or a picture first.', true);
+    return;
+  }
   await printerJob(async () => {
     const result = await printRaster(printer.get().transport, py, current.raster, {
       required_tape_width_mm: current.tape_width_mm,
@@ -818,7 +834,7 @@ export function queueItem(label) {
       say('Give at least one port a name first.', true);
       return false;
     }
-  } else if (item.mode === 'text' && !item.label.text.trim() && !(item.label.qr_enabled && item.label.qr_data.trim()) && !hasBarcode(item.label) && !item.label.image) {
+  } else if (item.mode === 'text' && !item.label.text.trim() && !hasQr(item.label) && !hasBarcode(item.label) && !item.label.image) {
     say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
   }

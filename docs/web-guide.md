@@ -28,7 +28,7 @@ The chip then shows the tape width and how much tape is left. Choose it again an
 Type in **Label text** and the preview shows the label on the tape, with its length, the tape it uses and the print time underneath. Then choose **Print**, or **Add to queue** to print it later together with others.
 
 - **Font and layout** on the right sets the font, weight, text size, alignment and a frame.
-- The tabs next to the text add a **QR code** (with a Wi-Fi helper), a **Barcode** or a **Picture**.
+- The tabs next to the text add a **QR code**, a **Barcode** or a **Picture**. Under the QR code content, **Wi-Fi**, **Contact**, **Email** and **More** (phone call, location, text message, WhatsApp, calendar event, social profile) fill it in for you, and a dot says whether the code will scan at this tape width.
 - **Fit** shows the whole label; **Real size** shows it at its printed size.
 
 ### Styling text
@@ -41,6 +41,11 @@ Select text and use the buttons above the editor, or type the markers yourself:
 | `# `, `## `, `-# ` at the start of a line | Large, medium or small line |
 | `<< `, `>< `, `>> ` at the start of a line | Left, centred or right line |
 | `---` on its own line | A new column with a divider line |
+
+The text box shows the styles as you type: bold, italic, underlined and inverted words look that way,
+and the markers turn pale grey. Sizes and alignment only show on the label. The buttons light up for
+the style under the cursor, and **\*\*** at the end of the toolbar switches the box to the plain
+markers and back. The **?** next to **Clear** explains the markers.
 
 ## 3. Pick the kind of label
 
@@ -87,7 +92,7 @@ Without Google, **Settings › Backups and sync** can save everything to one `.c
 
 ## 9. On a phone
 
-The same pages sit in tabs at the bottom, and **Print** and **Add** stay in reach above them. The styling buttons show up while you type. In Chrome's menu, **Add to Home screen** gives the app its own icon and window.
+The same pages sit in tabs at the bottom, and **Print** and **Add** stay in reach above them. On the Label page, tapping **Label** again asks which kind of label to edit: a text label, bin label, port strip or cable flag. On the Label page the editor is one card under the preview with four tabs: **Text**, **Code** (a QR code or a barcode), **Picture** and **Settings**, so the page stays put. The styling buttons show up while you type, docked on top of the keyboard. In Chrome's menu, **Add to Home screen** gives the app its own icon and window.
 
 <img src="images/guide/phone.png" alt="The Label page on an Android phone" width="300">
 

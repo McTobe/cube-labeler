@@ -4,14 +4,14 @@ import { useEffect, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { Icon } from './icons.js';
 import { PrinterChip } from './printer-ui.js';
-import { LabelPage } from './pages/label.js';
+import { LabelPage, MODES } from './pages/label.js';
 import { SettingsPage, SyncPanel, JoinSheet } from './pages/settings.js';
-import { Sheet } from './ui.js';
+import { Menu, Sheet, useWide } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
 import { HistoryPage } from './pages/history.js';
-import { app, start, pageChanged, queueLabelCount } from './app.js';
+import { app, start, pageChanged, queueLabelCount, setMode } from './app.js';
 import { useStore } from './state.js';
 import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive, driveReady } from './gdrive.js';
@@ -82,7 +82,9 @@ function SyncChip() {
 
 function App() {
   const [page, setPage] = useState(currentPage);
-  const { queue } = useStore(app);
+  const { queue, mode } = useStore(app);
+  const wide = useWide();
+  const [kinds, setKinds] = useState(false);
   useEffect(() => {
     const onHash = () => { pageChanged(); setPage(currentPage()); window.scrollTo(0, 0); };
     window.addEventListener('hashchange', onHash);
@@ -101,9 +103,19 @@ function App() {
   return html`<div class=${`shell page-${page.id}`}>
     <nav class="nav" aria-label="Pages">
       <a class="brand" href="#/label"><img src="icon-192.png" alt="" width="28" height="28" /><span>Cube Labeler</span></a>
-      ${PAGES.map((p) => html`<a href=${`#/${p.id}`} class=${p.id === page.id ? 'active' : ''}
-        aria-current=${p.id === page.id ? 'page' : undefined}>
-        <${Icon} name=${p.icon} /><span>${p.title}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`)}
+      ${PAGES.map((p) => {
+        const link = html`<a href=${`#/${p.id}`} class=${p.id === page.id ? 'active' : ''}
+          aria-current=${p.id === page.id ? 'page' : undefined}
+          onClick=${p.id === 'label' && !wide && page.id === 'label' ? (e) => { e.preventDefault(); setKinds(true); } : undefined}>
+          <${Icon} name=${p.icon} /><span>${p.title}${p.id === 'label' && !wide && html`<span class="nav-caret" aria-hidden="true"></span>`}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`;
+        if (p.id !== 'label' || wide) return link;
+        // On a phone the Label button goes back to the label, and on the Label page it asks
+        // which kind of label to edit
+        return html`<span class="menu-anchor nav-label">${link}
+          <${Menu} variant="tiles kinds" open=${kinds} onClose=${() => setKinds(false)}
+            items=${MODES.map((m) => ({ label: m.name, icon: m.icon, on: mode === m.id,
+              action: () => setMode(m.id) }))} /></span>`;
+      })}
     </nav>
     <div class="main-col">
       <header class="topbar">

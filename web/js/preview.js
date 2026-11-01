@@ -122,6 +122,7 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
     const fit = rows.length > 1 ? fitWidth(box, natural, wide, tapeMm, rows)
       : zoom === 'real' ? (natural ? Math.round(natural[0] * REAL_PX_PER_DOT) : null) : fitBase.current;
     const src = dots ? render.dotsUrl : render.previewUrl;
+    const sample = strip === undefined && render.sample;
     const alt = dots ? 'The dots the printer will print' : 'Label preview';
     const loaded = (e) => setNatural([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight]);
     let content;
@@ -142,7 +143,8 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
       </div>`;
     } else {
       content = html`<div class="tape-strip" style=${{ background: tape }}>
-        <img class=${dots ? 'dots' : ''} src=${src} style=${fit ? { width: `${fit}px` } : null} onLoad=${loaded} alt=${alt} />
+        <img class=${[dots && 'dots', sample && 'sample'].filter(Boolean).join(' ')} src=${src} style=${fit ? { width: `${fit}px` } : null}
+          onLoad=${loaded} alt=${sample ? 'Sample text: the label is empty' : alt} />
       </div>`;
     }
     stage = html`<div ref=${stageRef} class=${`tape-scroll zoom-${zoom}${fit ? ' fitted' : ''}`}>${content}</div>`;
@@ -163,7 +165,7 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
       </div>
     </div>
     <div class="preview-bar">
-      <span class="metrics">${m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · ${ports ? `lines up with ${ports.port_count} ports` : `about ${Math.max(1, Math.round(m.print_duration_sec))} s`}` : ''}</span>
+      <span class="metrics">${strip === undefined && render && render.sample ? 'Sample text. Type to start your label.' : m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · ${ports ? `lines up with ${ports.port_count} ports` : `about ${Math.max(1, Math.round(m.print_duration_sec))} s`}` : ''}</span>
       <span class="preview-controls">
         ${aids && html`<span class="chip-group" role="group" aria-label="Measuring aid">
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}

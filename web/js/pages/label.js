@@ -8,12 +8,14 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
+import { markerHtml, stylesAt } from '../marker-view.js';
+import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel } from '../qr-helpers.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
-  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode,
-  updatePorts, PORT_COUNTS, PORT_SPACINGS,
+  setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
+  updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -49,8 +51,8 @@ export function LabelPage() {
   } else if (mode === 'ports') {
     options = html`${!wide && html`<${PortCard} />`}<${PortSection} /><${PortFontSection} />`;
   } else {
-    options = html`
-      ${!wide && html`<${TextCard} /><section class="card insert-card"><${InsertTabs} /></section>`}
+    // On a phone the text, codes, picture and these options are tabs of one card
+    options = !wide ? html`<${PhoneTextCard} />` : html`
       ${mode === 'flag' && html`<${FlagSection} />`}
       <${FontSection} />
       <${TapeSection} length=${mode !== 'flag'} />
@@ -65,26 +67,28 @@ export function LabelPage() {
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
-      <${SettingsHead} mode=${mode} />
-      <${ModePicker} mode=${mode} />
+      ${wide ? html`<${SettingsHead} mode=${mode} /><${ModePicker} mode=${mode} />`
+        : !text && html`<${SettingsHead} mode=${mode} phone />`}
       ${options}
     </div>
   </div>`;
 }
 
-// The kinds of label, as tiles two to a row; more kinds add rows
-const MODES = [
+// The kinds of label, as tiles two to a row; more kinds add rows. On a phone they are picked
+// from the Label button in the page tabs instead (main.js).
+export const MODES = [
   { id: 'text', name: 'Text label', icon: 'text' },
   { id: 'bin', name: 'Bin label', icon: 'bin' },
   { id: 'ports', name: 'Port strip', icon: 'ports' },
   { id: 'flag', name: 'Cable flag', icon: 'flag' },
 ];
 
-// A slim line over the settings with Reset, which works the same for every kind of label
-function SettingsHead({ mode }) {
+// A slim line over the settings with Reset, which works the same for every kind of label. On a
+// phone it names the kind of label, which the Label button changes.
+function SettingsHead({ mode, phone = false }) {
   const { phase } = useStore(boot);
   return html`<div class="settings-head">
-    <span>Kind of label</span>
+    <span>${phone ? `${MODES.find((m) => m.id === mode).name} settings` : 'Kind of label'}</span>
     <button class="link-button reset-settings" disabled=${phase !== 'ready'}
       onClick=${() => { if (confirm(RESET_NOTES[mode])) resetSettings(); }}>
       <${Icon} name="undo" size=${16} /> Reset settings</button>
@@ -100,21 +104,40 @@ function ModePicker({ mode }) {
 
 // --- Text ----------------------------------------------------------------------------------
 
-function TextCard() {
+// The styled view of the text box (faded markers) is on unless this device turned it off
+const STYLED_KEY = 'cube-labeler-styled-text';
+function loadStyled() {
+  try { return localStorage.getItem(STYLED_KEY) !== 'off'; } catch { return true; }
+}
+function saveStyled(on) {
+  try { localStorage.setItem(STYLED_KEY, on ? 'on' : 'off'); } catch { /* forgets on reload */ }
+}
+
+// On a phone the box grows with the text, up to eight lines, so short labels show whole
+const textRows = (text) => Math.min(8, Math.max(3, text.split('\n').length));
+
+const NO_STYLES = { bold: false, italic: false, underline: false, invert: false };
+
+function TextEditor() {
   const { label } = useStore(app);
   const { phase } = useStore(boot);
   const ref = useRef(null);
+  const viewRef = useRef(null);
   const [lineStyle, setLineStyle] = useState(['normal', null]);
+  const [styles, setStyles] = useState(NO_STYLES);
+  const [styled, setStyled] = useState(loadStyled);
   const [helpOpen, setHelpOpen] = useState(false);
   // The size or alignment picker open above the toolbar
   const [picker, setPicker] = useState(null);
   const ready = phase === 'ready';
   const wide = useWide();
   useTypingRoom(ref, wide);
+  useMarkerView(ref, viewRef, styled, label.text);
 
   const syncLineStyle = async () => {
     const area = ref.current;
     if (!area) return;
+    setStyles(stylesAt(area.value, area.selectionStart));
     setLineStyle(await lineStyleAt(area.value, area.selectionStart));
   };
 
@@ -152,6 +175,12 @@ function TextCard() {
     setText(text, at + 5, at + 5);
   };
 
+  const switchView = () => {
+    setStyled(!styled);
+    saveStyled(!styled);
+    say(styled ? 'The text box shows the plain markers.' : 'The text box shows the styles, with the markers faded.');
+  };
+
   const onKeyDown = (e) => {
     const key = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && STYLE_KEYS[key] && ready) {
@@ -160,11 +189,20 @@ function TextCard() {
     }
   };
 
+  // One even row: the four styles, the line's size, alignment and a new column, then the view
+  const styleButton = (style, title, mark) => html`<button class=${`fmt${styles[style] ? ' on' : ''}`} title=${title}
+    aria-label=${title.replace(/ \(.*/, '')} aria-pressed=${styles[style]} disabled=${!ready}
+    onPointerDown=${keepFocus} onClick=${() => toggle(style)}>${mark}</button>`;
+
   // On a wide screen the card splits in two: the text, and the extras in tabs beside it
-  return html`<section class="card text-card"><div class="text-split"><div class="text-col">
+  return html`<div class="text-editor">
     <div class="card-head">
       <label class="card-title" for="label-text">Label text</label>
-      <button class="secondary" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
+      <span class="card-head-buttons">
+        <button class="secondary icon-only" title="How styling works" aria-label="How styling works"
+          onPointerDown=${keepFocus} onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${20} /></button>
+        <button class="secondary" onClick=${() => setText('', 0, 0)} disabled=${!label.text}>Clear</button>
+      </span>
     </div>
     <div class="format-tools">
       ${picker && html`<div class="fmt-picker" role="group" aria-label=${picker === 'size' ? 'Line size' : 'Line alignment'}>
@@ -176,37 +214,151 @@ function TextCard() {
         })}
       </div>`}
       <div class="format-bar" role="toolbar" aria-label="Text style">
-        <span class="fmt-group">
-          <button class="fmt" title="Bold (Ctrl+B)" aria-label="Bold" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('bold')}><b>B</b></button>
-          <button class="fmt" title="Italic (Ctrl+I)" aria-label="Italic" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('italic')}><i>I</i></button>
-          <button class="fmt" title="Underline (Ctrl+U)" aria-label="Underline" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('underline')}><u>U</u></button>
-          <button class="fmt" title="White text on black" aria-label="Inverted" disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => toggle('invert')}><span class="inv-mark">A</span></button>
-        </span>
-        <span class="fmt-group">
-          <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title="Size of this line" aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
-            disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
-            <span class="size-mark">A<small>a</small></span><span class="fmt-text">${wide ? LINE_SIZES.find(([v]) => v === lineStyle[0])[1] : SIZE_MARKS[lineStyle[0]]}</span></button>
-          <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
-            disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
-            <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${18} /></button>
-        </span>
-        <span class="fmt-group">
-          <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}><${Icon} name="column" size=${18} /><span class="fmt-text wide-text">Column</span></button>
-        </span>
-        <button class="fmt help" title="How styling works" aria-label="How styling works" onPointerDown=${keepFocus} onClick=${() => setHelpOpen(true)}><${Icon} name="help" size=${18} /></button>
+        ${styleButton('bold', 'Bold (Ctrl+B)', html`<b>B</b>`)}
+        ${styleButton('italic', 'Italic (Ctrl+I)', html`<i class="italic-mark">I</i>`)}
+        ${styleButton('underline', 'Underline (Ctrl+U)', html`<u>U</u>`)}
+        ${styleButton('invert', 'Inverted: white text on black', html`<span class="inv-mark">A</span>`)}
+        <span class="fmt-sep" aria-hidden="true"></span>
+        <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title=${`Size of this line: ${LINE_SIZES.find(([v]) => v === lineStyle[0])[1]}`}
+          aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
+          <span class="size-mark">A<small>a</small></span><span class="caret" aria-hidden="true">▾</span></button>
+        <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
+          disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
+          <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${20} /><span class="caret" aria-hidden="true">▾</span></button>
+        <button class="fmt" title="Add a column" aria-label="Add a column" disabled=${!ready} onPointerDown=${keepFocus} onClick=${addColumn}>
+          <${Icon} name="column" size=${20} /></button>
+        <span class="fmt-sep" aria-hidden="true"></span>
+        <button class=${`fmt view-toggle${styled ? ' on' : ''}`} aria-pressed=${styled}
+          title=${styled ? 'Styled view: tap to show the plain markers' : 'Plain markers: tap to show the styles'}
+          aria-label="Show the styles in the text box" onPointerDown=${keepFocus} onClick=${switchView}>**</button>
       </div>
     </div>
-    <textarea id="label-text" ref=${ref} rows="3" value=${label.text} spellcheck="false"
-      placeholder="Type your label"
-      onInput=${(e) => { updateLabel({ text: e.currentTarget.value }); syncLineStyle(); }}
-      onKeyDown=${onKeyDown} onKeyUp=${syncLineStyle} onClick=${syncLineStyle} onFocus=${syncLineStyle}></textarea>
+    <div class=${`text-box${styled ? ' styled' : ''}`}>
+      ${styled && html`<div class="marker-view" ref=${viewRef} aria-hidden="true"></div>`}
+      <textarea id="label-text" ref=${ref} rows=${wide ? 3 : textRows(label.text)} value=${label.text} spellcheck="false"
+        placeholder="Type your label"
+        onInput=${(e) => { updateLabel({ text: e.currentTarget.value }); syncLineStyle(); }}
+        onKeyDown=${onKeyDown} onKeyUp=${syncLineStyle} onClick=${syncLineStyle} onFocus=${syncLineStyle}
+        onSelect=${syncLineStyle}></textarea>
+    </div>
     <p class="hint marker-tips">Or type: <code>**bold**</code> <code>*italic*</code> <code>__underline__</code>
       <code>==inverted==</code> <code># big</code> <code>---</code> new column</p>
     <${Sheet} open=${helpOpen} title="Styling label text" onClose=${() => setHelpOpen(false)}>
       <${StylingHelp} />
     <//>
-  </div>${wide && html`<div class="insert-col"><${InsertTabs} /></div>`}</div></section>`;
+  </div>`;
 }
+
+// Keeps the styled layer behind the text box in step with it: the same text, the same width
+// (less a scroll bar, if the box has one) and the same scroll position
+function useMarkerView(ref, viewRef, styled, text) {
+  useEffect(() => {
+    const area = ref.current;
+    const view = viewRef.current;
+    if (!area || !view) return undefined;
+    const fit = () => {
+      const bar = area.offsetWidth - area.clientWidth - 2;  // the scroll bar, less the two borders
+      view.style.paddingRight = `${12 + Math.max(0, Math.round(bar))}px`;
+      view.scrollTop = area.scrollTop;
+    };
+    const paint = () => {
+      view.innerHTML = markerHtml(area.value);
+      fit();
+    };
+    paint();
+    // Typing shows at once, before the label is drawn again
+    area.addEventListener('input', paint);
+    area.addEventListener('scroll', fit);
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    if (observer) observer.observe(area);
+    return () => {
+      area.removeEventListener('input', paint);
+      area.removeEventListener('scroll', fit);
+      if (observer) observer.disconnect();
+    };
+  }, [styled, text]);
+}
+
+// On a wide screen the card splits in two: the text, and the extras in tabs beside it
+function TextCard() {
+  return html`<section class="card text-card"><div class="text-split"><div class="text-col"><${TextEditor} /></div>
+    <div class="insert-col"><${InsertTabs} /></div></div></section>`;
+}
+
+// On a phone the text is the first tab of one card, with the codes, the picture and the options,
+// so the page stays put: one panel at a time under the pinned preview
+function PhoneTextCard() {
+  const ref = useRef(null);
+  useFitBetween(ref);
+  return html`<section class="card insert-card text-card phone-tabs" ref=${ref}><${InsertTabs} phone /></section>`;
+}
+
+// Sizes the phone card to fill the room between the pinned preview and the Print bar on any
+// screen, so the page never scrolls; the tab's panel scrolls inside the card instead. While
+// typing the keyboard takes the room and the text box sizes itself (see useTypingRoom).
+function useFitBetween(ref) {
+  useEffect(() => {
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const card = ref.current;
+        const panel = card && card.querySelector('.insert-panel');
+        if (!panel) return;
+        const main = card.closest('main');
+        if (document.body.classList.contains('typing')) { panel.style.height = ''; main.style.paddingBottom = ''; return; }
+        const bar = document.querySelector('.action-bar');
+        const bottom = bar && bar.getClientRects().length ? bar.getBoundingClientRect().top : window.innerHeight;
+        const top = card.getBoundingClientRect().top + window.scrollY;
+        const chrome = card.offsetHeight - panel.offsetHeight;
+        panel.style.height = `${Math.max(200, Math.floor(bottom - top - chrome - 12))}px`;
+        // Leave room below the card for just the Print bar and the page tabs, so the page itself
+        // has nothing to scroll
+        main.style.paddingBottom = `${Math.floor(window.innerHeight - bottom)}px`;
+      });
+    };
+    fit();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null;
+    const col = document.querySelector('.label-preview-col');
+    if (observer && col) observer.observe(col);
+    window.addEventListener('resize', fit);
+    document.addEventListener('focusout', fit);
+    return () => {
+      cancelAnimationFrame(frame);
+      const main = document.querySelector('main');
+      if (main) main.style.paddingBottom = '';
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', fit);
+      document.removeEventListener('focusout', fit);
+    };
+  }, []);
+}
+
+// The Settings tab: the label's settings, which scroll inside the card
+function PhoneOptionsPanel() {
+  const { mode } = useStore(app);
+  return html`<div class="phone-options">
+    <${SettingsHead} mode=${mode} phone />
+    ${mode === 'flag' && html`<${FlagSection} />`}
+    <${FontSection} />
+    <${TapeSection} length=${mode !== 'flag'} />
+    <${AdvancedSection} />
+  </div>`;
+}
+// The Code tab: a QR code or a barcode, one switch apart, since a label rarely has both
+let lastCode = null;
+function CodePanel() {
+  const { label } = useStore(app);
+  const [kind, setCode] = useState(lastCode || (hasBarcode(label) && !hasQr(label) ? 'barcode' : 'qr'));
+  const setKind = (k) => { lastCode = k; setCode(k); };
+  return html`<div class="code-panel">
+    <${Segmented} ariaLabel="Kind of code" options=${[['qr', 'QR code'], ['barcode', 'Barcode']]} value=${kind} onChange=${setKind} />
+    ${kind === 'qr' ? html`<${QrPanel} />` : html`<${BarcodePanel} />`}
+  </div>`;
+}
+const CODE_TAB = { id: 'code', name: 'Code', icon: 'qr', on: (label) => hasQr(label) || hasBarcode(label), Panel: CodePanel };
+const OPTIONS_TAB = { id: 'options', name: 'Settings', icon: 'settings', on: () => false, Panel: PhoneOptionsPanel };
 
 // On a phone, while the keyboard is up for the label text, the page goes back to the top (preview,
 // label kind and the text card in view) and the text box stretches down to the toolbar docked on
@@ -256,6 +408,8 @@ function StylingHelp() {
       <code>&lt;&lt;</code> left, <code>&gt;&lt;</code> centre, <code>&gt;&gt;</code> right.</p>
     <p>A line with only <code>---</code> starts a new column with a divider line.</p>
     <p>Put a backslash before a marker to print it as it is, as in <code>M3 \\* 8</code>.</p>
+    <p>The text box shows the styles, with the markers in pale grey. The <code>**</code> button at the
+      end of the toolbar switches it to the plain markers and back. Sizes and alignment only show on the label.</p>
   </div>`;
 }
 
@@ -307,55 +461,39 @@ function TextSizeField({ label, onChange }) {
       : 'Fit fills the tape height. A size in mm is the height of a capital letter, the same on every label.'}</p>`;
 }
 
-function wifiCode({ ssid, password, security, hidden }) {
-  const esc = (s) => s.replace(/([\;,:"])/g, '\\$1');
-  let code = `WIFI:T:${security};S:${esc(ssid)};`;
-  if (security !== 'nopass') code += `P:${esc(password)};`;
-  if (hidden) code += 'H:true;';
-  return `${code};`;
-}
-
-function WifiForm({ onDone }) {
-  const [wifi, setWifi] = useState({ ssid: '', password: '', security: 'WPA', hidden: false });
-  const set = (change) => setWifi({ ...wifi, ...change });
-  const submit = (e) => {
-    e.preventDefault();
-    updateLabel({ qr_enabled: true, qr_data: wifiCode(wifi) });
-    onDone();
-  };
-  return html`<form class="wifi-form" onSubmit=${submit}>
-    <${Field} label="Network name"><input required value=${wifi.ssid} autocomplete="off" onInput=${(e) => set({ ssid: e.currentTarget.value })} /><//>
-    <${Segmented} label="Security" value=${wifi.security} options=${[['WPA', 'WPA/WPA2/WPA3'], ['WEP', 'WEP'], ['nopass', 'None']]}
-      onChange=${(security) => set({ security })} />
-    ${wifi.security !== 'nopass' && html`<${Field} label="Password">
-      <input value=${wifi.password} autocomplete="off" onInput=${(e) => set({ password: e.currentTarget.value })} /><//>`}
-    <${Toggle} label="Hidden network" checked=${wifi.hidden} onChange=${(hidden) => set({ hidden })} />
-    <p class="hint">Phones that scan the code join the network. Anyone who sees the label can read the password.</p>
-    <div class="button-row"><button class="primary" type="submit">Use this network</button></div>
-  </form>`;
-}
-
 // --- Extras next to the text ---------------------------------------------------------------
 
-// The things that can go next to the text, as tabs; a dot marks the ones on the label.
+// The things that can go next to the text, as tabs.
 // More kinds are added here.
 const INSERTS = [
-  { id: 'qr', name: 'QR code', icon: 'qr', on: (label) => label.qr_enabled, Panel: QrPanel },
+  { id: 'qr', name: 'QR code', icon: 'qr', on: hasQr, Panel: QrPanel },
   { id: 'barcode', name: 'Barcode', icon: 'barcode', on: hasBarcode, Panel: BarcodePanel },
   { id: 'picture', name: 'Picture', icon: 'image', on: (label) => !!label.image, Panel: PicturePanel },
 ];
 let lastInsert = INSERTS[0].id;
 
-function InsertTabs() {
+const TEXT_TAB = { id: 'text', name: 'Text', icon: 'text', on: () => false, Panel: TextEditor };
+let lastPhoneTab = 'text';
+// On a phone: Text, Code, Picture and Settings
+const PHONE_TABS = [TEXT_TAB, CODE_TAB, INSERTS.find((t) => t.id === 'picture'), OPTIONS_TAB];
+
+function InsertTabs({ phone = false }) {
+  const tabs = phone ? PHONE_TABS : INSERTS;
   const { label } = useStore(app);
-  const [tab, setTab] = useState(lastInsert);
-  const pick = (id) => { lastInsert = id; setTab(id); };
-  const current = INSERTS.find((t) => t.id === tab) || INSERTS[0];
+  const [tab, setTab] = useState(phone ? lastPhoneTab : lastInsert);
+  const pick = (id) => {
+    if (phone) lastPhoneTab = id; else lastInsert = id;
+    // Switching tabs closes the phone keyboard, so each tab opens at rest
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    setTab(id);
+  };
+  const current = tabs.find((t) => t.id === tab) || tabs[0];
   return html`<div class="insert-tabs">
-    <div class="insert-tab-bar" role="tablist" aria-label="Add to the label">
-      ${INSERTS.map((t) => html`<button role="tab" id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
-        aria-controls="insert-panel" aria-label=${t.name} title=${t.name} class=${t.id === current.id ? 'on' : ''} onClick=${() => pick(t.id)}>
-        <${Icon} name=${t.icon} size=${18} /><span class="tab-name">${t.name}</span>${t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
+    <div class="insert-tab-bar" role="tablist" aria-label=${phone ? 'Label content' : 'Add to the label'}>
+      ${tabs.map((t) => html`<button role="tab" id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
+        aria-controls="insert-panel" aria-label=${t.name} title=${t.name} class=${[t.id === current.id && 'on', t.on(label) && 'used'].filter(Boolean).join(' ')}
+        onClick=${() => pick(t.id)}>
+        <span class="tab-icon"><${Icon} name=${t.icon} size=${18} /></span><span class="tab-name">${t.name}</span>${!phone && t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
     </div>
     <div class="insert-panel" id="insert-panel" role="tabpanel" aria-labelledby=${`insert-tab-${current.id}`}>
       <${current.Panel} />
@@ -373,24 +511,113 @@ function Placement({ position, scale, min, max, field }) {
   </div>`;
 }
 
+// A one-line field with a small clear button at its right end while it has text in it
+function ClearField({ value, onClear, children }) {
+  return html`<div class="clear-field">${children}
+    ${value && html`<button type="button" class="clear-x" aria-label="Clear" title="Clear"
+      onPointerDown=${(e) => e.preventDefault()} onClick=${onClear}><${Icon} name="close" size=${16} /></button>`}
+  </div>`;
+}
+
 function QrPanel() {
   const { label } = useStore(app);
-  const [wifiOpen, setWifiOpen] = useState(false);
+  const [helper, setHelper] = useState(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const data = label.qr_data || '';
+  const open = (h) => setHelper(h);
   return html`<div class="insert-group">
-      <${Toggle} label="Add a QR code" checked=${label.qr_enabled} onChange=${(qr_enabled) => updateLabel({ qr_enabled })} />
-      <div class="row icon-row">
-        <${Field} label="Content: a link or text">
-          <input type="text" value=${label.qr_data} placeholder="https://example.com"
-            onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: label.qr_enabled || e.currentTarget.value !== '' })} />
+      <div class="field">
+        <div class="field-label-row"><label class="field-label" for="qr-data">Content: a link or text</label>
+          ${hasQr(label) && html`<${QrFitLine} short data=${data} tape=${label.tape_width_mm} scale=${label.qr_scale} />`}</div>
+        <${ClearField} value=${data} onClear=${() => updateLabel({ qr_data: '', qr_enabled: false })}>
+          <input id="qr-data" type="text" value=${data} placeholder="https://example.com"
+            onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: e.currentTarget.value !== '' })} />
         <//>
-        <button class="secondary" title="Make a code that joins a Wi-Fi network" onClick=${() => setWifiOpen(true)}>
-          <${Icon} name="wifi" size=${18} /> Wi-Fi</button>
       </div>
+      <div class="qr-helpers" role="group" aria-label="Make the content">
+        ${QR_HELPERS.slice(0, QR_ROW).map((h) => html`<button class="secondary" onClick=${() => open(h)}>
+          <${Icon} name=${h.icon} size=${18} /><span>${h.name}</span></button>`)}
+        <span class="menu-anchor">
+          <button class="secondary" aria-haspopup="menu" aria-expanded=${moreOpen} onClick=${() => setMoreOpen(true)}>
+            <span>More</span><span class="caret" aria-hidden="true">▾</span></button>
+          <${Menu} variant="tiles" open=${moreOpen} onClose=${() => setMoreOpen(false)}
+            items=${QR_HELPERS.slice(QR_ROW).map((h) => ({ label: h.name, icon: h.icon, action: () => open(h) }))} />
+        </span>
+      </div>
+      ${looksLikeSite(data) && html`<p class="hint qr-site">Phones show this as text. <button class="link-button"
+        onClick=${() => updateLabel({ qr_data: `https://${data.trim()}`, qr_enabled: true })}>Add https://</button> to make it a link.</p>`}
     </div>
     <${Placement} field="qr" position=${label.qr_position} scale=${label.qr_scale} min=${0.6} max=${1.1} />
-    <${Sheet} open=${wifiOpen} title="Wi-Fi QR code" onClose=${() => setWifiOpen(false)}>
-      <${WifiForm} onDone=${() => setWifiOpen(false)} />
-    <//>`;
+    ${helper && html`<${Sheet} open=${true} title=${helper.title} onClose=${() => setHelper(null)}>
+      <${HelperForm} helper=${helper} onDone=${() => setHelper(null)} />
+    <//>`}`;
+}
+
+// Whether phones will read the code at this tape width and size
+function QrFitLine({ data, tape, scale, short = false }) {
+  const [fit, setFit] = useState(null);
+  useEffect(() => {
+    let live = true;
+    const timer = setTimeout(async () => {
+      const result = data.trim() ? await qrFit(data, tape, scale) : null;
+      if (live) setFit(result);
+    }, 150);
+    return () => { live = false; clearTimeout(timer); };
+  }, [data, tape, scale]);
+  const level = fit && fitLevel(fit.dots_per_module);
+  if (!level) return null;
+  const brief = { ok: 'Scans well', small: 'Hard to scan', dense: 'Too dense' }[level];
+  const text = {
+    ok: `Should scan well on ${tape} mm tape.`,
+    small: `Small squares on ${tape} mm tape: it may need a steady phone. Shorter content helps.`,
+    dense: `Too dense for ${tape} mm tape: phones may not read it. Use shorter content, or a bigger size or tape.`,
+  }[level];
+  return html`<p class=${`qr-fit ${level}`} title=${short ? text : undefined}><span class="qr-fit-dot" aria-hidden="true"></span>${short ? brief : text}</p>`;
+}
+
+// A helper's form in a sheet, with the code it makes and how well that scans on this tape
+function HelperForm({ helper, onDone }) {
+  const { label } = useStore(app);
+  const [values, setValues] = useState(() => helperDefaults(helper));
+  const [locating, setLocating] = useState(false);
+  const set = (change) => setValues({ ...values, ...change });
+  const code = helperCode(helper, values);
+  const submit = (e) => {
+    e.preventDefault();
+    if (!code) return;
+    updateLabel({ qr_enabled: true, qr_data: code });
+    onDone();
+  };
+  const locate = (key) => {
+    if (!navigator.geolocation) { say("This browser can't tell where you are."); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setLocating(false); set({ [key]: `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}` }); },
+      () => { setLocating(false); say("Couldn't get your location. Paste coordinates or a map link instead."); },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  };
+  const field = (f) => {
+    if (f.when && !f.when(values)) return null;
+    const value = values[f.key];
+    const onInput = (e) => set({ [f.key]: e.currentTarget.value });
+    if (f.type === 'segmented') return html`<${Segmented} label=${f.label} value=${value} options=${f.options} onChange=${(v) => set({ [f.key]: v })} />`;
+    if (f.type === 'select') return html`<${Select} label=${f.label} value=${value} options=${f.options} onChange=${(v) => set({ [f.key]: v })} />`;
+    if (f.type === 'toggle') return html`<${Toggle} label=${f.label} checked=${value} onChange=${(v) => set({ [f.key]: v })} />`;
+    if (f.type === 'textarea') return html`<${Field} label=${f.label}><textarea rows="2" value=${value} onInput=${onInput}></textarea><//>`;
+    const input = html`<input type=${f.type || 'text'} value=${value} required=${f.required} placeholder=${f.placeholder || ''}
+      autocomplete="off" onInput=${onInput} />`;
+    if (!f.locate) return html`<${Field} label=${f.label}>${input}<//>`;
+    return html`<div class="row icon-row"><${Field} label=${f.label}>${input}<//>
+      <button type="button" class="secondary" disabled=${locating} onClick=${() => locate(f.key)}>
+        <${Icon} name="locate" size=${18} /> ${locating ? 'Finding...' : 'Here'}</button></div>`;
+  };
+  return html`<form class="helper-form" onSubmit=${submit}>
+    ${helper.fields.map(field)}
+    <p class="hint">${helper.note}</p>
+    ${code && html`<${QrFitLine} data=${code} tape=${label.tape_width_mm} scale=${label.qr_scale} />`}
+    <div class="button-row"><button class="primary" type="submit" disabled=${!code}>${helper.button}</button></div>
+  </form>`;
 }
 
 // Code 128, which holds plain letters, numbers and symbols; the bars keep a width scanners read,
@@ -399,10 +626,11 @@ function BarcodePanel() {
   const { label } = useStore(app);
   const data = label.barcode_data || '';
   return html`<div class="insert-group">
-      <${Toggle} label="Add a barcode" checked=${!!label.barcode_enabled} onChange=${(barcode_enabled) => updateLabel({ barcode_enabled })} />
       <${Field} label="Content: a number or code">
-        <input type="text" value=${data} placeholder="PN-10432" autocomplete="off" spellcheck="false"
-          onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: label.barcode_enabled || e.currentTarget.value !== '' })} />
+        <${ClearField} value=${data} onClear=${() => updateLabel({ barcode_data: '', barcode_enabled: false })}>
+          <input type="text" value=${data} placeholder="PN-10432" autocomplete="off" spellcheck="false"
+            onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: e.currentTarget.value !== '' })} />
+        <//>
       <//>
       <${Toggle} label="Number under the bars" checked=${label.barcode_show_text !== false}
         onChange=${(barcode_show_text) => updateLabel({ barcode_show_text })} />
@@ -503,9 +731,11 @@ function PortCard() {
   const names = ports.port_names.split('\n');
   const extra = names.length > ports.port_count && names.slice(ports.port_count).some((n) => n.trim());
   return html`<section class="card port-card">
-    <h2 class="card-title">On each port</h2>
-    <${Segmented} ariaLabel="On each port" options=${PORT_CONTENT} value=${ports.port_use_names ? 'names' : 'numbers'}
-      onChange=${(v) => updatePorts({ port_use_names: v === 'names' })} />
+    <div class="card-head">
+      <h2 class="card-title">On each port</h2>
+      <${Segmented} ariaLabel="On each port" options=${PORT_CONTENT} value=${ports.port_use_names ? 'names' : 'numbers'}
+        onChange=${(v) => updatePorts({ port_use_names: v === 'names' })} />
+    </div>
     ${ports.port_use_names ? html`
       <p class="hint">One name per line, such as NAS, Router, Office. An empty line leaves a port blank.</p>
       <textarea class="port-names" rows="4" value=${ports.port_names} spellcheck="false" aria-label="Port names"
@@ -634,23 +864,11 @@ function ActionBar() {
     return () => window.removeEventListener('keydown', onKey);
   }, [ready, p.transport, p.busy]);
 
-  const needsPrinter = p.supported && !p.transport;
-  // With labels waiting in the queue, the next step is printing them together
   const queued = queueLabelCount(queue);
   return html`<div class="action-bar">
     <div class="action-buttons">
-      ${queued > 0
-        ? html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
-            <${Icon} name="queue" size=${20} /> <span>Go to queue (${queued})</span></a>`
-        : needsPrinter
-        ? html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
-            <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`
-        : html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
-            title="Print (Ctrl+P)" onClick=${printLabel}>
-            <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`}
-      <button class="secondary big" disabled=${!ready} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
-        <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Add</span>
-      </button>
+      <${PrimaryAction} />
+      <${AddButton} />
       <span class="menu-anchor">
         <button class="secondary big icon-only" aria-label="More actions" onClick=${() => setMenuOpen(true)}>
           <${Icon} name="more" /></button>
@@ -663,4 +881,33 @@ function ActionBar() {
       </span>
     </div>
   </div>`;
+}
+
+// The main button: Go to queue while labels wait there, Connect without a printer, or Print
+function PrimaryAction() {
+  const { render, queue } = useStore(app);
+  const p = useStore(printer);
+  const { phase } = useStore(boot);
+  const ready = phase === 'ready';
+  const needsPrinter = p.supported && !p.transport;
+  // With labels waiting in the queue, the next step is printing them together
+  const queued = queueLabelCount(queue);
+  if (queued > 0) {
+    return html`<a class="button primary big" href="#/queue" title="Print the queue with this label or without it">
+      <${Icon} name="queue" size=${20} /> <span>Go to queue (${queued})</span></a>`;
+  }
+  if (needsPrinter) {
+    return html`<button class="primary big" disabled=${!ready || p.busy} onClick=${connectPrinter}>
+      <${Icon} name="printer" size=${20} /> <span>Connect<span class="hide-narrow"> printer</span></span></button>`;
+  }
+  return html`<button class="primary big" disabled=${!ready || !render || p.busy || !p.supported}
+    title="Print (Ctrl+P)" onClick=${printLabel}>
+    <${Icon} name="printer" size=${20} /> ${p.busy ? 'Printing...' : 'Print'}</button>`;
+}
+
+function AddButton() {
+  const { phase } = useStore(boot);
+  return html`<button class="secondary big" disabled=${phase !== 'ready'} title="Add to queue (Ctrl+Enter)" onClick=${addToQueue}>
+    <${Icon} name="queue" size=${20} /><span class="hide-narrow">Add to queue</span><span class="show-narrow">Add</span>
+  </button>`;
 }

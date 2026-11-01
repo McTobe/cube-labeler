@@ -321,6 +321,23 @@ def line_style_at(text: str, pos: int) -> List[Any]:
     return list(rich_text.line_style(text.split("\n")[n]))
 
 
+def qr_fit(data: str, tape_width_mm: float, scale: float = 1.0) -> Dict[str, Any]:
+    """
+    How a QR code of data prints on the tape: its squares across (with the border) and the
+    printer dots each square gets. Under about 2 dots a square, phones struggle to read it.
+    """
+    import qrcode
+    from core.specs import get_tape_spec
+    if not str(data).strip():
+        return {"modules": 0, "dots": 0, "dots_per_module": 0}
+    qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=1, border=1)
+    qr.add_data(str(data))
+    qr.make(fit=True)
+    modules = qr.modules_count + 2
+    dots = max(int(get_tape_spec(float(tape_width_mm))["printable_height"] * float(scale)), 8)
+    return {"modules": modules, "dots": dots, "dots_per_module": round(dots / modules, 2)}
+
+
 def blank_raster(length_mm: float) -> bytes:
     """An empty raster that feeds length_mm of tape when printed (like the desktop's Feed tape)."""
     return bytes(protocol.LINE_BYTES * protocol.feed_dots(float(length_mm)))

@@ -265,7 +265,7 @@ a.primary, a.secondary { text-decoration: none; box-sizing: border-box; }
 
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
 
-input[type="text"], input:not([type]), input[inputmode], select, textarea {
+input[type="text"], input:not([type]), input[inputmode], input[type="tel"], input[type="email"], input[type="datetime-local"], select, textarea {
   width: 100%;
   font: inherit;
   color: var(--text);
@@ -443,13 +443,24 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 @media (max-width: 899px) {
   body.typing .nav, body.typing .action-bar { display: none; }
   /* Only typing the label text needs the room of the size line and Rulers */
-  body.typing:has(#label-text:focus) .preview-bar,
-  body.typing:has(#label-text:focus) .settings-head,
-  body.typing:has(#label-text:focus) .mode-switch { display: none; }
+  body.typing:has(.phone-tabs :focus) .preview-bar,
+  body.typing:has(.phone-tabs :focus) .settings-head,
+  body.typing:has(.phone-tabs :focus) .mode-switch { display: none; }
+  /* The text, QR code, barcode and picture take turns in one card of one height, so
+     switching tabs never moves the page */
+  /* The card fills the screen down to Print (useFitBetween), and its panels scroll inside it */
+  .phone-tabs .insert-panel { height: 340px; overflow-y: auto; }
+  body.typing .phone-tabs .insert-panel { height: auto; overflow: visible; }
+  /* The text box takes the room the panel has left, on small screens too */
+  .phone-tabs .text-editor { display: flex; flex-direction: column; height: 100%; }
+  body.typing .phone-tabs .text-editor { height: auto; }
+  .phone-tabs .text-editor .card-head { margin-top: 12px; }
+  .phone-tabs .text-editor .text-box { flex: 1 1 0; min-height: 96px; }
+  .phone-tabs .text-editor textarea { flex: 1; min-height: 0; }
+  body.typing .phone-tabs .text-editor .text-box { flex: none; }
   body.typing .toast-slot { bottom: 72px; }
-  .wide-text { display: none; }
-  .format-bar { gap: 4px; }
-  .format-bar .fmt { min-width: 38px; padding: 4px 8px; }
+  /* Bigger buttons for thumbs */
+  .format-bar .fmt { min-height: 44px; }
   /* The toolbar only shows while the label text is being edited */
   .text-card:not(:has(#label-text:focus)) .format-tools { display: none; }
   /* The toolbar docks on top of the keyboard while the label text is being typed */
@@ -457,7 +468,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
     position: fixed; z-index: 25; left: 0; right: 0; bottom: 0;
     padding: 0 12px 8px; background: var(--bar); border-top: 1px solid var(--border);
   }
-  body.typing .text-card:focus-within .format-bar { margin: 8px 0 0; padding: 0; }
+  body.typing .text-card:focus-within .format-bar { margin: 8px 0 0; }
   body.typing .text-card:focus-within .fmt-picker { order: 0; margin-top: 8px; }
   body.typing .text-card:focus-within textarea { resize: none; }
 }
@@ -590,53 +601,108 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   text-align: left;
 }
 .menu button:not(:disabled):hover { background: var(--raised); }
+.menu-icon { display: inline-flex; }
+/* A menu of choices that are all alike, as an even grid of tiles: icon over name */
+.menu.tiles { display: grid; grid-template-columns: repeat(3, 104px); gap: 4px; padding: 8px; min-width: 0; }
+.menu.tiles button { flex-direction: column; justify-content: flex-start; white-space: nowrap; gap: 8px; padding: 12px 6px 10px; text-align: center; font-size: 0.86rem; line-height: 1.2; }
+.menu.tiles .menu-icon { width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.menu.tiles .menu-icon svg { width: 20px; height: 20px; }
+/* The kinds of label, from the Label button in the phone's page tabs */
+.menu.tiles.kinds { grid-template-columns: repeat(2, 132px); }
+.menu.tiles.kinds button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.menu.tiles.kinds button.on .menu-icon { background: var(--accent); color: var(--accent-text); }
+.nav .nav-label { flex: 1; display: flex; }
+.nav .nav-label > a { flex: 1; }
+/* The caret hangs to the right of "Label", so the word stays centred under its icon */
+.nav-label > a > span:not(.nav-count) { position: relative; }
+.nav-caret { position: absolute; left: 100%; top: 50%; margin: -3px 0 0 4px; width: 0; height: 0; border: 5px solid transparent; border-top: 0; border-bottom: 6px solid currentColor; }
 
-.text-card textarea { margin-top: 8px; }
-
-.format-bar {
-  display: flex;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  margin-left: -16px;
-  margin-right: -16px;
-  padding: 0 16px 2px;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
+/* The label text box. The editor font has no bold or italic file of its own, so the browser
+   slants italic itself and every letter keeps its width in the styled layer behind the box */
+@font-face {
+  font-family: "Cube Editor";
+  src: url("vendor/arimo-editor.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
+.text-box { position: relative; display: flex; flex-direction: column; margin-top: 8px; border-radius: 10px; background: var(--card); }
+.text-box textarea, .marker-view {
+  font-family: "Cube Editor", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  letter-spacing: 0;
+  word-spacing: 0;
+  tab-size: 4;
+}
+/* The styled view: the box's own text is see-through over a layer with the same characters,
+   styled, and the markers faded */
+.marker-view {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+  padding: 10px 12px; border: 1px solid transparent; border-radius: 10px;
+  white-space: pre-wrap; overflow-wrap: break-word; word-break: normal;
+  color: var(--text);
+}
+.text-box.styled textarea {
+  position: relative; z-index: 1; background: transparent;
+  color: transparent; caret-color: var(--text);
+}
+.text-box.styled textarea::selection { color: transparent; background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.marker-view .mk { color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.marker-view .st-bold:not(.mk) { -webkit-text-stroke: 0.045em currentColor; }
+.marker-view .st-italic { font-style: italic; font-synthesis: style; }
+.marker-view .st-underline:not(.mk) { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.marker-view .st-invert { background: var(--text); color: var(--card); border-radius: 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.marker-view .st-invert.mk { color: color-mix(in srgb, var(--card) 55%, transparent); }
+
+.text-card .card-head-buttons { display: inline-flex; gap: 8px; }
+.text-card .card-head-buttons .icon-only { display: inline-flex; align-items: center; padding: 8px 10px; color: var(--muted); }
+
+/* The toolbar: one even row of equal buttons, styles | line | view, split by thin lines */
+.format-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) 1px repeat(3, minmax(0, 1fr)) 1px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.fmt-sep { width: 1px; height: 24px; background: var(--border); }
 
 .fmt {
-  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-width: 40px;
-  min-height: 38px;
-  padding: 4px 10px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px 6px;
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--card);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
 }
-.fmt:not(:disabled):hover { background: var(--raised); }
-.fmt.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
-.inv-mark { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; background: var(--text); color: var(--card); font-weight: 700; font-size: 0.85rem; }
+.format-bar .fmt { border-color: transparent; background: none; }
+.fmt:not(:disabled):hover, .format-bar .fmt:not(:disabled):hover { background: var(--raised); }
+.fmt.on, .format-bar .fmt.on { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+.fmt-picker .fmt.on { border-color: var(--accent); }
+.italic-mark { font-family: Georgia, "Times New Roman", serif; font-size: 1.15rem; }
+.inv-mark { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; background: var(--text); color: var(--card); font-weight: 700; font-size: 0.9rem; }
+.fmt.on .inv-mark { background: var(--accent); color: var(--accent-soft); }
 .size-mark { font-weight: 700; font-size: 1rem; }
 .size-mark small { font-size: 0.7rem; }
+.fmt .caret { font-size: 0.6rem; color: var(--muted); }
+.fmt.on .caret { color: inherit; }
+.view-toggle { font-weight: 700; letter-spacing: 1px; color: var(--muted); }
 .format-tools { display: flex; flex-direction: column; }
 /* The size and alignment choices open under the toolbar, or above it when it sits on the keyboard */
 .fmt-picker { order: 2; display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
-.fmt-picker .fmt { flex: 1 0 auto; }
-/* The toolbar is groups of buttons of one height, split by thin lines */
-.fmt-group { flex: none; display: inline-flex; border: 1px solid var(--border); border-radius: 9px; background: var(--card); overflow: hidden; }
-.fmt-group .fmt { min-height: 36px; border: none; border-radius: 0; background: none; }
-.fmt-group .fmt + .fmt { border-left: 1px solid var(--border); }
-.fmt-group .fmt:not(:disabled):hover { background: var(--raised); }
-.fmt-group .fmt.on { background: var(--accent-soft); }
-.format-bar .fmt.help { margin: 0 0 0 auto; border-color: transparent; background: none; color: var(--muted); }
-.format-bar .fmt.help:hover { color: var(--text); }
+.fmt-picker .fmt { flex: 1 0 auto; font-size: 0.95rem; }
 .marker-tips { margin: 8px 0 0; font-size: 0.8rem; line-height: 1.8; }
 .marker-tips code { padding: 1px 6px; border-radius: 5px; background: var(--raised); font-size: 0.78rem; white-space: nowrap; }
 .text-card .card-head { gap: 12px; }
@@ -655,10 +721,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 @media (min-width: 900px) { .insert-tab-bar button { min-height: 36px; } }
 .insert-tab-bar button.on { background: var(--card); box-shadow: var(--shadow); font-weight: 600; color: var(--accent); }
+.insert-tab-bar .tab-icon { position: relative; display: inline-flex; }
+/* The faded sample text of an empty label */
+.tape-strip img.sample { opacity: 0.28; }
+/* What is on the label: a dot after the name on desktop, a blue icon on a phone */
+.on-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.phone-tabs .insert-tab-bar button.used .tab-icon { color: var(--accent); }
 /* Three names don't fit a narrow half card on one line each, so the tabs show just their icons */
 @container (max-width: 300px) { .insert-tab-bar .tab-name { display: none; } }
+@container (max-width: 300px) { .phone-tabs .insert-tab-bar .tab-name { display: inline; } }
 .tab-name { white-space: nowrap; }
-.on-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .insert-panel { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; }
 .insert-group > :first-child { margin-top: 14px; }
 .insert-group .row > .secondary { flex: none; display: inline-flex; align-items: center; gap: 6px; }
@@ -714,7 +786,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .action-bar { position: static; padding: 0; background: none; border: none; }
   .action-bar .status-line { margin: 8px 2px 0; white-space: normal; }
   .action-bar { display: flex; flex-direction: column-reverse; }
-  .format-bar { flex-wrap: wrap; overflow: visible; margin-left: 0; margin-right: 0; padding: 0; }
   /* The text and bin cards share one fixed height (what the fastener editor needs), so the preview keeps its size when
      switching kinds of label; on a short or narrow window the card scrolls, never the column */
   .label-preview-col .text-card, .label-preview-col .bin-card, .label-preview-col .port-card {
@@ -723,11 +794,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .label-preview-col .text-card, .label-preview-col .port-card { display: flex; flex-direction: column; }
   .label-preview-col .port-names { flex: 1; min-height: calc(4 * 1.5em + 22px); resize: none; }
   /* The text box takes the room down to the marker tips, at least about four lines */
+  .label-preview-col .text-card .text-box { flex: 1; min-height: 0; }
   .label-preview-col .text-card textarea { flex: 1; min-height: calc(4 * 1.5em + 22px); resize: none; }
   .label-preview-col .length-grid.quad { grid-template-columns: repeat(4, 1fr); }
   /* The text card splits in half: the text, a thin line, then the extras in tabs */
   .text-split { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; }
   .text-col, .insert-col { display: flex; flex-direction: column; min-width: 0; }
+  .text-col > .text-editor { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .text-col { padding-right: 20px; }
   .insert-col { padding-left: 20px; border-left: 1px solid var(--border); }
   .insert-tabs, .insert-panel { flex: 1; display: flex; flex-direction: column; }
@@ -735,8 +808,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 }
 /* With half the card for the text, the marker tips only fit on a big window; the help button has them too */
 @media (min-width: 900px) and (max-width: 1599px) {
-  .text-col .marker-tips, .text-col .wide-text, .text-col .size-mark + .fmt-text { display: none; }
-  .text-col .format-bar { gap: 4px; }
+  .text-col .marker-tips { display: none; }
+  .text-col .format-bar { gap: 2px; }
 }
 
 /* --- Sheets (dialogs) ---------------------------------------------------------------------- */
@@ -832,7 +905,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .settings-page .toggle { margin-top: 16px; }
 
 
-.wifi-form .toggle { margin-bottom: 12px; }
+.helper-form .toggle { margin: 14px 0 12px; }
+.helper-form textarea { min-height: 64px; }
+.helper-form > .hint { margin: 12px 0 0; }
+.helper-form .qr-fit { margin-top: 10px; }
+/* A field with a small clear button inside its right end */
+.clear-field { position: relative; }
+.clear-field > input { width: 100%; padding-right: 40px; }
+.clear-field > .clear-x { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 28px; height: 28px; min-height: 0; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 999px; background: var(--raised); color: var(--muted); }
+.clear-field > .clear-x:hover { color: var(--text); }
 
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
@@ -867,6 +949,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* The port strip's card: what goes over each port */
 .port-card .segmented { margin-bottom: 0; }
+/* The switch sits beside the title at the width of the bin label's, and gets its own row on a phone */
+.port-card .card-head { flex-wrap: wrap; gap: 10px 16px; }
+.port-card .card-head > .field { margin: 0; flex: 0 1 360px; }
+@media (max-width: 899px) { .port-card .card-head > .field { flex: 1 1 100%; } }
 .port-card .hint { margin: 8px 0 14px; }
 .port-card .field { margin: 0; }
 .port-names { width: 100%; font-family: inherit; }
@@ -874,6 +960,23 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .length-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .length-grid.one { grid-template-columns: 1fr 2fr; }
 .icon-row { align-items: flex-end; }
+/* QR code helpers: one even row under the content field, the rest in More */
+.qr-helpers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.qr-helpers .menu-anchor { display: flex; }
+.qr-helpers > button, .qr-helpers > .menu-anchor > button { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 4px; font-size: 0.92rem; min-height: 40px; white-space: nowrap; }
+.qr-helpers > button span, .qr-helpers > .menu-anchor > button span { overflow: hidden; text-overflow: ellipsis; }
+.qr-helpers .caret { font-size: 0.65rem; color: var(--muted); }
+@container (max-width: 440px) { .qr-helpers > button svg { display: none; } }
+.qr-site { margin: 10px 0 0; }
+.qr-site .link-button { padding: 0; }
+.qr-fit { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 0; font-size: 0.88rem; color: var(--muted); }
+/* Next to the content field's name, the short form */
+.field-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.field-label-row .qr-fit { margin: 0; font-size: 0.82rem; white-space: nowrap; }
+.qr-fit-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); transform: translateY(-1px); }
+.qr-fit.small .qr-fit-dot { background: var(--warn); }
+.qr-fit.dense { color: var(--error); }
+.qr-fit.dense .qr-fit-dot { background: var(--error); }
 .icon-row > .secondary { flex: none; }
 .picture-thumb.small { width: 44px; height: 44px; }
 
@@ -881,6 +984,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .bin-card .card-head { align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .bin-card .card-head .field { margin: 0; flex: 1 1 220px; max-width: 360px; }
 .bin-card .card-head > .secondary { flex: none; }
+/* On a phone the head wraps: the kind switch and the button each take a full row, like the
+   other tab switches */
+@media (max-width: 899px) {
+  .bin-card .card-head > .field, .bin-card .card-head > .secondary { flex: 1 1 100%; max-width: none; }
+}
 .bin-grid { display: grid; gap: 14px 24px; }
 .bin-grid .bin-col > :first-child, .bin-grid .bin-group > :first-child { margin-top: 0; }
 .bin-col { display: flex; flex-direction: column; gap: 14px; }
@@ -1463,3 +1571,8 @@ input.tape-number { width: 160px; }
   /* Room for three buttons: the two secondary ones keep their size, Print again takes the rest */
   .history-page .action-buttons > .secondary { min-width: 140px; }
 }
+/* Four phone tabs: the icon over the name */
+.phone-tabs .insert-tab-bar button { flex-direction: column; gap: 2px; min-height: 48px; font-size: 0.78rem; }
+.phone-tabs .insert-tab-bar .tab-name { display: inline; }
+.phone-options > :first-child { margin-top: 14px; }
+.code-panel > .field:first-child { margin-top: 14px; }
