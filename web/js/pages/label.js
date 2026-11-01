@@ -479,6 +479,7 @@ const PHONE_TABS = [TEXT_TAB, CODE_TAB, INSERTS.find((t) => t.id === 'picture'),
 
 function InsertTabs({ phone = false }) {
   const tabs = phone ? PHONE_TABS : INSERTS;
+  const { label } = useStore(app);
   const [tab, setTab] = useState(phone ? lastPhoneTab : lastInsert);
   const pick = (id) => {
     if (phone) lastPhoneTab = id; else lastInsert = id;
@@ -490,8 +491,9 @@ function InsertTabs({ phone = false }) {
   return html`<div class="insert-tabs">
     <div class="insert-tab-bar" role="tablist" aria-label=${phone ? 'Label content' : 'Add to the label'}>
       ${tabs.map((t) => html`<button role="tab" id=${`insert-tab-${t.id}`} aria-selected=${t.id === current.id}
-        aria-controls="insert-panel" aria-label=${t.name} title=${t.name} class=${t.id === current.id ? 'on' : ''} onClick=${() => pick(t.id)}>
-        <${Icon} name=${t.icon} size=${18} /><span class="tab-name">${t.name}</span></button>`)}
+        aria-controls="insert-panel" aria-label=${t.name} title=${t.name} class=${[t.id === current.id && 'on', t.on(label) && 'used'].filter(Boolean).join(' ')}
+        onClick=${() => pick(t.id)}>
+        <span class="tab-icon"><${Icon} name=${t.icon} size=${18} /></span><span class="tab-name">${t.name}</span>${!phone && t.on(label) && html`<span class="on-dot" title="On the label"></span>`}</button>`)}
     </div>
     <div class="insert-panel" id="insert-panel" role="tabpanel" aria-labelledby=${`insert-tab-${current.id}`}>
       <${current.Panel} />
