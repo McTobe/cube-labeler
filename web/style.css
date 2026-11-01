@@ -722,6 +722,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 @media (min-width: 900px) { .insert-tab-bar button { min-height: 36px; } }
 .insert-tab-bar button.on { background: var(--card); box-shadow: var(--shadow); font-weight: 600; color: var(--accent); }
 .insert-tab-bar .tab-icon { position: relative; display: inline-flex; }
+/* The faded sample text of an empty label */
+.tape-strip img.sample { opacity: 0.28; }
 /* What is on the label: a dot after the name on desktop, a blue icon on a phone */
 .on-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .phone-tabs .insert-tab-bar button.used .tab-icon { color: var(--accent); }

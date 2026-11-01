@@ -438,6 +438,8 @@ function fitTooTallPreset(item, metrics) {
   say(`${item.label.text_height_mm} mm is too big for this text ${ports ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
 }
 
+const SAMPLE_TEXT = 'Your text here';
+
 // Renders the current label. Calls made while one runs fold into a single follow-up render.
 export async function renderNow() {
   clearTimeout(renderTimer);
@@ -455,6 +457,9 @@ export async function renderNow() {
         // here and not in its queue item
         const options = itemOptions(item);
         if (item.mode === 'bin' || item.label.layout === 'ports') options.show_rulers = app.get().label.show_rulers;
+        // An empty text label shows faded sample text, not a blank piece of tape (it can't print)
+        const sample = item.mode === 'text' && item.label.layout !== 'ports' && options.text === ' ';
+        if (sample) options.text = SAMPLE_TEXT;
         const result = await py.render_label(options);
         const old = app.get().render;
         if (old) { URL.revokeObjectURL(old.previewUrl); URL.revokeObjectURL(old.dotsUrl); }
@@ -467,6 +472,7 @@ export async function renderNow() {
             tape_width_mm: itemTapeWidth(item),
             item,
             tape_bg_color: item.mode === 'bin' ? '#FFFFFF' : item.label.tape_bg_color,
+            sample,
           },
           renderError: null,
         });
@@ -696,6 +702,10 @@ export async function printLabel() {
   await renderNow();  // print exactly what the editor shows, even mid-typing
   const current = app.get().render;
   if (!current || !printer.get().transport || tooLong(current.metrics)) return;
+  if (current.sample) {
+    say('Add some text, a QR code, a barcode or a picture first.', true);
+    return;
+  }
   await printerJob(async () => {
     const result = await printRaster(printer.get().transport, py, current.raster, {
       required_tape_width_mm: current.tape_width_mm,
