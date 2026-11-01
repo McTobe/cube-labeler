@@ -354,8 +354,12 @@ class LabelRenderer:
             elif config.image_position == "right":
                 elements_right.append(merged_img)
 
-        for el in elements_left + elements_right:
-            total_content_w += el.width + gap
+        # One gap between neighbours, none after the last, so a code or picture on its own sits
+        # in the middle of the label
+        elements = elements_left + elements_right
+        for el in elements:
+            total_content_w += el.width
+        total_content_w += gap * max(len(elements) + (1 if has_text else 0) - 1, 0)
 
         if has_text:
             total_content_w += text_w
