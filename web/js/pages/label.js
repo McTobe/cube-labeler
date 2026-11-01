@@ -509,6 +509,14 @@ function Placement({ position, scale, min, max, field }) {
   </div>`;
 }
 
+// A one-line field with a small clear button at its right end while it has text in it
+function ClearField({ value, onClear, children }) {
+  return html`<div class="clear-field">${children}
+    ${value && html`<button type="button" class="clear-x" aria-label="Clear" title="Clear"
+      onPointerDown=${(e) => e.preventDefault()} onClick=${onClear}><${Icon} name="close" size=${16} /></button>`}
+  </div>`;
+}
+
 function QrPanel() {
   const { label } = useStore(app);
   const [helper, setHelper] = useState(null);
@@ -519,8 +527,10 @@ function QrPanel() {
       <div class="field">
         <div class="field-label-row"><label class="field-label" for="qr-data">Content: a link or text</label>
           ${hasQr(label) && html`<${QrFitLine} short data=${data} tape=${label.tape_width_mm} scale=${label.qr_scale} />`}</div>
-        <input id="qr-data" type="text" value=${data} placeholder="https://example.com"
-          onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: e.currentTarget.value !== '' })} />
+        <${ClearField} value=${data} onClear=${() => updateLabel({ qr_data: '', qr_enabled: false })}>
+          <input id="qr-data" type="text" value=${data} placeholder="https://example.com"
+            onInput=${(e) => updateLabel({ qr_data: e.currentTarget.value, qr_enabled: e.currentTarget.value !== '' })} />
+        <//>
       </div>
       <div class="qr-helpers" role="group" aria-label="Make the content">
         ${QR_HELPERS.slice(0, QR_ROW).map((h) => html`<button class="secondary" onClick=${() => open(h)}>
@@ -615,8 +625,10 @@ function BarcodePanel() {
   const data = label.barcode_data || '';
   return html`<div class="insert-group">
       <${Field} label="Content: a number or code">
-        <input type="text" value=${data} placeholder="PN-10432" autocomplete="off" spellcheck="false"
-          onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: e.currentTarget.value !== '' })} />
+        <${ClearField} value=${data} onClear=${() => updateLabel({ barcode_data: '', barcode_enabled: false })}>
+          <input type="text" value=${data} placeholder="PN-10432" autocomplete="off" spellcheck="false"
+            onInput=${(e) => updateLabel({ barcode_data: e.currentTarget.value, barcode_enabled: e.currentTarget.value !== '' })} />
+        <//>
       <//>
       <${Toggle} label="Number under the bars" checked=${label.barcode_show_text !== false}
         onChange=${(barcode_show_text) => updateLabel({ barcode_show_text })} />

@@ -903,6 +903,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .helper-form textarea { min-height: 64px; }
 .helper-form > .hint { margin: 12px 0 0; }
 .helper-form .qr-fit { margin-top: 10px; }
+/* A field with a small clear button inside its right end */
+.clear-field { position: relative; }
+.clear-field > input { width: 100%; padding-right: 40px; }
+.clear-field > .clear-x { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 28px; height: 28px; min-height: 0; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 999px; background: var(--raised); color: var(--muted); }
+.clear-field > .clear-x:hover { color: var(--text); }
 
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
