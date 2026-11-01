@@ -613,7 +613,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .menu.tiles.kinds button.on .menu-icon { background: var(--accent); color: var(--accent-text); }
 .nav .nav-label { flex: 1; display: flex; }
 .nav .nav-label > a { flex: 1; }
-.nav-caret { margin-left: 3px; font-size: 0.7rem; }
+/* The caret hangs to the right of "Label", so the word stays centred under its icon */
+.nav-label > a > span:not(.nav-count) { position: relative; }
+.nav-caret { position: absolute; left: 100%; top: 50%; margin: -3px 0 0 4px; width: 0; height: 0; border: 5px solid transparent; border-top: 0; border-bottom: 6px solid currentColor; }
 
 /* The label text box. The editor font has no bold or italic file of its own, so the browser
    slants italic itself and every letter keeps its width in the styled layer behind the box */
@@ -935,6 +937,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* The port strip's card: what goes over each port */
 .port-card .segmented { margin-bottom: 0; }
+/* The switch sits beside the title at the width of the bin label's, and gets its own row on a phone */
+.port-card .card-head { flex-wrap: wrap; gap: 10px 16px; }
+.port-card .card-head > .field { margin: 0; flex: 0 1 360px; }
+@media (max-width: 899px) { .port-card .card-head > .field { flex: 1 1 100%; } }
 .port-card .hint { margin: 8px 0 14px; }
 .port-card .field { margin: 0; }
 .port-names { width: 100%; font-family: inherit; }
@@ -966,6 +972,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .bin-card .card-head { align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .bin-card .card-head .field { margin: 0; flex: 1 1 220px; max-width: 360px; }
 .bin-card .card-head > .secondary { flex: none; }
+/* On a phone the head wraps: the kind switch and the button each take a full row, like the
+   other tab switches */
+@media (max-width: 899px) {
+  .bin-card .card-head > .field, .bin-card .card-head > .secondary { flex: 1 1 100%; max-width: none; }
+}
 .bin-grid { display: grid; gap: 14px 24px; }
 .bin-grid .bin-col > :first-child, .bin-grid .bin-group > :first-child { margin-top: 0; }
 .bin-col { display: flex; flex-direction: column; gap: 14px; }

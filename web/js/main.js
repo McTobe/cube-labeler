@@ -107,7 +107,7 @@ function App() {
         const link = html`<a href=${`#/${p.id}`} class=${p.id === page.id ? 'active' : ''}
           aria-current=${p.id === page.id ? 'page' : undefined}
           onClick=${p.id === 'label' && !wide && page.id === 'label' ? (e) => { e.preventDefault(); setKinds(true); } : undefined}>
-          <${Icon} name=${p.icon} /><span>${p.title}${p.id === 'label' && !wide && html`<span class="nav-caret" aria-hidden="true">▴</span>`}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`;
+          <${Icon} name=${p.icon} /><span>${p.title}${p.id === 'label' && !wide && html`<span class="nav-caret" aria-hidden="true"></span>`}</span>${p.id === 'queue' && queue.length > 0 && html`<span class="nav-count">${queueLabelCount(queue)}</span>`}</a>`;
         if (p.id !== 'label' || wide) return link;
         // On a phone the Label button goes back to the label, and on the Label page it asks
         // which kind of label to edit

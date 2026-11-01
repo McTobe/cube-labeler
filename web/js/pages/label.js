@@ -717,9 +717,11 @@ function PortCard() {
   const names = ports.port_names.split('\n');
   const extra = names.length > ports.port_count && names.slice(ports.port_count).some((n) => n.trim());
   return html`<section class="card port-card">
-    <h2 class="card-title">On each port</h2>
-    <${Segmented} ariaLabel="On each port" options=${PORT_CONTENT} value=${ports.port_use_names ? 'names' : 'numbers'}
-      onChange=${(v) => updatePorts({ port_use_names: v === 'names' })} />
+    <div class="card-head">
+      <h2 class="card-title">On each port</h2>
+      <${Segmented} ariaLabel="On each port" options=${PORT_CONTENT} value=${ports.port_use_names ? 'names' : 'numbers'}
+        onChange=${(v) => updatePorts({ port_use_names: v === 'names' })} />
+    </div>
     ${ports.port_use_names ? html`
       <p class="hint">One name per line, such as NAS, Router, Office. An empty line leaves a port blank.</p>
       <textarea class="port-names" rows="4" value=${ports.port_names} spellcheck="false" aria-label="Port names"
