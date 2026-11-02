@@ -483,10 +483,8 @@ function BorderSheet({ open, data, value, onPick, onClose }) {
   const tiles = data ? data.tiles.filter((t) => t.category === category) : [];
   return html`<${Sheet} open=${open} title="Border" onClose=${onClose} wide=${wide}>
     ${!data ? html`<p class="hint">Drawing the borders…</p>` : html`
-      <div class="border-categories" role="tablist" aria-label="Kinds of border"
-        style=${{ gridTemplateColumns: `repeat(${data.categories.length}, 1fr)` }}>
-        ${data.categories.map(([id, name]) => html`<button type="button" role="tab" aria-selected=${id === category}
-          class=${id === category ? 'on' : ''} onClick=${() => pickCategory(id)}>${name}</button>`)}
+      <div class="border-kinds">
+        <${Segmented} ariaLabel="Kinds of border" options=${data.categories} value=${category} onChange=${pickCategory} />
       </div>
       <div class="border-grid">
         ${tiles.map((t) => html`<button type="button" class=${t.id === value ? 'border-tile on' : 'border-tile'}
