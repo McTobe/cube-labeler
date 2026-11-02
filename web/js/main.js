@@ -4,14 +4,14 @@ import { useEffect, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { Icon } from './icons.js';
 import { PrinterChip } from './printer-ui.js';
-import { LabelPage, MODES } from './pages/label.js';
+import { LabelPage, kindItems } from './pages/label.js';
 import { SettingsPage, SyncPanel, JoinSheet } from './pages/settings.js';
 import { Menu, Sheet, useWide } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
 import { HistoryPage } from './pages/history.js';
-import { app, start, pageChanged, queueLabelCount, setMode } from './app.js';
+import { app, start, pageChanged, queueLabelCount } from './app.js';
 import { useStore } from './state.js';
 import { startAutoBackup, autoBackup } from './autobackup.js';
 import { drive, driveReady } from './gdrive.js';
@@ -113,8 +113,7 @@ function App() {
         // which kind of label to edit
         return html`<span class="menu-anchor nav-label">${link}
           <${Menu} variant="tiles kinds" open=${kinds} onClose=${() => setKinds(false)}
-            items=${MODES.map((m) => ({ label: m.name, icon: m.icon, on: mode === m.id,
-              action: () => setMode(m.id) }))} /></span>`;
+            items=${kindItems(mode)} /></span>`;
       })}
     </nav>
     <div class="main-col">

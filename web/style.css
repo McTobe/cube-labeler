@@ -961,7 +961,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
-/* The kinds of label as tiles, two to a row; more kinds add rows */
+/* The main kinds of label as tiles, two to a row, the last one opening the menu of all kinds */
 /* The line over the settings column: what the picker is for, and Reset for every kind of label */
 .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -4px 2px 6px; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .settings-head .reset-settings { display: inline-flex; align-items: center; gap: 6px; padding: 4px 2px; color: var(--muted); font-size: 0.85rem; }
@@ -976,7 +976,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.mode-switch button {
+.mode-switch > button, .mode-more > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -988,7 +988,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   font-weight: 600;
   color: var(--muted);
 }
-.mode-switch button.on { background: var(--accent-soft); color: var(--accent); }
+.mode-switch > button.on, .mode-more > button.on { background: var(--accent-soft); color: var(--accent); }
+.mode-more { display: block; }
+.mode-more > button { width: 100%; }
+.mode-more > button .icon:last-child { margin-left: -2px; opacity: 0.7; }
 
 /* The port strip's card: what goes over each port */
 .port-card .segmented { margin-bottom: 0; }
