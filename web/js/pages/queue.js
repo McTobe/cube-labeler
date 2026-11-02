@@ -9,6 +9,7 @@ import { Preview } from '../preview.js';
 import { binSummary } from './bin.js';
 import { NewRollSheet } from '../printer-ui.js';
 import { formatTape } from '../tape.js';
+import { outletParts } from '../outlet-code.js';
 import {
   app, boot, printer, connectPrinter, itemTitle, moveQueueItem, removeQueueItem, clearQueue,
   editQueueItem, printQueue, keepPrintedQueue, showingQueue, savePicture, setQueueCopies,
@@ -23,8 +24,19 @@ function itemDetail(item) {
   if (l.layout === 'breakers') {
     return `${breakerModules(l)} modules, ${Number(l.breaker_module_mm).toFixed(1)} mm each · ${l.tape_width_mm} mm tape · ${l.font_name}`;
   }
+  if (l.layout === 'outlet') {
+    const where = outletParts(l).where;
+    return `Network outlet${where ? ` · ${where}` : ''} · ${l.tape_width_mm} mm tape · ${l.font_name}`;
+  }
   if (l.layout === 'ports') {
     return `${l.port_count} ports, ${Number(l.port_pitch_mm).toFixed(1)} mm apart · ${l.tape_width_mm} mm tape · ${l.font_name}`;
+  }
+  if (l.layout === 'date') {
+    return `${textLines(l).slice(1).join(' · ')} · ${l.tape_width_mm} mm tape · ${l.font_name}`;
+  }
+  if (l.layout === 'asset') {
+    const code = { barcode: 'Barcode', qr: 'QR code' }[l.asset_code];
+    return `${l.asset_owner.trim() ? `${l.asset_owner.trim()} · ` : ''}${code ? `${code} · ` : ''}${l.tape_width_mm} mm tape · ${l.font_name}`;
   }
   // The lines after the title tell labels with the same first line apart
   const more = textLines(l).slice(1).join(' · ');

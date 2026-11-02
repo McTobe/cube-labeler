@@ -985,6 +985,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   color: var(--muted);
 }
 .mode-switch > button.on { background: var(--accent-soft); color: var(--accent); }
+.mode-switch > button { white-space: nowrap; min-width: 0; padding-left: 6px; padding-right: 6px; }
 .mode-switch > button .icon + .icon { margin-left: -2px; opacity: 0.7; }
 
 /* The port strip's card: what goes over each port */
@@ -1091,6 +1092,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   /* Parts: four pictures a row, so the pictures end level with the fields */
   .bin-grid.three.parts .icon-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; }
 }
+/* Date labels: three even columns; the calendar for "Pick a day" opens from under the Made buttons */
+@media (min-width: 1500px) { .bin-grid.three.dates { grid-template-columns: 1fr 1fr 1fr; } }
+/* Two columns on a smaller window: portions and what to show share a row under them, so the
+   card needs no scrolling */
+@media (min-width: 900px) and (max-width: 1499px) {
+  .bin-grid.dates > .bin-col:last-child { grid-column: 1 / -1; flex-direction: row; gap: 24px; }
+  .bin-grid.dates > .bin-col:last-child > .bin-group { flex: 1; min-width: 0; }
+  .bin-grid.dates .field { margin-top: 0; }
+}
+.made-field { position: relative; }
+.made-field .field { margin-top: 0; }
+.day-picker { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
 .bin-kind { margin: 12px 0 14px; }
 .drawer-card .hint { margin: 4px 0 10px; }
 .drawer-card .hint:last-child { margin-bottom: 0; }
@@ -1714,3 +1727,27 @@ input.tape-number { width: 160px; }
 .kind-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .kind-name .icon { flex: none; color: var(--accent); }
 .kind-card.on .template-name { color: var(--accent); }
+
+/* The network outlet card: its three columns of plain fields fit from a small desktop window up */
+@media (min-width: 900px) {
+  .bin-grid.three.outlet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .bin-grid.three.outlet-grid > .bin-col { padding: 2px 16px; min-width: 0; gap: 0; }
+  .bin-grid.three.outlet-grid > .bin-col:first-child { padding-left: 0; }
+  .bin-grid.three.outlet-grid > .bin-col:last-child { padding-right: 0; }
+  .bin-grid.three.outlet-grid > .bin-col + .bin-col { border-left: 1px solid var(--border); }
+}
+.outlet-card .card-head { align-items: center; }
+
+/* The asset tag card: three even columns with dividers from the desktop width on, since its
+   fields are short */
+@media (min-width: 900px) {
+  .bin-grid.three.asset-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .bin-grid.three.asset-grid > .bin-col { padding: 2px 16px; min-width: 0; }
+  .bin-grid.three.asset-grid > .bin-col:first-child { padding-left: 0; }
+  .bin-grid.three.asset-grid > .bin-col:last-child { padding-right: 0; }
+  .bin-grid.three.asset-grid > .bin-col + .bin-col { border-left: 1px solid var(--border); }
+}
+.asset-grid .bin-group { display: flex; flex-direction: column; gap: 8px; }
+.asset-grid .bin-group > .field, .asset-grid .bin-group > .hint, .asset-grid .bin-group > .toggle { margin: 0; }
+.asset-grid .hint { margin: 8px 0 0; }
+.asset-grid input:disabled { opacity: 0.5; }

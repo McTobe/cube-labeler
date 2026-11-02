@@ -6,7 +6,8 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { Sheet } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS, DEFAULT_BREAKERS } from '../app.js';
+import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS, DEFAULT_OUTLET, DEFAULT_DATES, DEFAULT_ASSET, DEFAULT_BREAKERS } from '../app.js';
+import { dateText } from '../dates.js';
 import { templates, thumbnail } from '../templates.js';
 
 // What each kind is for, in one line
@@ -30,6 +31,12 @@ export const KIND_EXAMPLES = {
   },
   flag: () => ({ mode: 'text', label: { ...DEFAULT_LABEL, layout: 'flag', text: 'NAS', font_name: 'Arimo Bold' } }),
   ports: () => ({ mode: 'text', label: { ...DEFAULT_PORTS, port_count: 6 } }),
+  outlet: () => ({ mode: 'text', label: { ...DEFAULT_OUTLET, text: 'DA01P02 3/4' } }),
+  date: () => {
+    const label = { ...DEFAULT_DATES, date_name: 'Chili', date_portions: '2', date_show: 'use' };
+    return { mode: 'text', label: { ...label, text: dateText(label) } };
+  },
+  asset: () => ({ mode: 'text', label: { ...DEFAULT_ASSET, asset_owner: 'Workshop', asset_number: '0042' } }),
   breakers: () => ({ mode: 'text', label: { ...DEFAULT_BREAKERS, breaker_prefix: 'F',
     breakers: ['Lights', 'Oven', 'Washer', 'Bath'].map((name) => ({ name, number: '', modules: name === 'Oven' ? 2 : 1, blank: false })) } }),
 };

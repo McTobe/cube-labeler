@@ -13,11 +13,14 @@ import { markerHtml, stylesAt, everyLineSized } from '../marker-view.js';
 import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel } from '../qr-helpers.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
+import { OutletCard, OutletHelp, OutletStyleSection } from './outlet.js';
 import { KindSheet } from './kinds.js';
+import { DateCard, DateOptions } from './date.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
-  updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
+  updatePorts, updateOutlet, updateDates, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
+  updateAsset, addAssetRow, assetRow, assetTag, ASSET_CODES,
   updateBreakers, breakerTexts, breakerModules, newBreaker, BREAKER_MODULES, BREAKER_MAX, isStrip,
 } from '../app.js';
 
@@ -64,6 +67,14 @@ export function LabelPage() {
     options = html`${!wide && html`<${BinCard} />`}<${BinOptions} />`;
   } else if (mode === 'ports') {
     options = html`${!wide && html`<${PortCard} />`}<${PortSection} /><${PortFontSection} />`;
+  } else if (mode === 'outlet') {
+    options = html`${wide ? html`<${OutletHelp} />` : html`<${OutletCard} />`}<${OutletStyleSection} />
+      <${PortFontSection} id="outlet-font" kind="outlet" update=${updateOutlet} />`;
+  } else if (mode === 'date') {
+    options = html`${!wide && html`<${DateCard} />`}<${DateOptions} /><${PortFontSection} id="date-font" kind="dates" update=${updateDates} sizes=${false} />`;
+  } else if (mode === 'asset') {
+    options = html`${wide ? html`<${AssetHowTo} />` : html`<${AssetCard} />`}<${AssetStyleSection} />
+      <${PortFontSection} id="asset-font" kind="asset" update=${updateAsset} sizes=${false} />`;
   } else if (mode === 'breakers') {
     options = html`${wide ? html`<${BreakerHowTo} />` : html`<${BreakerCard} />`}<${BreakerSection} /><${BreakerFontSection} />`;
   } else {
@@ -80,6 +91,9 @@ export function LabelPage() {
       ${text && wide && html`<${TextCard} />`}
       ${mode === 'bin' && wide && html`<${BinCard} />`}
       ${mode === 'ports' && wide && html`<${PortCard} />`}
+      ${mode === 'outlet' && wide && html`<${OutletCard} />`}
+      ${mode === 'date' && wide && html`<${DateCard} />`}
+      ${mode === 'asset' && wide && html`<${AssetCard} />`}
       ${mode === 'breakers' && wide && html`<${BreakerCard} />`}
       <${ActionBar} />
     </div>
@@ -100,10 +114,10 @@ export const MODES = [
   { id: 'bin', name: 'Bin label', icon: 'bin' },
   { id: 'flag', name: 'Cable flag', icon: 'flag' },
   { id: 'ports', name: 'Port strip', icon: 'ports' },
-  { id: 'outlet', name: 'Network outlet', icon: 'outlet', soon: true },
+  { id: 'outlet', name: 'Network outlet', icon: 'outlet' },
   { id: 'breakers', name: 'Breaker strip', icon: 'breaker' },
-  { id: 'asset', name: 'Asset tag', icon: 'asset', soon: true },
-  { id: 'date', name: 'Date label', icon: 'calendar', soon: true },
+  { id: 'asset', name: 'Asset tag', icon: 'asset' },
+  { id: 'date', name: 'Date label', icon: 'calendar' },
 ];
 export const modeName = (mode) => (MODES.find((m) => m.id === mode) || MODES[0]).name;
 
@@ -931,13 +945,17 @@ function PortSection() {
   <//>`;
 }
 
-// Font and tape of a strip (port or breaker): its own, apart from the text label's
-function StripFontSection({ id, label, update }) {
-  const { fonts, tapeWidths } = useStore(app);
+// Font and tape of a label with its own settings: the port strip, or the one under kind (an
+// outlet or date label) with its update function. A date label has two lines on the tape, which
+// leave no room for a size in mm, so it has no Text size and always fits.
+function PortFontSection({ id = 'port-font', kind = 'ports', update = updatePorts, sizes = true }) {
+  const state = useStore(app);
+  const { fonts, tapeWidths } = state;
+  const label = state[kind];
   const names = fonts.length ? fonts : [label.font_name];
-  return html`<${Section} id=${id} title="Font and tape" summary=${`${label.font_name}, ${label.tape_width_mm} mm tape`}>
+  return html`<${Section} id=${id} title="Font and tape" summary=${`${label.font_name}, ${label.tape_width_mm} mm tape`} defaultOpen=${sizes}>
     <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => update({ font_name })} />
-    <${TextSizeField} label=${label} onChange=${update} />
+    ${sizes && html`<${TextSizeField} label=${label} onChange=${update} />`}
     <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${label.tape_width_mm}
       onChange=${(tape_width_mm) => update({ tape_width_mm: Number(tape_width_mm) })} />
     <${Select} label="Tape colour in the preview" value=${`${label.tape_bg_color}/${label.tape_fg_color}`}
@@ -945,9 +963,101 @@ function StripFontSection({ id, label, update }) {
   <//>`;
 }
 
-function PortFontSection() {
-  const { ports } = useStore(app);
-  return html`<${StripFontSection} id="port-font" label=${ports} update=${updatePorts} />`;
+// --- Asset tag -----------------------------------------------------------------------------
+
+const ASSET_HOLDS = [['tag', 'The tag'], ['link', 'A link']];
+const ASSET_BIG = [['number', 'Number big'], ['owner', 'Owner big']];
+
+function AssetText({ label, value, placeholder, onChange, disabled = false, inputmode }) {
+  return html`<${Field} label=${label}>
+    <input type="text" value=${value} placeholder=${placeholder} autocomplete="off" spellcheck="false"
+      inputmode=${inputmode} disabled=${disabled} onInput=${(e) => onChange(e.currentTarget.value)} />
+  <//>`;
+}
+
+// Adds the row of tags and gets the card ready for the next row
+function addAssetsAndNext() {
+  if (!addAssetRow()) return;
+  setTimeout(() => document.querySelector('.asset-card input[inputmode="numeric"]')?.focus());
+}
+
+// The tag's fields under the preview: who owns it and how it is numbered, the code, and how
+// many tags to add at once
+function AssetCard() {
+  const { asset } = useStore(app);
+  const { phase } = useStore(boot);
+  const [countText, onCount] = useNumberText(asset.asset_count, (v) => { if (v >= 1 && v <= 500) updateAsset({ asset_count: Math.floor(v) }); });
+  const row = assetRow(asset);
+  const first = assetTag(row[0]);
+  const last = assetTag(row[row.length - 1]);
+  const noCode = asset.asset_code === 'none';
+  const link = !noCode && asset.asset_code_holds === 'link';
+  return html`<section class="card bin-card asset-card">
+    <div class="card-head">
+      <h2 class="card-title">Asset tag</h2>
+      <button class="secondary" disabled=${phase !== 'ready'} title="Add these tags to the queue and count on for the next ones"
+        onClick=${addAssetsAndNext}>Add to queue and start the next</button>
+    </div>
+    <div class="bin-grid three asset-grid">
+      <div class="bin-col">
+        <div class="bin-group">
+          <${AssetText} label="Owner or company" value=${asset.asset_owner} placeholder="Optional, e.g. your company"
+            onChange=${(asset_owner) => updateAsset({ asset_owner })} />
+          <${AssetText} label="Before the number" value=${asset.asset_prefix} placeholder="Nothing, or PC-, TOOL-"
+            onChange=${(asset_prefix) => updateAsset({ asset_prefix })} />
+          <${AssetText} label="Next number" value=${asset.asset_number} placeholder="0001" inputmode="numeric"
+            onChange=${(asset_number) => updateAsset({ asset_number })} />
+        </div>
+      </div>
+      <div class="bin-col">
+        <div class="bin-group">
+          <${Segmented} label="Code" options=${ASSET_CODES} value=${asset.asset_code}
+            onChange=${(asset_code) => updateAsset({ asset_code })} />
+          <${Segmented} label="The code holds" options=${ASSET_HOLDS} value=${asset.asset_code_holds} disabled=${noCode}
+            onChange=${(asset_code_holds) => updateAsset({ asset_code_holds })} />
+          <${AssetText} label="Link" value=${asset.asset_link} placeholder="https://.../{tag}" disabled=${!link}
+            onChange=${(asset_link) => updateAsset({ asset_link })} />
+        </div>
+        ${link && asset.asset_code === 'barcode' && html`<p class="hint">A link makes a long barcode. A QR code holds it in less tape.</p>`}
+      </div>
+      <div class="bin-col">
+        <div class="bin-group">
+          <${Field} label="Labels in a row">
+            <input type="text" inputmode="numeric" value=${countText} onInput=${onCount} />
+          <//>
+          <p class="hint">${first || last ? `Adds ${row.length > 1 ? `${first} to ${last}` : first} to the queue.` : 'Type a number first.'}</p>
+          <${Toggle} label="Count on after adding" checked=${asset.asset_count_on}
+            onChange=${(asset_count_on) => updateAsset({ asset_count_on })} />
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
+// A short how-to in the side panel, like the bin label's
+function AssetHowTo() {
+  return html`<section class="card drawer-card">
+    <h2 class="card-title">Asset tags</h2>
+    <p class="hint">Numbered tags for computers, tools and anything you lend out or keep track of.</p>
+    <ol class="how-to">
+      <li>Type the owner and how tag numbers start.</li>
+      <li>Pick a barcode, a QR code or none.</li>
+      <li>Add one tag or a whole row of them.</li>
+    </ol>
+    <p class="hint">The next number is remembered, so tomorrow's tags carry on where today's ended.</p>
+  </section>`;
+}
+
+function AssetStyleSection() {
+  const { asset } = useStore(app);
+  const big = ASSET_BIG.find(([id]) => id === asset.asset_big) || ASSET_BIG[0];
+  return html`<${Section} id="asset-style" title="Tag style" summary=${big[0] === 'number' ? 'Number big, owner small' : 'Owner big, number small'}>
+    <${Segmented} label="Text" options=${ASSET_BIG} value=${big[0]} onChange=${(asset_big) => updateAsset({ asset_big })} />
+    <${Segmented} label="Code on the" options=${ALIGNS.filter(([id]) => id !== 'center')} value=${asset.asset_code_side}
+      disabled=${asset.asset_code === 'none'} onChange=${(asset_code_side) => updateAsset({ asset_code_side })} />
+    <${Toggle} label="Number under the bars" checked=${asset.barcode_show_text} disabled=${asset.asset_code !== 'barcode'}
+      onChange=${(barcode_show_text) => updateAsset({ barcode_show_text })} />
+  <//>`;
 }
 
 // --- Breaker strip -------------------------------------------------------------------------
@@ -1079,8 +1189,7 @@ function BreakerSection() {
 }
 
 function BreakerFontSection() {
-  const { breakers } = useStore(app);
-  return html`<${StripFontSection} id="breaker-font" label=${breakers} update=${updateBreakers} />`;
+  return html`<${PortFontSection} id="breaker-font" kind="breakers" update=${updateBreakers} />`;
 }
 
 // --- Cable flag ----------------------------------------------------------------------------

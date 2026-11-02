@@ -11,6 +11,8 @@ import { SerialTransport, queryStatus, printRaster, feedTape, errorMessage } fro
 import {
   tapeKey, newRoll, correctRoll, countPrint, rollLeft, formatTape, planParts, partItems,
 } from './tape.js';
+import { outletText, outletParts, nextFirst } from './outlet-code.js';
+import { dateText } from './dates.js';
 
 const RENDER_DELAY_MS = 120;
 const SAVE_DELAY_MS = 400;
@@ -76,6 +78,74 @@ export const DEFAULT_PORTS = {
   port_divider_every: 0,
 };
 
+// A network outlet label is a text label whose text is made from the parts of its code (see
+// outlet-code.js); like the port strip it keeps its own settings apart from the text label
+export const DEFAULT_OUTLET = {
+  ...DEFAULT_LABEL,
+  layout: 'outlet',
+  text: '',
+  font_name: 'Arimo Bold',
+  outlet_building: '',
+  outlet_floor: '',
+  outlet_room: '',
+  outlet_rack: 'DA01',
+  outlet_panel_kind: 'P',  // what the panel is called: P (panel), M or U (rack unit)
+  outlet_panel: '01',
+  outlet_ports: 2,  // ports on the outlet: 1, 2 or 4
+  outlet_first: 1,  // the first of them
+  outlet_row: 1,  // labels added at once, each for the next ports
+  outlet_sep: '',  // between the parts: '', ' ', '-' or '.'
+  outlet_pair: '/',  // two ports as 3/4, 3-4 or 3+4
+  outlet_digits: 0,  // numbers as typed, or padded to 2 or 3 digits
+  outlet_lines: 1,  // 2 puts building, floor and room small over the code
+};
+DEFAULT_OUTLET.text = outletText(DEFAULT_OUTLET);
+
+// A date label (freezer, fridge, opened jars) is a text label whose text is worked out from
+// these fields (see dates.js), kept apart from the text label like the port strip
+export const DEFAULT_DATES = {
+  ...DEFAULT_LABEL,
+  layout: 'date',
+  text: '',
+  date_name: '',
+  date_made: 'today',  // 'today', 'yesterday' or a picked day as YYYY-MM-DD
+  date_keeps: '3m',  // an id from KEEPS in dates.js
+  date_portions: '',
+  date_show: 'both',  // 'both', 'use' (use-by only) or 'made'
+  date_style: 'words',  // 'words' (2 Nov 2026), 'dots' (02.11.26) or 'iso' (2026-11-02)
+};
+
+// An asset tag is a text label worked out from these fields by core/asset_tag.py: the tag
+// (asset_prefix and asset_number, as PC-0042) and the owner, with a barcode or QR code
+export const DEFAULT_ASSET = {
+  ...DEFAULT_LABEL,
+  layout: 'asset',
+  text: '',
+  asset_owner: '',
+  asset_prefix: 'PC-',
+  asset_number: '0001',  // the next tag's number, as typed, so leading zeros stay
+  asset_code: 'barcode',  // 'barcode', 'qr' or 'none'
+  asset_code_holds: 'tag',  // 'tag', or 'link': asset_link with {tag} filled in
+  asset_link: '',
+  asset_big: 'number',  // 'number' (the tag big, the owner small) or 'owner'
+  asset_code_side: 'left',
+  barcode_show_text: false,
+  asset_count: 1,  // tags "Add to queue and start the next" adds in a row
+  asset_count_on: true,  // and then the number counts on past them
+};
+export const ASSET_CODES = [['barcode', 'Barcode'], ['qr', 'QR'], ['none', 'None']];
+
+// The tag as printed, as PC-0042
+export const assetTag = (label) => `${(label.asset_prefix || '').trim()}${(label.asset_number || '').trim()}`;
+
+// The number step tags on, keeping its width (0042, 0043 ... 0099, 0100), as core/asset_tag.py
+export function nextAssetNumber(number, step = 1) {
+  const match = /(\d+)(\D*)$/.exec(number || '');
+  if (!match) return number || '';
+  const digits = match[1];
+  const value = String(BigInt(digits) + BigInt(step)).padStart(digits.length, '0');
+  return number.slice(0, match.index) + value + match[2];
+}
 // Breaker module widths: [id, name, mm]. DIN rail breakers are 17.5 mm a module; Custom takes
 // the user's own measurement.
 export const BREAKER_MODULES = [['din', '17.5 mm', 17.5], ['wide', '18 mm', 18.0], ['custom', 'Custom', null]];
@@ -128,9 +198,12 @@ export const BIN_TAPE_MM = 12;
 export const boot = createStore({ phase: 'loading', text: 'Starting...', error: null });
 
 export const app = createStore({
-  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'breakers' or 'flag' (a cable flag of the text label)
+  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet', 'date', 'asset', 'breakers' or 'flag' (a cable flag of the text label)
   label: DEFAULT_LABEL,
   ports: DEFAULT_PORTS,  // the port strip being edited
+  outlet: DEFAULT_OUTLET,  // the network outlet label being edited
+  dates: DEFAULT_DATES,  // the date label being edited
+  asset: DEFAULT_ASSET,  // the asset tag being edited
   breakers: DEFAULT_BREAKERS,  // the breaker strip being edited
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
@@ -190,7 +263,7 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue, device, ports, breakers] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device, ports, outlet, dates, asset, breakers] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
@@ -199,6 +272,9 @@ export async function start() {
     storage.load('queue', []),
     storage.load('deviceId', null),
     storage.load('ports', {}),
+    storage.load('outlet', {}),
+    storage.load('dates', {}),
+    storage.load('asset', {}),
     storage.load('breakers', {}),
   ]);
   // The tape counter counts each device's prints apart, so syncing never counts one twice
@@ -209,6 +285,9 @@ export async function start() {
     // The printable-area guides no longer have a switch, so a label saved with them on drops them
     label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     ports: { ...DEFAULT_PORTS, ...ports, layout: 'ports' },
+    outlet: withOutletText({ ...DEFAULT_OUTLET, ...outlet }),
+    dates: { ...DEFAULT_DATES, ...dates, layout: 'date' },
+    asset: { ...DEFAULT_ASSET, ...asset, layout: 'asset' },
     breakers: { ...DEFAULT_BREAKERS, ...breakers, layout: 'breakers' },
     mode,
     bin,
@@ -318,6 +397,23 @@ export function updatePorts(change) {
   changed('ports');
 }
 
+const withOutletText = (outlet) => ({ ...outlet, layout: 'outlet', text: outletText(outlet) });
+
+export function updateOutlet(change) {
+  app.set({ outlet: withOutletText({ ...app.get().outlet, ...change }) });
+  changed('outlet');
+}
+
+export function updateDates(change) {
+  app.set({ dates: { ...app.get().dates, ...change } });
+  changed('dates');
+}
+
+export function updateAsset(change) {
+  app.set({ asset: { ...app.get().asset, ...change } });
+  changed('asset');
+}
+
 export function updateBreakers(change) {
   app.set({ breakers: { ...app.get().breakers, ...change } });
   changed('breakers');
@@ -357,13 +453,32 @@ export const RESET_NOTES = {
   text: 'Reset font, size, QR code, picture and tape settings? Your text is kept.',
   flag: 'Reset the cable, font, size, QR code, picture and tape settings? Your text is kept.',
   ports: 'Reset ports, spacing, font, size and tape? Your numbers and names are kept.',
+  outlet: 'Reset the code style, font, size and tape? The parts of your code are kept.',
+  date: 'Reset the date style, font, size and tape? What is on the label is kept.',
+  asset: 'Reset the code, tag style, font and tape? The owner, numbers and link are kept.',
   breakers: 'Reset module width, font, size and tape? Your breakers, numbers and names are kept.',
   bin: 'Reset the label length and drive icon? What is on the label is kept.',
 };
 
+// What Reset keeps on an outlet label: the code itself
+const OUTLET_PART_KEYS = ['outlet_building', 'outlet_floor', 'outlet_room', 'outlet_rack', 'outlet_panel_kind',
+  'outlet_panel', 'outlet_ports', 'outlet_first', 'outlet_row'];
+
 export function resetSettings() {
-  const { mode, label, ports, breakers, bin, settings } = app.get();
-  if (mode === 'breakers') {
+  const { mode, label, ports, outlet, dates, asset, breakers, bin, settings } = app.get();
+  if (mode === 'outlet') {
+    const keep = Object.fromEntries(OUTLET_PART_KEYS.map((k) => [k, outlet[k]]));
+    updateOutlet({ ...DEFAULT_OUTLET, tape_width_mm: labelDefaults().tape_width_mm, ...keep });
+    say('Settings reset. The parts of your code are kept.');
+  } else if (mode === 'date') {
+    const kept = ['date_name', 'date_made', 'date_keeps', 'date_portions', 'date_show'];
+    updateDates({ ...DEFAULT_DATES, ...labelDefaults(), ...Object.fromEntries(kept.map((k) => [k, dates[k]])) });
+    say('Settings reset. What is on the label is kept.');
+  } else if (mode === 'asset') {
+    const { asset_owner, asset_prefix, asset_number, asset_link } = asset;
+    updateAsset({ ...DEFAULT_ASSET, tape_width_mm: labelDefaults().tape_width_mm, asset_owner, asset_prefix, asset_number, asset_link });
+    say('Settings reset. The owner, numbers and link are kept.');
+  } else if (mode === 'breakers') {
     const { breakers: list, breaker_prefix, breaker_first, breaker_show } = breakers;
     updateBreakers({ ...DEFAULT_BREAKERS, tape_width_mm: labelDefaults().tape_width_mm, breakers: list, breaker_prefix, breaker_first, breaker_show });
     say('Settings reset. Your breakers are kept.');
@@ -423,9 +538,13 @@ export function itemOptions(item) {
 }
 
 export function currentItem() {
-  const { mode, label, bin, ports, breakers } = app.get();
+  const { mode, label, bin, ports, outlet, dates, asset, breakers } = app.get();
   if (mode === 'bin' && bin) return { mode, bin: bin[bin.kind] };
   if (mode === 'ports') return { mode: 'text', label: ports };
+  if (mode === 'outlet') return { mode: 'text', label: outlet };
+  // The text is worked out each time, so "Today" is the day the label is printed
+  if (mode === 'date') return { mode: 'text', label: { ...dates, text: dateText(dates) } };
+  if (mode === 'asset') return { mode: 'text', label: asset };
   if (mode === 'breakers') return { mode: 'text', label: breakers };
   return { mode: 'text', label: { ...label, layout: mode === 'flag' ? 'flag' : 'text' } };
 }
@@ -433,7 +552,8 @@ export function currentItem() {
 // The kind of label on the Label page that edits a queued or saved label
 export function editorMode(item) {
   if (item.mode === 'bin') return 'bin';
-  return ['ports', 'breakers', 'flag'].includes(item.label.layout) ? item.label.layout : 'text';
+  const { layout } = item.label;
+  return ['ports', 'outlet', 'flag', 'date', 'asset', 'breakers'].includes(layout) ? layout : 'text';
 }
 
 // What goes on each breaker of a breaker strip, as the Python core draws it: [{number, name}],
@@ -471,6 +591,7 @@ export function textLines(label) {
 }
 
 export function itemTitle(item) {
+  if (item.mode === 'text' && item.label.layout === 'asset') return assetTag(item.label) || item.label.asset_owner.trim() || 'Asset tag';
   if (item.mode === 'text' && item.label.layout === 'breakers') {
     const shown = breakerTexts(item.label).filter((b) => !b.blank);
     return shown.length ? `Breakers ${shown[0].number}${shown.length > 1 ? ` to ${shown[shown.length - 1].number}` : ''}` : 'Breaker strip';
@@ -478,6 +599,10 @@ export function itemTitle(item) {
   if (item.mode === 'text' && item.label.layout === 'ports') {
     const named = portTexts(item.label).filter((t) => t);
     return named.length ? `Ports ${named[0]}${named.length > 1 ? ` to ${named[named.length - 1]}` : ''}` : 'Port strip';
+  }
+  if (item.mode === 'text' && item.label.layout === 'outlet') return outletParts(item.label).code || textLines(item.label)[0] || 'Network outlet';
+  if (item.mode === 'text' && item.label.layout === 'date') {
+    return [item.label.date_name, item.label.date_portions].map((t) => String(t || '').trim()).filter(Boolean).join(' · ') || 'Date label';
   }
   if (item.mode === 'bin') {
     const b = item.bin;
@@ -492,9 +617,10 @@ function fitTooTallPreset(item, metrics) {
   if (item.mode !== 'text' || !metrics.text_height_fell_back) return;
   const strip = isStrip(item.label);
   const { layout } = item.label;
-  const label = layout === 'ports' ? app.get().ports : layout === 'breakers' ? app.get().breakers : app.get().label;
+  const own = { ports: ['ports', updatePorts], outlet: ['outlet', updateOutlet], date: ['dates', updateDates], breakers: ['breakers', updateBreakers] }[layout];
+  const label = own ? app.get()[own[0]] : app.get().label;
   if (label.text_height_mm !== item.label.text_height_mm) return;
-  (layout === 'ports' ? updatePorts : layout === 'breakers' ? updateBreakers : updateLabel)({ text_height_mm: null });
+  (own ? own[1] : updateLabel)({ text_height_mm: null });
   say(`${item.label.text_height_mm} mm is too big for this text ${strip ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
 }
 
@@ -516,9 +642,9 @@ export async function renderNow() {
         // The rulers are only for this preview, so a bin label takes the text label's choice
         // here and not in its queue item
         const options = itemOptions(item);
-        if (item.mode === 'bin' || isStrip(item.label)) options.show_rulers = app.get().label.show_rulers;
+        if (item.mode === 'bin' || isStrip(item.label) || ['date', 'asset'].includes(item.label.layout)) options.show_rulers = app.get().label.show_rulers;
         // An empty text label shows faded sample text, not a blank piece of tape (it can't print)
-        const sample = item.mode === 'text' && !isStrip(item.label) && options.text === ' ';
+        const sample = item.mode === 'text' && item.label.layout === 'text' && options.text === ' ';
         if (sample) options.text = SAMPLE_TEXT;
         const result = await py.render_label(options);
         const old = app.get().render;
@@ -894,8 +1020,29 @@ async function makeThumb(item) {
 }
 
 export function addToQueue() {
+  if (app.get().mode === 'outlet') return addOutlets();
   const item = currentItem();
   return queueItem(item.mode === 'bin' ? { ...item, font: binFont() } : item);
+}
+
+export const MAX_OUTLET_ROW = 48;
+
+// Adds the network outlet labels: one, or a row of them for the next ports (3/4, 5/6, 7/8).
+// next moves the first port on past them, ready for the next outlet.
+export function addOutlets(next = false) {
+  const { outlet } = app.get();
+  const numbered = Number.isFinite(parseInt(outlet.outlet_first, 10));
+  const rows = numbered ? Math.min(MAX_OUTLET_ROW, Math.max(1, parseInt(outlet.outlet_row, 10) || 1)) : 1;
+  for (let i = 0; i < rows; i++) {
+    const label = withOutletText({ ...outlet, outlet_first: numbered ? nextFirst(outlet, i) : outlet.outlet_first });
+    if (!queueItem({ mode: 'text', label })) return false;
+  }
+  if (rows > 1) {
+    const last = outletParts(outlet, nextFirst(outlet, rows - 1)).code;
+    say(`Added ${rows} labels to the queue, ${outletParts(outlet).code} to ${last}.`);
+  }
+  if (next && numbered) updateOutlet({ outlet_first: nextFirst(outlet, rows) });
+  return true;
 }
 
 // Adds a label ({mode, label} or {mode, bin, font}) to the queue, like one from the history
@@ -911,6 +1058,14 @@ export function queueItem(label) {
     const shown = breakerTexts(item.label);
     if (!shown.some((b) => item.label.breaker_show === 'name' ? b.name : b.number)) {
       say('Give at least one breaker a name first.', true);
+      return false;
+    }
+  } else if (item.mode === 'text' && item.label.layout === 'outlet' && !item.label.text.trim()) {
+    say('Fill in at least one part of the code first.', true);
+    return false;
+  } else if (item.mode === 'text' && item.label.layout === 'asset') {
+    if (!assetTag(item.label) && !item.label.asset_owner.trim()) {
+      say('Type a tag number or an owner first.', true);
       return false;
     }
   } else if (item.mode === 'text' && !item.label.text.trim() && !hasQr(item.label) && !hasBarcode(item.label) && !item.label.image) {
@@ -990,6 +1145,15 @@ export function openItem(item) {
   } else if (editorMode(item) === 'ports') {
     app.set({ mode: 'ports', ports: { ...DEFAULT_PORTS, ...item.label } });
     storage.save('ports', app.get().ports);
+  } else if (editorMode(item) === 'outlet') {
+    app.set({ mode: 'outlet', outlet: withOutletText({ ...DEFAULT_OUTLET, ...item.label }) });
+    storage.save('outlet', app.get().outlet);
+  } else if (editorMode(item) === 'date') {
+    app.set({ mode: 'date', dates: { ...DEFAULT_DATES, ...item.label } });
+    storage.save('dates', app.get().dates);
+  } else if (editorMode(item) === 'asset') {
+    app.set({ mode: 'asset', asset: { ...DEFAULT_ASSET, ...item.label } });
+    storage.save('asset', app.get().asset);
   } else if (editorMode(item) === 'breakers') {
     app.set({ mode: 'breakers', breakers: { ...DEFAULT_BREAKERS, ...item.label } });
     storage.save('breakers', app.get().breakers);
@@ -1157,4 +1321,26 @@ async function printWholeQueue() {
       say(`Queue of ${strip.count} labels sent, but the printer did not confirm completion.`, true);
     }
   });
+}
+
+// The asset tags in a row from the next number: asset_count of them, PC-0042 to PC-0051
+export function assetRow(asset) {
+  const count = Math.max(1, Math.min(500, Math.floor(Number(asset.asset_count)) || 1));
+  return Array.from({ length: count }, (_, i) => ({ ...asset, asset_number: nextAssetNumber(asset.asset_number, i) }));
+}
+
+// Adds the row of asset tags to the queue and, with Count on after adding, moves the next
+// number on past them, so the next row (or tomorrow's) carries on where this one ended
+export function addAssetRow() {
+  const { asset } = app.get();
+  const row = assetRow(asset);
+  for (const label of row) if (!queueItem({ mode: 'text', label })) return false;
+  const first = assetTag(row[0]);
+  const last = assetTag(row[row.length - 1]);
+  if (asset.asset_count_on && /\d/.test(asset.asset_number)) {
+    updateAsset({ asset_number: nextAssetNumber(asset.asset_number, row.length) });
+  }
+  const count = queueLabelCount(app.get().queue);
+  say(`Added ${row.length > 1 ? `${first} to ${last}` : first || 'the tag'} to the queue (${count} label${count === 1 ? '' : 's'}).${asset.asset_count_on && /\d/.test(asset.asset_number) ? ` Next is ${assetTag(app.get().asset)}.` : ''}`);
+  return true;
 }
