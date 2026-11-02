@@ -8,7 +8,7 @@ import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
 import { Preview } from '../preview.js';
-import { markerHtml, stylesAt } from '../marker-view.js';
+import { markerHtml, stylesAt, everyLineSized } from '../marker-view.js';
 import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel } from '../qr-helpers.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
@@ -579,9 +579,12 @@ function TextSizeField({ label, onChange }) {
   const max = metrics && metrics.max_text_height_mm;
   const fits = (v) => max == null || v <= max || String(v) === chosen;
   const options = [['fit', 'Fit'], ...TEXT_SIZES.filter(fits).map((v) => [String(v), `${v} mm`])];
-  return html`<${Segmented} label="Text size" options=${options} value=${chosen}
+  // Every line sized in the text: this has nothing left to size, so it rests
+  const sized = !ports && everyLineSized(label.text || '');
+  return html`<${Segmented} label="Text size" options=${options} value=${chosen} disabled=${sized}
       onChange=${(v) => onChange({ text_height_mm: v === 'fit' ? null : Number(v) })} />
-    <p class="hint">${TEXT_SIZES.some((v) => !fits(v))
+    <p class="hint">${sized ? 'Every line has its own size in the text, so this has no effect. Set a line to Auto to use it again.'
+      : TEXT_SIZES.some((v) => !fits(v))
       ? `Sizes over ${Math.floor(max * 10) / 10} mm don't fit this text ${ports ? 'between the dividers' : 'on the tape'}, so they're left out.`
       : ports ? 'Fit makes the text as big as the ports and the tape allow. Every port gets the same size.'
       : 'Fit fills the tape height. A size in mm is the height of a capital letter. Lines given their own size in the text keep it.'}</p>`;
@@ -951,7 +954,8 @@ function AdvancedSection() {
   const { label, previewDots } = useStore(app);
   return html`<${Section} id="advanced" title="Advanced" defaultOpen=${false}>
     <${Slider} label="Text scale" min=${50} max=${150} step=${5} value=${label.font_scale} format=${(v) => `${v}%`}
-      disabled=${label.text_height_mm != null} display=${label.text_height_mm != null ? 'Off for a size in mm' : undefined}
+      disabled=${label.text_height_mm != null || everyLineSized(label.text || '')}
+      display=${label.text_height_mm != null || everyLineSized(label.text || '') ? 'Off for a size in mm' : undefined}
       onChange=${(font_scale) => updateLabel({ font_scale })} />
     <${Slider} label="Line spacing" min=${0.8} max=${2} step=${0.05} value=${label.line_spacing} format=${(v) => `${v.toFixed(2)}×`}
       onChange=${(line_spacing) => updateLabel({ line_spacing })} />

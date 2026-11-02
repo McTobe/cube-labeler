@@ -102,6 +102,12 @@ function lineParts(line, out) {
 
 // The whole text as pieces, with the line breaks as pieces of their own. A typed "\n" is a line
 // break on the label too, so it shows as a marker and the text after it starts a new line.
+// True when every line with text has its own size in mm, so the label's Text size sizes nothing
+export function everyLineSized(text) {
+  const lines = text.split('\n').filter((l) => l.trim() && l.trim() !== COLUMN_BREAK);
+  return lines.length > 0 && lines.every((l) => MM_PREFIX.test(l.replace(/^(<<|><|>>) /, '')));
+}
+
 export function textParts(text) {
   const out = [];
   text.split('\n').forEach((line, n) => {
