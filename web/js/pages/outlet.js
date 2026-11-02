@@ -70,7 +70,8 @@ export function OutletCard() {
         <${Part} label="Rack" field="outlet_rack" placeholder="DA01" />
         <${Segmented} label="Rack measured in" options=${OUTLET_PANEL_KINDS} value=${kind[0]}
           onChange=${(outlet_panel_kind) => updateOutlet({ outlet_panel_kind })} />
-        <${Part} label=${kind[0] === 'P' ? 'Panel' : kind[0] === 'U' ? 'Rack unit (U)' : 'Position from the top (M)'} field="outlet_panel" placeholder="02" />
+        <${Part} label=${kind[0] === 'P' ? 'Panel' : kind[0] === 'U' ? 'Rack unit (U)' : 'cm from the top of the rack (M)'} field="outlet_panel"
+          placeholder=${kind[0] === 'M' ? '010' : '02'} />
       </div>
       <div class="bin-col">
         <${Segmented} label="Ports on the outlet" options=${OUTLET_PORTS.map(([v, n]) => [String(v), n])}

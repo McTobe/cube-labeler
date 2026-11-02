@@ -2,9 +2,10 @@
 // room), then the rack, the panel and the ports its cables go to. Empty parts are left out.
 // Pure functions, so tests can run them without the app.
 
-// How the rack counts the place of a panel: by panel (P), by an M position (sites use M for
-// module or metric positions, so the app doesn't say which) or by rack unit (U)
-export const OUTLET_PANEL_KINDS = [['P', 'Panel P'], ['M', 'M'], ['U', 'Unit U']];
+// How the rack counts the place of a panel: by panel (P), by M (mått / monteringsplats in the
+// Swedish standard SS 455 12 01: whole cm from the top of the rack down to the top edge of the
+// panel, like M010) or by rack unit (U)
+export const OUTLET_PANEL_KINDS = [['P', 'Panel P'], ['M', 'cm M'], ['U', 'Unit U']];
 export const OUTLET_PORTS = [[1, 'One'], [2, 'Two'], [4, 'Four']];
 export const OUTLET_SEPARATORS = [['', 'None'], [' ', 'Space'], ['-', '-'], ['.', '.']];
 export const OUTLET_PAIRS = [['/', '3/4'], ['-', '3-4'], ['+', '3+4']];
