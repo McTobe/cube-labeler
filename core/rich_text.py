@@ -318,6 +318,17 @@ class TextLayout:
                 y += self._gap(img.height, heights[i + 1])
         return out
 
+    @staticmethod
+    def _column_top(col: Image.Image, height: int) -> int:
+        """Where a column goes so its ink sits on the middle of the block. Line boxes leave room
+        for descenders and accents (from all the label's text), which is empty space in most
+        lines, so centring the boxes lets a short column ride high next to a taller one."""
+        box = col.getbbox()
+        if not box:
+            return (height - col.height) // 2
+        top = int(round(height / 2 - (box[1] + box[3]) / 2))
+        return min(max(top, -box[1]), height - box[3])
+
     def render(self, base: int) -> Image.Image:
         """Draws the whole text block as a mask (255 = ink), columns side by side."""
         cols = [self._render_column(col, base) for col in self.doc.columns]
@@ -331,7 +342,7 @@ class TextLayout:
         draw = ImageDraw.Draw(out)
         x = 0
         for i, col in enumerate(cols):
-            out.paste(col, (x, (height - col.height) // 2))
+            out.paste(col, (x, self._column_top(col, height)))
             x += col.width
             if i + 1 < len(cols):
                 x += gap

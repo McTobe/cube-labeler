@@ -173,6 +173,19 @@ class TestRendering(unittest.TestCase):
         groups = 1 + sum(1 for a, b in zip(dark, dark[1:]) if b > a + 1)
         self.assertEqual(groups, 3)
 
+    def test_columns_share_a_middle(self):
+        # A line box leaves room for every descender in the label ("j" here), so centring the
+        # boxes let a lone capital column ride high next to a two-line one (issue seen in Open Sans)
+        open_sans = os.path.join(BASE_DIR, "web", "fonts", "OpenSans-Regular.ttf")
+        for font in (ROBOTO, open_sans):
+            with self.subTest(font):
+                layout = rt.TextLayout(rt.parse("# BECO\n---\n-# << Tobias Kejonen\n-# << 072 225 27 24"), font)
+                img = layout.render(40)
+                widths = [layout._render_column(col, 40).width for col in layout.doc.columns]
+                left = img.crop((0, 0, widths[0], img.height)).getbbox()
+                right = img.crop((img.width - widths[1], 0, img.width, img.height)).getbbox()
+                self.assertLessEqual(abs((left[1] + left[3]) - (right[1] + right[3])), 2)
+
     def test_frame_surrounds_the_content(self):
         for frame in ("box", "rounded"):
             with self.subTest(frame):
