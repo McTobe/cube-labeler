@@ -641,12 +641,6 @@ def _moon(p, cx, cy, r):
     p.clear_circle(cx + r * 0.45, cy - r * 0.25, r * 0.85)
 
 
-def _hammer(p, x, y, s):
-    p.rect(x + s * 0.44, y + s * 0.25, x + s * 0.56, y + s, radius=s * 0.04)
-    p.rect(x + s * 0.15, y + s * 0.05, x + s * 0.85, y + s * 0.3, radius=s * 0.03)
-    p.clear_rect(x + s * 0.72, y + s * 0.05, x + s * 0.85, y + s * 0.15)
-
-
 def _mug(p, x, base, s):
     """A mug with steam, standing on base."""
     p.rect(x, base - s * 0.6, x + s * 0.6, base, radius=s * 0.08)
@@ -693,24 +687,6 @@ def _palm(p, x, base, h):
         _leaf(p, tx + math.cos(a) * h * 0.2 - h * 0.18, ty + math.sin(a) * h * 0.14 - h * 0.08, h * 0.36, ang)
 
 
-def _plug(p, x, y, s):
-    """A mains plug pointing right, its cable leaving on the left."""
-    p.rect(x, y + s * 0.2, x + s * 0.6, y + s * 0.8, radius=s * 0.12)
-    p.rect(x + s * 0.6, y + s * 0.32, x + s * 0.95, y + s * 0.4)
-    p.rect(x + s * 0.6, y + s * 0.6, x + s * 0.95, y + s * 0.68)
-
-
-def _bulb(p, x, y, s):
-    p.circle(x + s * 0.5, y + s * 0.38, s * 0.34)
-    p.rect(x + s * 0.32, y + s * 0.62, x + s * 0.68, y + s * 0.92, radius=s * 0.04)
-    for k in (0.72, 0.82):
-        p.d.line([((x + s * 0.32) * p.k, (y + s * k) * p.k), ((x + s * 0.68) * p.k, (y + s * k) * p.k)], fill=0, width=max(1, round(p.k)))
-    for ang in (-150, -110, -70, -30):
-        a = math.radians(ang)
-        cx, cy = x + s * 0.5, y + s * 0.38
-        p.line([(cx + math.cos(a) * s * 0.45, cy + math.sin(a) * s * 0.45), (cx + math.cos(a) * s * 0.6, cy + math.sin(a) * s * 0.6)], 1)
-
-
 # --- Themed borders: little scenes ---------------------------------------------------------
 
 def _scene_garden(p):
@@ -723,7 +699,6 @@ def _scene_garden(p):
     _tulip(p, w - 11, base, h * 0.8, h * 0.15)
     _stem_flower(p, w - 26, base, h * 0.55, h * 0.14)
     _grass(p, w - 36, base, h * 0.28)
-    p.line([(40, 1.2), (w - 40, 1.2)], 1.2)
 
 
 def _scene_winter(p):
@@ -738,33 +713,6 @@ def _scene_winter(p):
     _moon(p, w - 34, h * 0.22, h * 0.11)
     for x, y in ((30, 6), (w - 46, 10), (36, 14)):
         _star(p, x, y, 4)
-    p.line([(30, 1.2), (w - 48, 1.2)], 1.2)
-
-
-def _scene_workshop(p):
-    w, h = p.w, p.h
-    rail = 3.5
-    p.rect(0, 0.5, w, rail)
-    for x in _along(w, 6):
-        p.clear_circle(x, 2, 0.7)
-    s = h * 0.55
-    _wrench(p, 2, rail + 2, s)
-    _hammer(p, 2 + s * 0.9, rail + 2, s * 0.75)
-    _screwdriver(p, w - s - 2, rail + 2, s)
-    p.line([(0, h - 1.5), (w, h - 1.5)], 2.2)
-
-
-def _scene_night(p):
-    w, h = p.w, p.h
-    _moon(p, 8, h * 0.4, h * 0.22)
-    _star(p, 17, 3, h * 0.18)
-    _star(p, 22, h * 0.55, h * 0.12)
-    _star(p, 13, h * 0.72, h * 0.1)
-    _star(p, w - 12, h * 0.15, h * 0.28)
-    _star(p, w - 24, h * 0.6, h * 0.14)
-    _star(p, w - 8, h * 0.7, h * 0.1)
-    p.line([(30, 1.2), (w - 34, 1.2)], 1.2)
-    p.line([(28, h - 1.2), (w - 30, h - 1.2)], 1.2)
 
 
 def _scene_kitchen(p):
@@ -780,10 +728,9 @@ def _scene_kitchen(p):
 def _scene_beach(p):
     w, h = p.w, p.h
     _waves(p, 0, w, h - 3, 1.5, 9, 1.5)
-    _sun(p, 1, 1, h * 0.42)
-    _palm(p, 26, h - 3, h * 0.85)
+    _palm(p, h * 0.42, h - 3, h * 0.85)
     _boat(p, w - h * 0.6, h - 3.5, h * 0.55)
-    p.line([(34, 1.2), (w - h * 0.7, 1.2)], 1.2)
+    _sun(p, w - h * 0.8, 0.5, h * 0.3)
 
 
 def _scene_town(p):
@@ -795,20 +742,6 @@ def _scene_town(p):
     _house(p, w - h * 0.5, base - h * 0.5, h * 0.48)
     _house(p, w - h * 0.95, base - h * 0.42, h * 0.42)
     _cloud(p, w - h * 0.85, -h * 0.02, h * 0.34)
-    p.line([(h * 1.2, 1.2), (w - h * 1.15, 1.2)], 1.2)
-
-
-def _scene_power(p):
-    w, h = p.w, p.h
-    # A cable runs along the bottom from a plug on the left to a bulb on the right
-    s = h * 0.5
-    _plug(p, 1, h - s - 0.5, s)
-    p.line([(1, h - s / 2 - 0.5), (0, h - s / 2 - 0.5)], 1.6)
-    cable = [(s * 0.95 + 1, h - s / 2 - 0.5), (s + 6, h - 2), (w - h * 0.4, h - 2), (w - h * 0.3, h - h * 0.35)]
-    p.line(cable, 1.6)
-    _bulb(p, w - h * 0.55, 0.5, h * 0.62)
-    _bolt(p, s * 0.2, 1, h * 0.36)
-    p.line([(s + 4, 1.2), (w - h * 0.75, 1.2)], 1.2)
 
 
 # --- Themed borders: garlands along the top and bottom -------------------------------------
@@ -894,12 +827,9 @@ def _leaf_pair(p, x, y, s):
 THEMED_BORDERS = [
     Border("garden", "Garden", "themed", _scene_garden, 0.7, 0.07),
     Border("winter", "Winter", "themed", _scene_winter, 0.72, 0.07),
-    Border("workshop", "Workshop", "themed", _scene_workshop, 0.95, 0.1),
-    Border("night", "Night sky", "themed", _scene_night, 0.5, 0.07),
     Border("kitchen", "Kitchen", "themed", _scene_kitchen, 0.92, 0.1),
     Border("beach", "Beach", "themed", _scene_beach, 0.8, 0.07),
     Border("town", "Town", "themed", _scene_town, 1.15, 0.07),
-    Border("power", "Power", "themed", _scene_power, 0.74, 0.07),
     Border("leaf-vine", "Leaf vine", "themed", _garland_leaves, 0.03, 0.22),
     Border("bunting", "Bunting", "themed", _garland_bunting, 0.03, 0.2),
     Border("star-chain", "Star chain", "themed", _garland_stars, 0.03, 0.2),
@@ -911,7 +841,6 @@ THEMED_BORDERS = [
     Border("music-corners", "Music corners", "themed", _corner_bunch(_note), 0.82, 0.08),
     Border("snow-corners", "Snow corners", "themed", _corner_bunch(_snowflake), 0.82, 0.08),
     Border("paw-corners", "Paw corners", "themed", _corner_bunch(_paw), 0.82, 0.08),
-    Border("tool-corners", "Tool corners", "themed", _corner_bunch(_wrench, _bolt), 0.82, 0.08),
 ]
 
 BORDERS_LIST = [
