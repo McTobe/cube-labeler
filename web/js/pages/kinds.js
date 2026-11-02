@@ -38,7 +38,8 @@ export const KIND_EXAMPLES = {
   },
   asset: () => ({ mode: 'text', label: { ...DEFAULT_ASSET, asset_owner: 'Workshop', asset_number: '0042' } }),
   breakers: () => ({ mode: 'text', label: { ...DEFAULT_BREAKERS, breaker_prefix: 'F',
-    breakers: ['Lights', 'Oven', 'Washer', 'Bath'].map((name) => ({ name, number: '', modules: name === 'Oven' ? 2 : 1, blank: false })) } }),
+    // Single breakers only: in a small picture a wide one reads as a gap
+    breakers: ['Lights', 'Oven', 'Washer', 'Bath', 'Garage'].map((name) => ({ name, number: '', modules: 1, blank: false })) } }),
 };
 
 function KindCard({ kind, on, pick }) {
