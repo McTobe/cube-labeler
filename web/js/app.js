@@ -111,7 +111,8 @@ export const app = createStore({
   queue: [],  // [{id, mode, label, copies} or {id, mode, bin, copies}], printed as one strip
   queueUndo: null,  // {queue, text}: the queue before the last removal, while it can be undone
   queueRender: null,  // like render, for the whole queue
-  previewDots: false,  // the label page's preview shows the printer's dots instead of the tape
+  previewDots: false,
+  previewZoom: 'fit',  // how every preview shows the label: 'fit', 'full' (full height) or 'real'  // the label page's preview shows the printer's dots instead of the tape
   queuePrinted: 0,  // labels in the last printed queue, until the user keeps or clears it
   queuePlan: null,  // {parts, long, needed, left} when the queue is too long for one print or the roll
   queueRun: null,  // {parts, next, count, hidden} while a queue prints in parts
