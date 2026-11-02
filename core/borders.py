@@ -13,6 +13,8 @@ from typing import Callable, Dict, List, Tuple
 
 from PIL import Image, ImageDraw, ImageFilter
 
+from core import border_art
+
 SS = 4  # drawn this many times bigger, then reduced to printer dots
 CLEAR_GAP = 0.03  # room between a border and the text, as a share of the printable height
 
@@ -22,10 +24,8 @@ CATEGORIES = [
     ("lines", "Lines"),
     ("shapes", "Shapes"),
     ("corners", "Corners"),
+    ("themed", "Themed"),
 ]
-# Themed borders (motifs at the ends) are drawn below but left out of the list for now:
-# Tobe wants another look at them first. Add ("themed", "Themed") back and THEMED_BORDERS
-# to BORDERS_LIST to bring them back.
 
 
 class Pen:
@@ -473,156 +473,22 @@ def _corner_dot_fill(p):
                 p.circle(x + sx * (2.4 + i * step), y + sy * (2.4 + j * step), 0.95)
 
 
-# --- Themed motifs, each drawn in a square box (x, y, size) --------------------------------
+# --- Themed: pictures at the ends, drawn in core/border_art.py -----------------------------
 
-def _star(p, x, y, s, points=5):
-    cx, cy, ro, ri = x + s / 2, y + s / 2 + s * 0.04, s / 2, s * 0.2
-    pts = []
-    for i in range(points * 2):
-        a = -math.pi / 2 + i * math.pi / points
-        r = ro if i % 2 == 0 else ri
-        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
-    p.poly(pts)
-
-
-def _heart(p, x, y, s):
-    r = s * 0.26
-    p.circle(x + s * 0.28, y + s * 0.32, r)
-    p.circle(x + s * 0.72, y + s * 0.32, r)
-    p.poly([(x + s * 0.04, y + s * 0.42), (x + s * 0.96, y + s * 0.42), (x + s * 0.5, y + s * 0.95)])
-
-
-def _flower(p, x, y, s):
-    cx, cy = x + s / 2, y + s / 2
-    for i in range(5):
-        a = -math.pi / 2 + i * 2 * math.pi / 5
-        p.circle(cx + math.cos(a) * s * 0.26, cy + math.sin(a) * s * 0.26, s * 0.2)
-    p.clear_circle(cx, cy, s * 0.13)
-    p.circle(cx, cy, s * 0.07)
-
-
-def _leaf(p, x, y, s, angle=-35):
-    a = math.radians(angle)
-    cx, cy, L, Wd = x + s / 2, y + s / 2, s * 0.5, s * 0.24
-    pts = []
-    for i in range(25):
-        t = -1 + 2 * i / 24
-        pts.append((t * L, Wd * (1 - t * t) * (1 - 0.25 * t)))
-    for i in range(25):
-        t = 1 - 2 * i / 24
-        pts.append((t * L, -Wd * (1 - t * t) * (1 - 0.25 * t)))
-    p.poly([(cx + u * math.cos(a) - v * math.sin(a), cy + u * math.sin(a) + v * math.cos(a)) for u, v in pts])
-    p.d.line([((x + s / 2 - math.cos(a) * s * 0.4) * p.k, (y + s / 2 - math.sin(a) * s * 0.4) * p.k),
-              ((x + s / 2 + math.cos(a) * s * 0.4) * p.k, (y + s / 2 + math.sin(a) * s * 0.4) * p.k)], fill=0, width=max(1, round(p.k)))
-
-
-def _snowflake(p, x, y, s):
-    cx, cy = x + s / 2, y + s / 2
-    for i in range(6):
-        a = i * math.pi / 3
-        ex, ey = cx + math.cos(a) * s * 0.48, cy + math.sin(a) * s * 0.48
-        p.line([(cx, cy), (ex, ey)], s * 0.08)
-        for k in (0.6,):
-            bx, by = cx + math.cos(a) * s * 0.48 * k, cy + math.sin(a) * s * 0.48 * k
-            for da in (-0.7, 0.7):
-                p.line([(bx, by), (bx + math.cos(a + da) * s * 0.16, by + math.sin(a + da) * s * 0.16)], s * 0.07)
-
-
-def _note(p, x, y, s):
-    p.ellipse(x + s * 0.3, y + s * 0.8, s * 0.2, s * 0.14, -20)
-    p.ellipse(x + s * 0.78, y + s * 0.68, s * 0.2, s * 0.14, -20)
-    p.line([(x + s * 0.47, y + s * 0.78), (x + s * 0.47, y + s * 0.12)], s * 0.08)
-    p.line([(x + s * 0.95, y + s * 0.66), (x + s * 0.95, y + s * 0.02)], s * 0.08)
-    p.poly([(x + s * 0.43, y + s * 0.1), (x + s * 0.99, y - s * 0.02), (x + s * 0.99, y + s * 0.16), (x + s * 0.43, y + s * 0.28)])
-
-
-def _wrench(p, x, y, s):
-    # Handle from bottom left to top right, open jaw at the top
-    p.line([(x + s * 0.18, y + s * 0.85), (x + s * 0.68, y + s * 0.35)], s * 0.17)
-    p.circle(x + s * 0.72, y + s * 0.28, s * 0.26)
-    p.clear_rect(x + s * 0.68, y - s * 0.05, x + s * 0.9, y + s * 0.26)
-    p.circle(x + s * 0.18, y + s * 0.85, s * 0.12)
-    p.clear_circle(x + s * 0.18, y + s * 0.85, s * 0.05)
-
-
-def _screwdriver(p, x, y, s):
-    # Lying from top right (handle) to bottom left (tip), like the wrench
-    a = math.radians(135)
-    def at(u, v):
-        return (x + s / 2 + u * math.cos(a) - v * math.sin(a), y + s / 2 + u * math.sin(a) + v * math.cos(a))
-    hw = s * 0.15
-    p.poly([at(-0.5 * s, -hw), at(-0.05 * s, -hw * 1.1), at(-0.05 * s, hw * 1.1), at(-0.5 * s, hw)])
-    p.circle(*at(-0.5 * s, 0), hw)
-    p.line([at(-0.05 * s, 0), at(0.4 * s, 0)], s * 0.1)
-    p.poly([at(0.38 * s, -s * 0.07), at(0.52 * s, -s * 0.03), at(0.52 * s, s * 0.03), at(0.38 * s, s * 0.07)])
-
-
-def _bolt(p, x, y, s):
-    p.poly([(x + s * 0.6, y), (x + s * 0.15, y + s * 0.58), (x + s * 0.45, y + s * 0.58),
-            (x + s * 0.32, y + s), (x + s * 0.85, y + s * 0.38), (x + s * 0.55, y + s * 0.38), (x + s * 0.72, y)])
-
-
-def _fork(p, x, y, s):
-    for k in (0.36, 0.5, 0.64):
-        p.line([(x + s * k, y), (x + s * k, y + s * 0.3)], s * 0.07)
-    p.rect(x + s * 0.32, y + s * 0.25, x + s * 0.68, y + s * 0.38, radius=s * 0.06)
-    p.line([(x + s * 0.5, y + s * 0.35), (x + s * 0.5, y + s * 0.98)], s * 0.11)
-
-
-def _knife(p, x, y, s):
-    p.poly([(x + s * 0.44, y + s * 0.55), (x + s * 0.44, y + s * 0.1), (x + s * 0.52, y), (x + s * 0.62, y + s * 0.2), (x + s * 0.6, y + s * 0.55)])
-    p.rect(x + s * 0.42, y + s * 0.55, x + s * 0.62, y + s, radius=s * 0.08)
-
-
-def _house(p, x, y, s):
-    p.poly([(x + s * 0.5, y + s * 0.05), (x + s * 0.98, y + s * 0.48), (x + s * 0.02, y + s * 0.48)])
-    p.rect(x + s * 0.14, y + s * 0.46, x + s * 0.86, y + s * 0.98)
-    p.clear_rect(x + s * 0.42, y + s * 0.66, x + s * 0.58, y + s * 0.98)
-    p.rect(x + s * 0.7, y + s * 0.12, x + s * 0.82, y + s * 0.36)
-
-
-def _paw(p, x, y, s):
-    p.ellipse(x + s * 0.5, y + s * 0.7, s * 0.24, s * 0.2)
-    for cx, cy in ((0.2, 0.42), (0.38, 0.2), (0.62, 0.2), (0.8, 0.42)):
-        p.ellipse(x + s * cx, y + s * cy, s * 0.1, s * 0.13)
-
-
-def _sun(p, x, y, s):
-    cx, cy = x + s / 2, y + s / 2
-    p.circle(cx, cy, s * 0.24)
-    for i in range(8):
-        a = i * math.pi / 4
-        p.line([(cx + math.cos(a) * s * 0.34, cy + math.sin(a) * s * 0.34), (cx + math.cos(a) * s * 0.49, cy + math.sin(a) * s * 0.49)], s * 0.08)
-
-
-def _cloud(p, x, y, s):
-    p.circle(x + s * 0.3, y + s * 0.6, s * 0.2)
-    p.circle(x + s * 0.55, y + s * 0.45, s * 0.27)
-    p.circle(x + s * 0.78, y + s * 0.62, s * 0.18)
-    p.rect(x + s * 0.12, y + s * 0.6, x + s * 0.92, y + s * 0.8, radius=s * 0.1)
-
-
-def _themed(left, right=None, lines=True, small=None):
-    """Motifs at both ends (a smaller second one beside each when small is given) with thin lines between."""
-    right = right or left
-
-    def draw(p: Pen):
-        s = p.h * 0.62
-        y = (p.h - s) / 2
-        left(p, 0.5, y, s)
-        right(p, p.w - s - 0.5, y, s)
-        if small:
-            ss = p.h * 0.32
-            small(p, s + 0.5, p.h - ss - 1, ss)
-            small(p, p.w - s - ss - 0.5, 1, ss)
-        if lines:
-            x0 = s + (p.h * 0.36 if small else 2)
-            x1 = p.w - s - (p.h * 0.36 if small else 2)
-            if x1 > x0:
-                p.line([(x0, 1.2), (x1, 1.2)], 1.6)
-                p.line([(x0, p.h - 1.2), (x1, p.h - 1.2)], 1.6)
-    return draw
-
+THEMED_BORDERS = [
+    Border("garden", "Garden", "themed", border_art.garden, 0.86, 0.07),
+    Border("kitchen", "Kitchen", "themed", border_art.kitchen, 0.98, 0.07),
+    Border("winter", "Winter", "themed", border_art.winter, 1.0, 0.07),
+    Border("beach", "Beach", "themed", border_art.beach, 0.9, 0.07),
+    Border("town", "Town", "themed", border_art.town, 0.86, 0.07),
+    Border("space", "Space", "themed", border_art.space, 0.8, 0.07),
+    Border("music", "Music", "themed", border_art.music, 0.95, 0.07),
+    Border("party", "Party", "themed", border_art.party, 0.95, 0.07),
+    Border("scroll-corners", "Scroll corners", "themed", border_art.scrolls, 0.6, 0.09),
+    Border("bunting", "Bunting", "themed", border_art.bunting, 0.12, 0.26),
+    Border("laurels", "Laurels", "themed", border_art.laurels, 0.46, 0.12),
+    Border("deco-fans", "Deco fans", "themed", border_art.deco, 0.48, 0.1),
+]
 
 BORDERS_LIST = [
     Border("none", "None", "simple", lambda p: None, 0, 0),
@@ -676,24 +542,9 @@ BORDERS_LIST = [
     Border("corner-dot-fill", "Dot corners", "corners", _corner_dot_fill, 0.2, 0.08),
 
 ]
-
-THEMED_BORDERS = [
-    Border("stars", "Stars", "themed", _themed(_star, small=_star), 1.1, 0.07),
-    Border("hearts", "Hearts", "themed", _themed(_heart), 0.72, 0.07),
-    Border("flowers", "Flowers", "themed", _themed(_flower, small=_flower), 1.1, 0.07),
-    Border("leaves", "Leaves", "themed", _themed(lambda p, x, y, s: _leaf(p, x, y, s, -40), lambda p, x, y, s: _leaf(p, x, y, s, 40)), 0.72, 0.07),
-    Border("snow", "Snowflakes", "themed", _themed(_snowflake), 0.72, 0.07),
-    Border("music", "Music", "themed", _themed(_note), 0.72, 0.07),
-    Border("tools", "Tools", "themed", _themed(_wrench, _screwdriver), 0.72, 0.07),
-    Border("power", "Power", "themed", _themed(_bolt), 0.72, 0.07),
-    Border("kitchen", "Kitchen", "themed", _themed(_fork, _knife), 0.72, 0.07),
-    Border("home", "Home", "themed", _themed(_house), 0.72, 0.07),
-    Border("paws", "Paws", "themed", _themed(_paw, small=_paw), 1.1, 0.07),
-    Border("weather", "Sun and cloud", "themed", _themed(_sun, _cloud), 0.72, 0.07),
-]
+BORDERS_LIST += THEMED_BORDERS
 
 BORDERS: Dict[str, Border] = {b.id: b for b in BORDERS_LIST}
-_DRAWABLE: Dict[str, Border] = {b.id: b for b in BORDERS_LIST + THEMED_BORDERS}
 
 
 def get(border_id: str) -> Border:
@@ -705,7 +556,7 @@ def render(border_id: str, w: int, h: int, scale: float = 1.0) -> Image.Image:
     The border as a mask w x h printer dots, 255 where it prints. scale: printer dots per
     180 dpi dot, for a printer with a finer head.
     """
-    b = _DRAWABLE.get(border_id or "none", BORDERS["none"])
+    b = get(border_id)
     p = Pen(max(w, 4), max(h, 4), scale)
     b.draw(p)
     m = p.mask()

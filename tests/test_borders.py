@@ -48,8 +48,7 @@ class TestBorders(unittest.TestCase):
         self.assertEqual(borders.get("no-such-border").id, "none")
 
     def test_every_border_draws_and_leaves_the_middle_for_the_text(self):
-        # The themed ones are left out of the list for now, but must keep working
-        for b in borders.BORDERS_LIST + borders.THEMED_BORDERS:
+        for b in borders.BORDERS_LIST:
             if b.id == "none":
                 continue
             with self.subTest(b.id):
@@ -62,8 +61,8 @@ class TestBorders(unittest.TestCase):
 
     def test_text_never_touches_its_border(self):
         from PIL import ImageChops, ImageFilter
-        for b in borders.BORDERS_LIST + borders.THEMED_BORDERS:
-            if b.id == "none" or b.category == "themed":
+        for b in borders.BORDERS_LIST:
+            if b.id == "none":
                 continue
             for text in ("Spices", "WMgy|", "A\nB"):
                 with self.subTest(b.id, text=text):
