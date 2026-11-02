@@ -114,6 +114,31 @@ code { font: 0.92em ui-monospace, "Cascadia Mono", Consolas, monospace; backgrou
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* --- Phone turned sideways (class set in index.html) ------------------------------------- */
+
+.turn-upright { display: none; }
+
+.sideways .turn-upright {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: center;
+}
+
+.sideways body { overflow: hidden; }
+.turn-upright p { margin: 0; }
+.turn-title { font-size: 1.15rem; font-weight: 600; margin-top: 12px !important; }
+.turn-phone { stroke: var(--text); }
+.turn-phone .turn-arrow { stroke: var(--accent); }
+
 /* --- Shell --------------------------------------------------------------------------------- */
 
 .nav {

@@ -48,6 +48,24 @@
       }, 12000);
     })();
   </script>
+  <script>
+    // A phone turned sideways gets a "turn it upright" note over the app. Read from the screen,
+    // not the window, so the keyboard opening on a small phone doesn't count as turning it.
+    // Only touch screens under 600 px on the short side: tablets and desktops are left alone.
+    (function () {
+      var touch = window.matchMedia && matchMedia('(pointer: coarse)');
+      function check() {
+        var type = screen.orientation && screen.orientation.type;
+        var sideways = type ? type.indexOf('landscape') === 0 : Math.abs(window.orientation || 0) === 90;
+        var phone = touch && touch.matches && Math.min(screen.width, screen.height) < 600;
+        document.documentElement.classList.toggle('sideways', !!(phone && sideways));
+      }
+      check();
+      if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', check);
+      window.addEventListener('orientationchange', check);
+      window.addEventListener('resize', check);
+    })();
+  </script>
   <script type="importmap">
     {
       "imports": {
@@ -66,6 +84,16 @@
       <noscript><p>Cube Labeler needs JavaScript.</p></noscript>
       <p class="hint"><a href="about.html">About Cube Labeler</a> · <a href="privacy.html">Privacy policy</a></p>
     </div>
+  </div>
+  <div class="turn-upright" role="alert">
+    <svg class="turn-phone" viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+      <path class="turn-arrow" d="M14 40a20 20 0 0 1 22-26" fill="none" stroke-width="3" stroke-linecap="round"/>
+      <path class="turn-arrow" d="M30 9l7 5-6 6" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="26" y="22" width="22" height="36" rx="4" fill="none" stroke-width="3"/>
+      <line x1="34" y1="52" x2="40" y2="52" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <p class="turn-title">Turn your phone upright</p>
+    <p class="hint">Cube Labeler is made for portrait on phones.</p>
   </div>
 </body>
 </html>
