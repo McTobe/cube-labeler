@@ -138,13 +138,16 @@ class TestBreakerStrip(unittest.TestCase):
             canvas = self._strip(breakers, breaker_module_mm=module)[0]
             self.assertEqual(canvas.width, round(14 * module / DOT_PITCH_MM))
 
-    def test_dividers_sit_between_breakers_not_inside_wide_ones(self):
+    def test_lines_close_each_breaker_but_not_inside_wide_ones(self):
         module = 17.5
         breakers = [{"modules": 1}, {"modules": 2}, {"modules": 1}]
         canvas, _, border, printable_h, _, _ = self._strip(breakers, breaker_module_mm=module, breaker_show="name")
         dividers = _runs(_ink_columns(canvas, border, border + printable_h))
-        self.assertEqual(len(dividers), 2)
-        for (first, last), modules in zip(dividers, (1, 3)):
+        # One at each end too, so every breaker sits in a closed box
+        self.assertEqual(len(dividers), 4)
+        self.assertEqual(dividers[0][0], 0)
+        self.assertEqual(dividers[-1][1], canvas.width - 1)
+        for (first, last), modules in zip(dividers[1:-1], (1, 3)):
             self.assertAlmostEqual((first + last + 1) / 2 * DOT_PITCH_MM, modules * module, delta=DOT_PITCH_MM)
 
     def test_numbers_count_up_past_blanks_and_keep_typed_ones(self):

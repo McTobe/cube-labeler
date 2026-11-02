@@ -180,7 +180,7 @@ PORT_THICK_DIVIDER_DOTS = 5
 PORT_TEXT_MARGIN_DOTS = 8
 PORT_TEXT_V_MARGIN_DOTS = 4
 # A breaker's name next to its number, as a share of the number's size
-BREAKER_NAME_FACTOR = 0.72
+BREAKER_NAME_FACTOR = 0.6
 BREAKER_MAX_MODULES = 4
 # How far the marks where a cable flag folds reach in from the edges of the print
 FLAG_MARK_DOTS = 8
@@ -747,8 +747,9 @@ class LabelRenderer:
         edges = [int(round(m * module)) for m in starts]
         img_canvas = Image.new("RGB", (edges[-1], canvas_h), "white")
         draw = ImageDraw.Draw(img_canvas)
-        for x in edges[1:-1]:
-            left = x - PORT_DIVIDER_DOTS // 2
+        # A line between breakers, and one at each end, so every breaker sits in a closed box
+        for x in edges:
+            left = min(max(x - PORT_DIVIDER_DOTS // 2, 0), edges[-1] - PORT_DIVIDER_DOTS)
             draw.rectangle([left, print_border, left + PORT_DIVIDER_DOTS - 1, print_border + printable_h - 1], fill="black")
 
         font = config.font_name
