@@ -46,7 +46,8 @@ class TestBorders(unittest.TestCase):
         self.assertEqual(borders.get("no-such-border").id, "none")
 
     def test_every_border_draws_and_leaves_the_middle_for_the_text(self):
-        for b in borders.BORDERS_LIST:
+        # The themed ones are left out of the list for now, but must keep working
+        for b in borders.BORDERS_LIST + borders.THEMED_BORDERS:
             if b.id == "none":
                 continue
             with self.subTest(b.id):
@@ -57,9 +58,18 @@ class TestBorders(unittest.TestCase):
                 inner = mask.crop((ix + 1, iy + 1, 300 - ix - 1, 64 - iy - 1))
                 self.assertIsNone(inner.getbbox(), "draws where the text goes")
 
+    def test_a_finer_head_gets_the_same_border_sharper(self):
+        # Twice the dots per mm: the same design, its lines twice as many dots thick
+        def ink_rows(mask, x):
+            return sum(1 for y in range(mask.height) if mask.getpixel((x, y)))
+        normal = borders.render("thick", 300, 64)
+        fine = borders.render("thick", 600, 128, scale=2.0)
+        self.assertEqual(ink_rows(fine, 300), 2 * ink_rows(normal, 150))
+
     def test_border_goes_round_the_text(self):
-        plain, _, border_y, printable_h, _, _ = self._canvas()
-        framed = self._canvas(frame="stars")[0]
+        fixed = dict(auto_fit_font=False, fixed_font_size=30)
+        plain, _, border_y, printable_h, _, _ = self._canvas(**fixed)
+        framed = self._canvas(frame="wave", **fixed)[0]
         self.assertGreater(framed.width, plain.width)
         top = _ink(framed).crop((0, border_y, framed.width, border_y + 2)).getbbox()
         self.assertIsNotNone(top)

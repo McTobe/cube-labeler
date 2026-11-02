@@ -1636,6 +1636,6 @@ input.tape-number { width: 160px; }
   background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
 }
 @media (max-width: 639px) {
-  .border-categories { grid-template-columns: repeat(3, 1fr); }
+  .border-categories button { font-size: 0.85rem; padding: 6px 2px; }
   .border-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }

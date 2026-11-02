@@ -420,7 +420,9 @@ class LabelRenderer:
         width = canvas.width - 2 * config.h_padding - config.end_margin
         if width < 4:
             return
-        mask = borders.render(border.id, width, printable_h)
+        # Borders are designed for the 180 dpi head; a finer head draws them at the same size
+        scale = (25.4 / 180) / self.DOT_PITCH_MM
+        mask = borders.render(border.id, width, printable_h, scale)
         canvas.paste("black", (config.h_padding, print_border), mask)
 
     def _vertical_block(self, doc, layout, size: int) -> Image.Image:

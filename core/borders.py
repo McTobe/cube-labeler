@@ -21,23 +21,31 @@ CATEGORIES = [
     ("lines", "Lines"),
     ("shapes", "Shapes"),
     ("corners", "Corners"),
-    ("themed", "Themed"),
 ]
+# Themed borders (motifs at the ends) are drawn below but left out of the list for now:
+# Tobe wants another look at them first. Add ("themed", "Themed") back and THEMED_BORDERS
+# to BORDERS_LIST to bring them back.
 
 
 class Pen:
-    """Draws in printer dots on a canvas SS times as big."""
+    """
+    Draws on a canvas SS times as big as the printer dots. Designs are measured in dots of the
+    PT-P300BT's 180 dpi head; scale is how many of the printer's dots that is, so a printer
+    with a finer head gets the same border, as sharp as it can print it.
+    """
 
-    def __init__(self, w: int, h: int):
-        self.w, self.h = w, h
+    def __init__(self, w: int, h: int, scale: float = 1.0):
+        self.px_w, self.px_h = w, h
+        self.w, self.h = w / scale, h / scale  # in design dots
+        self.k = SS * scale  # canvas pixels per design dot
         self.img = Image.new("L", (w * SS, h * SS), 0)
         self.d = ImageDraw.Draw(self.img)
 
     def _p(self, pts):
-        return [(x * SS, y * SS) for x, y in pts]
+        return [(x * self.k, y * self.k) for x, y in pts]
 
     def line(self, pts, width=2.0):
-        self.d.line(self._p(pts), fill=255, width=max(1, int(round(width * SS))), joint="curve")
+        self.d.line(self._p(pts), fill=255, width=max(1, int(round(width * self.k))), joint="curve")
 
     def poly(self, pts, fill=True, width=2.0):
         if fill:
@@ -46,24 +54,24 @@ class Pen:
             self.line(list(pts) + [pts[0]], width)
 
     def rect(self, x0, y0, x1, y1, fill=True, width=2.0, radius=0.0):
-        box = [x0 * SS, y0 * SS, x1 * SS - 1, y1 * SS - 1]
+        box = [x0 * self.k, y0 * self.k, x1 * self.k - 1, y1 * self.k - 1]
         if fill:
-            self.d.rounded_rectangle(box, radius=radius * SS, fill=255)
+            self.d.rounded_rectangle(box, radius=radius * self.k, fill=255)
         else:
-            self.d.rounded_rectangle(box, radius=radius * SS, outline=255, width=max(1, int(round(width * SS))))
+            self.d.rounded_rectangle(box, radius=radius * self.k, outline=255, width=max(1, int(round(width * self.k))))
 
     def clear_rect(self, x0, y0, x1, y1, radius=0.0):
-        self.d.rounded_rectangle([x0 * SS, y0 * SS, x1 * SS - 1, y1 * SS - 1], radius=radius * SS, fill=0)
+        self.d.rounded_rectangle([x0 * self.k, y0 * self.k, x1 * self.k - 1, y1 * self.k - 1], radius=radius * self.k, fill=0)
 
     def circle(self, cx, cy, r, fill=True, width=2.0):
-        box = [(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS]
+        box = [(cx - r) * self.k, (cy - r) * self.k, (cx + r) * self.k, (cy + r) * self.k]
         if fill:
             self.d.ellipse(box, fill=255)
         else:
-            self.d.ellipse(box, outline=255, width=max(1, int(round(width * SS))))
+            self.d.ellipse(box, outline=255, width=max(1, int(round(width * self.k))))
 
     def clear_circle(self, cx, cy, r):
-        self.d.ellipse([(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS], fill=0)
+        self.d.ellipse([(cx - r) * self.k, (cy - r) * self.k, (cx + r) * self.k, (cy + r) * self.k], fill=0)
 
     def ellipse(self, cx, cy, rx, ry, angle=0.0, fill=True):
         pts = []
@@ -75,12 +83,12 @@ class Pen:
         self.poly(pts, fill=fill)
 
     def arc(self, cx, cy, r, start, end, width=2.0):
-        box = [(cx - r) * SS, (cy - r) * SS, (cx + r) * SS, (cy + r) * SS]
-        self.d.arc(box, start, end, fill=255, width=max(1, int(round(width * SS))))
+        box = [(cx - r) * self.k, (cy - r) * self.k, (cx + r) * self.k, (cy + r) * self.k]
+        self.d.arc(box, start, end, fill=255, width=max(1, int(round(width * self.k))))
 
     def mask(self) -> Image.Image:
         """The drawing in printer dots, 255 where the printer prints."""
-        small = self.img.resize((self.w, self.h), Image.LANCZOS)
+        small = self.img.resize((self.px_w, self.px_h), Image.LANCZOS)
         return small.point(lambda v: 255 if v >= 110 else 0)
 
 
@@ -347,6 +355,29 @@ def _arrow(p):
     p.poly([(0, 0), (p.w - d, 0), (p.w, p.h / 2), (p.w - d, p.h), (0, p.h)])
 
 
+def _arrow_left(p):
+    d = p.h * 0.45
+    p.poly([(d, 0), (p.w, 0), (p.w, p.h), (d, p.h), (0, p.h / 2)])
+
+
+def _flag(p):
+    d = p.h * 0.3
+    p.poly([(0, 0), (p.w, 0), (p.w - d, p.h / 2), (p.w, p.h), (0, p.h)])
+
+
+def _flag_left(p):
+    d = p.h * 0.3
+    p.poly([(0, 0), (p.w, 0), (p.w, p.h), (0, p.h), (d, p.h / 2)])
+
+
+def _parentheses(p):
+    # A round bracket at each end, as tall as the tape
+    r = p.h * 0.75
+    a = math.degrees(math.asin(min(1.0, (p.h / 2 - 1.5) / r)))
+    p.arc(r + 1.5, p.h / 2, r, 180 - a, 180 + a, 3)
+    p.arc(p.w - r - 1.5, p.h / 2, r, -a, a, 3)
+
+
 def _octagon(p):
     c = p.h * 0.28
     p.poly([(c, 0), (p.w - c, 0), (p.w, c), (p.w, p.h - c), (p.w - c, p.h), (c, p.h), (0, p.h - c), (0, c)])
@@ -476,8 +507,8 @@ def _leaf(p, x, y, s, angle=-35):
         t = 1 - 2 * i / 24
         pts.append((t * L, -Wd * (1 - t * t) * (1 - 0.25 * t)))
     p.poly([(cx + u * math.cos(a) - v * math.sin(a), cy + u * math.sin(a) + v * math.cos(a)) for u, v in pts])
-    p.d.line([((x + s / 2 - math.cos(a) * s * 0.4) * SS, (y + s / 2 - math.sin(a) * s * 0.4) * SS),
-              ((x + s / 2 + math.cos(a) * s * 0.4) * SS, (y + s / 2 + math.sin(a) * s * 0.4) * SS)], fill=0, width=SS)
+    p.d.line([((x + s / 2 - math.cos(a) * s * 0.4) * p.k, (y + s / 2 - math.sin(a) * s * 0.4) * p.k),
+              ((x + s / 2 + math.cos(a) * s * 0.4) * p.k, (y + s / 2 + math.sin(a) * s * 0.4) * p.k)], fill=0, width=max(1, round(p.k)))
 
 
 def _snowflake(p, x, y, s):
@@ -622,9 +653,13 @@ BORDERS_LIST = [
     Border("banner", "Banner", "shapes", _banner, 0.36, 0.08, trace=2),
     Border("capsule", "Capsule", "shapes", _capsule, 0.32, 0.08, trace=2),
     Border("plaque", "Plaque", "shapes", _plaque, 0.24, 0.08, trace=2),
-    Border("arrow", "Arrow", "shapes", _arrow, 0.46, 0.08, trace=2),
+    Border("arrow", "Arrow right", "shapes", _arrow, 0.46, 0.08, trace=2),
+    Border("arrow-left", "Arrow left", "shapes", _arrow_left, 0.46, 0.08, trace=2),
+    Border("flag", "Flag right", "shapes", _flag, 0.32, 0.08, trace=2),
+    Border("flag-left", "Flag left", "shapes", _flag_left, 0.32, 0.08, trace=2),
     Border("octagon", "Octagon", "shapes", _octagon, 0.24, 0.08, trace=2),
     Border("brackets", "Brackets", "shapes", _brackets, 0.14, 0.06),
+    Border("parentheses", "Round brackets", "shapes", _parentheses, 0.2, 0.06),
 
     Border("corner-marks", "Corner marks", "corners", _corner_marks, 0.1, 0.1),
     Border("corner-triangles", "Triangles", "corners", _corner_triangles, 0.32, 0.08),
@@ -635,6 +670,9 @@ BORDERS_LIST = [
     Border("corner-curls", "Curls", "corners", _corner_curls, 0.36, 0.08),
     Border("corner-dot-fill", "Dot corners", "corners", _corner_dot_fill, 0.2, 0.08),
 
+]
+
+THEMED_BORDERS = [
     Border("stars", "Stars", "themed", _themed(_star, small=_star), 1.1, 0.07),
     Border("hearts", "Hearts", "themed", _themed(_heart), 0.72, 0.07),
     Border("flowers", "Flowers", "themed", _themed(_flower, small=_flower), 1.1, 0.07),
@@ -650,20 +688,24 @@ BORDERS_LIST = [
 ]
 
 BORDERS: Dict[str, Border] = {b.id: b for b in BORDERS_LIST}
+_DRAWABLE: Dict[str, Border] = {b.id: b for b in BORDERS_LIST + THEMED_BORDERS}
 
 
 def get(border_id: str) -> Border:
     return BORDERS.get(border_id or "none", BORDERS["none"])
 
 
-def render(border_id: str, w: int, h: int) -> Image.Image:
-    """The border as a mask w x h dots, 255 where it prints."""
-    b = get(border_id)
-    p = Pen(max(w, 4), max(h, 4))
+def render(border_id: str, w: int, h: int, scale: float = 1.0) -> Image.Image:
+    """
+    The border as a mask w x h printer dots, 255 where it prints. scale: printer dots per
+    180 dpi dot, for a printer with a finer head.
+    """
+    b = _DRAWABLE.get(border_id or "none", BORDERS["none"])
+    p = Pen(max(w, 4), max(h, 4), scale)
     b.draw(p)
     m = p.mask()
     if b.trace:
-        m = outline_of(m, b.trace)
+        m = outline_of(m, max(1, int(round(b.trace * scale))))
     return m
 
 
