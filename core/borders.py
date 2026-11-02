@@ -534,32 +534,6 @@ def _note(p, x, y, s):
     p.poly([(x + s * 0.43, y + s * 0.1), (x + s * 0.99, y - s * 0.02), (x + s * 0.99, y + s * 0.16), (x + s * 0.43, y + s * 0.28)])
 
 
-def _wrench(p, x, y, s):
-    # Handle from bottom left to top right, open jaw at the top
-    p.line([(x + s * 0.18, y + s * 0.85), (x + s * 0.68, y + s * 0.35)], s * 0.17)
-    p.circle(x + s * 0.72, y + s * 0.28, s * 0.26)
-    p.clear_rect(x + s * 0.68, y - s * 0.05, x + s * 0.9, y + s * 0.26)
-    p.circle(x + s * 0.18, y + s * 0.85, s * 0.12)
-    p.clear_circle(x + s * 0.18, y + s * 0.85, s * 0.05)
-
-
-def _screwdriver(p, x, y, s):
-    # Lying from top right (handle) to bottom left (tip), like the wrench
-    a = math.radians(135)
-    def at(u, v):
-        return (x + s / 2 + u * math.cos(a) - v * math.sin(a), y + s / 2 + u * math.sin(a) + v * math.cos(a))
-    hw = s * 0.15
-    p.poly([at(-0.5 * s, -hw), at(-0.05 * s, -hw * 1.1), at(-0.05 * s, hw * 1.1), at(-0.5 * s, hw)])
-    p.circle(*at(-0.5 * s, 0), hw)
-    p.line([at(-0.05 * s, 0), at(0.4 * s, 0)], s * 0.1)
-    p.poly([at(0.38 * s, -s * 0.07), at(0.52 * s, -s * 0.03), at(0.52 * s, s * 0.03), at(0.38 * s, s * 0.07)])
-
-
-def _bolt(p, x, y, s):
-    p.poly([(x + s * 0.6, y), (x + s * 0.15, y + s * 0.58), (x + s * 0.45, y + s * 0.58),
-            (x + s * 0.32, y + s), (x + s * 0.85, y + s * 0.38), (x + s * 0.55, y + s * 0.38), (x + s * 0.72, y)])
-
-
 def _fork(p, x, y, s):
     for k in (0.36, 0.5, 0.64):
         p.line([(x + s * k, y), (x + s * k, y + s * 0.3)], s * 0.07)
