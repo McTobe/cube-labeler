@@ -137,7 +137,8 @@ function SettingsHead({ mode, phone = false }) {
 }
 
 // The side panel's picker: Text label, and More for every other kind, which shows the kind
-// picked from it
+// picked from it. Text label is always beside More, so the sheet leaves it out (the phone's
+// Label button has no row beside it, so its sheet keeps every kind)
 function ModePicker({ mode }) {
   const [open, setOpen] = useState(false);
   const other = MODES.find((m) => m.id === mode && !m.main);
@@ -148,7 +149,7 @@ function ModePicker({ mode }) {
       <${Icon} name=${other ? other.icon : 'more'} size=${20} /> ${other ? other.name : 'More'}
       <${Icon} name="chevron" size=${16} /></button>
   </div>
-  <${KindSheet} open=${open} onClose=${() => setOpen(false)} kinds=${readyKinds()} />`;
+  <${KindSheet} open=${open} onClose=${() => setOpen(false)} kinds=${readyKinds().filter((m) => !m.main)} />`;
 }
 
 // --- Text ----------------------------------------------------------------------------------
