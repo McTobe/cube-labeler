@@ -9,6 +9,7 @@ import { Preview } from '../preview.js';
 import { binSummary } from './bin.js';
 import { NewRollSheet } from '../printer-ui.js';
 import { formatTape } from '../tape.js';
+import { outletParts } from '../outlet-code.js';
 import {
   app, boot, printer, connectPrinter, itemTitle, moveQueueItem, removeQueueItem, clearQueue,
   editQueueItem, printQueue, keepPrintedQueue, showingQueue, savePicture, setQueueCopies,
@@ -20,6 +21,10 @@ function itemDetail(item) {
   // The font tells otherwise equal labels apart
   if (item.mode === 'bin') return `${binSummary(item.bin)} · ${item.font?.bin_font || BIN_FONT}`;
   const l = item.label;
+  if (l.layout === 'outlet') {
+    const where = outletParts(l).where;
+    return `Network outlet${where ? ` · ${where}` : ''} · ${l.tape_width_mm} mm tape · ${l.font_name}`;
+  }
   if (l.layout === 'ports') {
     return `${l.port_count} ports, ${Number(l.port_pitch_mm).toFixed(1)} mm apart · ${l.tape_width_mm} mm tape · ${l.font_name}`;
   }

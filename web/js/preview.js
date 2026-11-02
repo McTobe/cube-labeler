@@ -97,7 +97,7 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
   const zoom = state.previewZoom === 'full' ? 'full' : 'fit';
   const setZoom = (value) => app.set({ previewZoom: value });
   // Bin labels and queue strips are on 12 mm tape; a label from the history says its own
-  const editing = state.mode === 'ports' ? state.ports : label;
+  const editing = state.mode === 'ports' ? state.ports : state.mode === 'outlet' ? state.outlet : label;
   const tapeMm = stripTapeMm || (strip === undefined && state.mode !== 'bin' ? Number(editing.tape_width_mm) || 12 : 12);
   const box = useStageBox(stageRef);
   const oneRow = [{ from: 0, to: 1 }];
