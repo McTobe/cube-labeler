@@ -322,26 +322,18 @@ def tree(a, cx, base, H, trunk=True):
         a.box(cx - 1.3, base - H * 0.2, cx + 1.3, base)
 
 
-def snowflake(a, cx, cy, r, w=1.4):
+def snowflake(a, cx, cy, r, w=1.4, branches=True):
     for i in range(6):
         t = math.radians(90 + i * 60)
         ux, uy = math.cos(t), math.sin(t)
         a.stroke([(cx, cy), (cx + ux * r, cy + uy * r)], w)
-        for side in (1, -1):
+        for side in ((1, -1) if branches else ()):
             b = t + side * math.radians(45)
             bx, by = cx + ux * r * 0.55, cy + uy * r * 0.55
             a.stroke([(bx, by), (bx + math.cos(b) * r * 0.36, by + math.sin(b) * r * 0.36)], w * 0.8)
     a.dot(cx, cy, w * 1.1)
 
 
-def sled(a, x, base):
-    """A wooden sled on the snow, its runner curling up at the front (on the right)."""
-    a.stroke([(x, base - 2)] + [(x + 36 + 5 * math.sin(math.radians(t)), base - 7 + 5 * math.cos(math.radians(t))) for t in range(0, 271, 15)], 1.6)
-    for sx in (x + 5, x + 16, x + 27):
-        a.stroke([(sx, base - 2), (sx, base - 8)], 1.4)
-    a.box(x - 1, base - 11.5, x + 34, base - 7.5, 1)
-    for sx in (x + 10.5, x + 22.5):
-        a.erase([(sx, base - 11), (sx, base - 8)], 0.9)
 
 
 def winter(p):
@@ -362,13 +354,15 @@ def winter(p):
     a.stroke([(0, B), (W, B)], 2.0)
     for x, y in ((46, 8), (52, 22), (4, 6), (30, 6), (8, 34), (58, 12)):
         a.dot(x, y, 1.1)
-    # a sled carrying a little pine, a big snowflake, falling snow
-    sled(a, W - 47, B)
-    tree(a, W - 30, B - 11.5, 26)
-    snowflake(a, W - 9, 12, 8)
-    snowflake(a, W - 52, 24, 5.5, 1.2)
-    for x, y in ((W - 58, 34), (W - 40, 6), (W - 20, 30), (W - 6, 34), (W - 52, 50), (W - 26, 4)):
-        a.dot(x, y, 1.1)
+    # a calm night over the two pines: a crescent moon and snowflakes drifting down
+    for cx, H in ((W - 7, 24), (W - 15, 16)):
+        tree(a, cx, B, H)
+    a.dot(W - 46, 11, 6.0); a.dot(W - 43.3, 9.2, 5.3, on=False)
+    snowflake(a, W - 14, 11, 7.5, 1.05)
+    snowflake(a, W - 31, 27, 5.0, 1.0, branches=False)
+    snowflake(a, W - 52, 36, 4.2, 0.95, branches=False)
+    for x, y in ((W - 28, 6), (W - 38, 40), (W - 58, 18), (W - 44, 52), (W - 26, 44), (W - 4, 30), (W - 34, 14)):
+        a.dot(x, y, 1.0)
 
 
 # --- Beach: lighthouse with beams; sailboat, sun and gulls ----------------------------------
