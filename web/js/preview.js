@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { useStore } from './state.js';
-import { app, boot, updateLabel, hush } from './app.js';
+import { app, boot, updateLabel, hush, breakerModules } from './app.js';
 import { Icon } from './icons.js';
 import { useWide } from './ui.js';
 
@@ -97,7 +97,7 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
   const zoom = state.previewZoom === 'full' ? 'full' : 'fit';
   const setZoom = (value) => app.set({ previewZoom: value });
   // Bin labels and queue strips are on 12 mm tape; a label from the history says its own
-  const editing = state.mode === 'ports' ? state.ports : state.mode === 'outlet' ? state.outlet : state.mode === 'date' ? state.dates : state.mode === 'asset' ? state.asset : label;
+  const editing = state.mode === 'ports' ? state.ports : state.mode === 'outlet' ? state.outlet : state.mode === 'date' ? state.dates : state.mode === 'asset' ? state.asset : state.mode === 'breakers' ? state.breakers : label;
   const tapeMm = stripTapeMm || (strip === undefined && state.mode !== 'bin' ? Number(editing.tape_width_mm) || 12 : 12);
   const box = useStageBox(stageRef);
   const oneRow = [{ from: 0, to: 1 }];
@@ -162,8 +162,10 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
   }
 
   const m = render && render.metrics;
-  // A port strip says what it lines up with, in place of the print time
-  const ports = strip === undefined && render && render.item.mode === 'text' && render.item.label.layout === 'ports' ? render.item.label : null;
+  // A port or breaker strip says what it lines up with, in place of the print time
+  const lined = strip === undefined && render && render.item.mode === 'text' ? render.item.label : null;
+  const linesUp = lined && lined.layout === 'ports' ? `lines up with ${lined.port_count} ports`
+    : lined && lined.layout === 'breakers' ? `lines up with ${breakerModules(lined)} module${breakerModules(lined) === 1 ? '' : 's'}` : null;
   const { status } = state;
   return html`<section class="card preview" aria-label="Preview">
     <div class="stage-wrap">
@@ -176,7 +178,7 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
       </div>
     </div>
     <div class="preview-bar">
-      <span class="metrics">${strip === undefined && render && render.sample ? 'Sample text. Type to start your label.' : m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · ${ports ? `lines up with ${ports.port_count} ports` : `about ${Math.max(1, Math.round(m.print_duration_sec))} s`}` : ''}</span>
+      <span class="metrics">${strip === undefined && render && render.sample ? 'Sample text. Type to start your label.' : m ? `${m.label_count > 1 ? `${m.label_count} labels, ${m.print_length_mm} mm` : `${m.print_length_mm} mm label`}${rows.length > 1 ? ` in one strip, shown in ${rows.length} rows` : ''} · ${m.total_used_length_mm} mm of tape · ${linesUp || `about ${Math.max(1, Math.round(m.print_duration_sec))} s`}` : ''}</span>
       <span class="preview-controls">
         ${aids && html`<span class="chip-group" role="group" aria-label="Measuring aid">
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}
