@@ -22,10 +22,8 @@ CATEGORIES = [
     ("lines", "Lines"),
     ("shapes", "Shapes"),
     ("corners", "Corners"),
+    ("themed", "Themed"),
 ]
-# Themed borders (motifs at the ends) are drawn below but left out of the list for now:
-# Tobe wants another look at them first. Add ("themed", "Themed") back and THEMED_BORDERS
-# to BORDERS_LIST to bring them back.
 
 
 class Pen:
@@ -602,27 +600,319 @@ def _cloud(p, x, y, s):
     p.rect(x + s * 0.12, y + s * 0.6, x + s * 0.92, y + s * 0.8, radius=s * 0.1)
 
 
-def _themed(left, right=None, lines=True, small=None):
-    """Motifs at both ends (a smaller second one beside each when small is given) with thin lines between."""
-    right = right or left
+# --- More motifs for the themed borders, each drawn from a base line or in a box -----------
+
+def _tree(p, x, base, h, w=None):
+    """A fir tree standing on base, x in the middle."""
+    w = w or h * 0.6
+    for top, bottom, wide in ((0, 0.45, 0.55), (0.25, 0.72, 0.8), (0.5, 0.92, 1.0)):
+        p.poly([(x, base - h + top * h), (x - wide * w / 2, base - h + bottom * h), (x + wide * w / 2, base - h + bottom * h)])
+    p.rect(x - w * 0.08, base - h * 0.1, x + w * 0.08, base)
+
+
+def _round_tree(p, x, base, h):
+    p.rect(x - h * 0.06, base - h * 0.45, x + h * 0.06, base)
+    p.circle(x, base - h * 0.62, h * 0.3)
+    p.circle(x - h * 0.18, base - h * 0.5, h * 0.2)
+    p.circle(x + h * 0.18, base - h * 0.5, h * 0.2)
+
+
+def _stem_flower(p, x, base, h, r):
+    p.line([(x, base), (x, base - h + r)], 1.4)
+    _leaf(p, x - r * 1.2, base - h * 0.45 - r * 0.6, r * 1.4, 30)
+    _flower(p, x - r, base - h - r * 0.2, 2 * r)
+
+
+def _tulip(p, x, base, h, r):
+    p.line([(x, base), (x, base - h + r)], 1.4)
+    _leaf(p, x, base - h * 0.4 - r * 0.6, r * 1.4, -30)
+    cx, cy = x, base - h
+    p.poly([(cx - r, cy - r * 0.9), (cx - r * 0.4, cy - r * 0.3), (cx, cy - r), (cx + r * 0.4, cy - r * 0.3),
+            (cx + r, cy - r * 0.9), (cx + r * 0.9, cy + r * 0.2), (cx, cy + r * 0.8), (cx - r * 0.9, cy + r * 0.2)])
+
+
+def _grass(p, x, base, h):
+    for dx, tall, lean in ((0, 1, -0.3), (2.2, 0.75, 0.4), (-2.2, 0.6, -0.6), (4, 0.5, 0.7)):
+        p.poly([(x + dx - 1, base), (x + dx + 1, base), (x + dx + lean * h * tall, base - h * tall)])
+
+
+def _moon(p, cx, cy, r):
+    p.circle(cx, cy, r)
+    p.clear_circle(cx + r * 0.45, cy - r * 0.25, r * 0.85)
+
+
+def _hammer(p, x, y, s):
+    p.rect(x + s * 0.44, y + s * 0.25, x + s * 0.56, y + s, radius=s * 0.04)
+    p.rect(x + s * 0.15, y + s * 0.05, x + s * 0.85, y + s * 0.3, radius=s * 0.03)
+    p.clear_rect(x + s * 0.72, y + s * 0.05, x + s * 0.85, y + s * 0.15)
+
+
+def _mug(p, x, base, s):
+    """A mug with steam, standing on base."""
+    p.rect(x, base - s * 0.6, x + s * 0.6, base, radius=s * 0.08)
+    p.arc(x + s * 0.62, base - s * 0.32, s * 0.16, 270, 90, s * 0.08)
+    for dx in (0.18, 0.42):
+        pts = [(x + s * dx + math.sin(t / 3) * s * 0.06, base - s * 0.7 - t * s * 0.05) for t in range(7)]
+        p.line(pts, 1.1)
+
+
+def _pot(p, x, base, s):
+    """A cooking pot with a lid, standing on base."""
+    p.rect(x, base - s * 0.5, x + s, base, radius=s * 0.06)
+    p.rect(x - s * 0.12, base - s * 0.44, x + s * 1.12, base - s * 0.36)
+    p.rect(x + s * 0.05, base - s * 0.62, x + s * 0.95, base - s * 0.54, radius=s * 0.04)
+    p.circle(x + s * 0.5, base - s * 0.68, s * 0.07)
+
+
+def _spoon_whisk(p, x, y, s):
+    """A spoon and a whisk hanging side by side from y."""
+    p.line([(x + s * 0.2, y), (x + s * 0.2, y + s * 0.65)], s * 0.08)
+    p.ellipse(x + s * 0.2, y + s * 0.8, s * 0.12, s * 0.2)
+    p.line([(x + s * 0.65, y), (x + s * 0.65, y + s * 0.45)], s * 0.08)
+    for k in (-0.14, 0, 0.14):
+        p.ellipse(x + s * 0.65, y + s * 0.72, abs(k) * s + s * 0.04, s * 0.28, fill=False)
+
+
+def _waves(p, x0, x1, y, amp=1.6, period=8.0, width=1.4):
+    pts = [(x, y + amp * math.sin(2 * math.pi * x / period)) for x in [x0 + i * 0.5 for i in range(int((x1 - x0) * 2) + 1)]]
+    p.line(pts, width)
+
+
+def _boat(p, x, base, s):
+    p.poly([(x, base - s * 0.25), (x + s, base - s * 0.25), (x + s * 0.82, base), (x + s * 0.18, base)])
+    p.line([(x + s * 0.5, base - s * 0.25), (x + s * 0.5, base - s)], 1.2)
+    p.poly([(x + s * 0.55, base - s * 0.95), (x + s * 0.55, base - s * 0.32), (x + s * 0.95, base - s * 0.32)])
+
+
+def _palm(p, x, base, h):
+    pts = [(x + math.sin(t / 6) * h * 0.12, base - t / 10 * h * 0.8) for t in range(11)]
+    p.line(pts, h * 0.07)
+    tx, ty = pts[-1]
+    for ang in (-160, -120, -60, -20, 200):
+        a = math.radians(ang)
+        _leaf(p, tx + math.cos(a) * h * 0.2 - h * 0.18, ty + math.sin(a) * h * 0.14 - h * 0.08, h * 0.36, ang)
+
+
+def _plug(p, x, y, s):
+    """A mains plug pointing right, its cable leaving on the left."""
+    p.rect(x, y + s * 0.2, x + s * 0.6, y + s * 0.8, radius=s * 0.12)
+    p.rect(x + s * 0.6, y + s * 0.32, x + s * 0.95, y + s * 0.4)
+    p.rect(x + s * 0.6, y + s * 0.6, x + s * 0.95, y + s * 0.68)
+
+
+def _bulb(p, x, y, s):
+    p.circle(x + s * 0.5, y + s * 0.38, s * 0.34)
+    p.rect(x + s * 0.32, y + s * 0.62, x + s * 0.68, y + s * 0.92, radius=s * 0.04)
+    for k in (0.72, 0.82):
+        p.d.line([((x + s * 0.32) * p.k, (y + s * k) * p.k), ((x + s * 0.68) * p.k, (y + s * k) * p.k)], fill=0, width=max(1, round(p.k)))
+    for ang in (-150, -110, -70, -30):
+        a = math.radians(ang)
+        cx, cy = x + s * 0.5, y + s * 0.38
+        p.line([(cx + math.cos(a) * s * 0.45, cy + math.sin(a) * s * 0.45), (cx + math.cos(a) * s * 0.6, cy + math.sin(a) * s * 0.6)], 1)
+
+
+# --- Themed borders: little scenes ---------------------------------------------------------
+
+def _scene_garden(p):
+    w, h = p.w, p.h
+    base = h - 1.2
+    p.line([(0, base), (w, base)], 1.8)
+    _stem_flower(p, 10, base, h * 0.8, h * 0.17)
+    _tulip(p, 24, base, h * 0.55, h * 0.13)
+    _grass(p, 33, base, h * 0.3)
+    _tulip(p, w - 11, base, h * 0.8, h * 0.15)
+    _stem_flower(p, w - 26, base, h * 0.55, h * 0.14)
+    _grass(p, w - 36, base, h * 0.28)
+    p.line([(40, 1.2), (w - 40, 1.2)], 1.2)
+
+
+def _scene_winter(p):
+    w, h = p.w, p.h
+    base = h - 1.2
+    hill = [(x, base - (h * 0.45) * max(0.0, 1 - x / 40) ** 2) for x in range(0, 41, 2)]
+    p.line(hill + [(w, base)], 1.8)
+    _tree(p, 8, h * 0.62, h * 0.55)
+    _tree(p, 20, h * 0.82, h * 0.45)
+    _tree(p, w - 9, base, h * 0.8)
+    _tree(p, w - 21, base, h * 0.55)
+    _moon(p, w - 34, h * 0.22, h * 0.11)
+    for x, y in ((30, 6), (w - 46, 10), (36, 14)):
+        _star(p, x, y, 4)
+    p.line([(30, 1.2), (w - 48, 1.2)], 1.2)
+
+
+def _scene_workshop(p):
+    w, h = p.w, p.h
+    rail = 3.5
+    p.rect(0, 0.5, w, rail)
+    for x in _along(w, 6):
+        p.clear_circle(x, 2, 0.7)
+    s = h * 0.55
+    _wrench(p, 2, rail + 2, s)
+    _hammer(p, 2 + s * 0.9, rail + 2, s * 0.75)
+    _screwdriver(p, w - s - 2, rail + 2, s)
+    p.line([(0, h - 1.5), (w, h - 1.5)], 2.2)
+
+
+def _scene_night(p):
+    w, h = p.w, p.h
+    _moon(p, 8, h * 0.4, h * 0.22)
+    _star(p, 17, 3, h * 0.18)
+    _star(p, 22, h * 0.55, h * 0.12)
+    _star(p, 13, h * 0.72, h * 0.1)
+    _star(p, w - 12, h * 0.15, h * 0.28)
+    _star(p, w - 24, h * 0.6, h * 0.14)
+    _star(p, w - 8, h * 0.7, h * 0.1)
+    p.line([(30, 1.2), (w - 34, 1.2)], 1.2)
+    p.line([(28, h - 1.2), (w - 30, h - 1.2)], 1.2)
+
+
+def _scene_kitchen(p):
+    w, h = p.w, p.h
+    shelf = h - 1.5
+    p.line([(0, shelf), (w, shelf)], 2.2)
+    p.line([(0, 1.2), (w, 1.2)], 1.6)
+    _pot(p, 3, shelf, h * 0.45)
+    _mug(p, 3 + h * 0.6, shelf, h * 0.42)
+    _spoon_whisk(p, w - h * 0.62, 2, h * 0.6)
+
+
+def _scene_beach(p):
+    w, h = p.w, p.h
+    _waves(p, 0, w, h - 3, 1.5, 9, 1.5)
+    _sun(p, 1, 1, h * 0.42)
+    _palm(p, 26, h - 3, h * 0.85)
+    _boat(p, w - h * 0.6, h - 3.5, h * 0.55)
+    p.line([(34, 1.2), (w - h * 0.7, 1.2)], 1.2)
+
+
+def _scene_town(p):
+    w, h = p.w, p.h
+    base = h - 1.2
+    p.line([(0, base), (w, base)], 1.8)
+    _house(p, 1, base - h * 0.62, h * 0.62)
+    _round_tree(p, h * 0.85, base, h * 0.55)
+    _house(p, w - h * 0.5, base - h * 0.5, h * 0.48)
+    _house(p, w - h * 0.95, base - h * 0.42, h * 0.42)
+    _cloud(p, w - h * 0.85, -h * 0.02, h * 0.34)
+    p.line([(h * 1.2, 1.2), (w - h * 1.15, 1.2)], 1.2)
+
+
+def _scene_power(p):
+    w, h = p.w, p.h
+    # A cable runs along the bottom from a plug on the left to a bulb on the right
+    s = h * 0.5
+    _plug(p, 1, h - s - 0.5, s)
+    p.line([(1, h - s / 2 - 0.5), (0, h - s / 2 - 0.5)], 1.6)
+    cable = [(s * 0.95 + 1, h - s / 2 - 0.5), (s + 6, h - 2), (w - h * 0.4, h - 2), (w - h * 0.3, h - h * 0.35)]
+    p.line(cable, 1.6)
+    _bulb(p, w - h * 0.55, 0.5, h * 0.62)
+    _bolt(p, s * 0.2, 1, h * 0.36)
+    p.line([(s + 4, 1.2), (w - h * 0.75, 1.2)], 1.2)
+
+
+# --- Themed borders: garlands along the top and bottom -------------------------------------
+
+def _vine_edge(p, y, flip):
+    period = 14
+    sign = -1 if flip else 1
+    pts = [(x, y + sign * 1.6 * math.sin(2 * math.pi * x / period)) for x in [i * 0.5 for i in range(int(p.w * 2) + 1)]]
+    p.line(pts, 1.2)
+    for i, x in enumerate(_along(p.w, period / 2)):
+        up = (i % 2 == 0) ^ flip
+        yy = y + sign * 1.6 * math.sin(2 * math.pi * x / period)
+        _leaf(p, x - 3.5, yy - (7 if up else -0.5), 7, -35 if up else 35)
+
+
+def _garland_leaves(p):
+    _vine_edge(p, 4.5, False)
+    _vine_edge(p, p.h - 4.5, True)
+
+
+def _garland_bunting(p):
+    sag = 3
+    n = max(2, int(p.w // 34))
+    seg = p.w / n
+    for k in range(n):
+        x0 = k * seg
+        p.line([(x0 + t * seg, 1 + sag * math.sin(math.pi * t)) for t in [i / 20 for i in range(21)]], 1)
+        for t in (0.25, 0.5, 0.75):
+            x, y = x0 + t * seg, 1 + sag * math.sin(math.pi * t)
+            p.poly([(x - 3.6, y), (x + 3.6, y), (x, y + 9)])
+    p.line([(0, p.h - 1.2), (p.w, p.h - 1.2)], 1.2)
+
+
+def _garland_stars(p):
+    for y in (4, p.h - 4):
+        p.line([(0, y), (p.w, y)], 0.9)
+        for i, x in enumerate(_along(p.w, 12)):
+            s = 8 if i % 2 == 0 else 5
+            _star(p, x - s / 2, y - s / 2 - 0.2, s)
+
+
+def _garland_hearts(p):
+    for y in (3.6, p.h - 3.6):
+        p.line([(0, y), (p.w, y)], 0.8)
+        for x in _along(p.w, 10):
+            _heart(p, x - 3.5, y - 3.5, 7)
+
+
+# --- Themed borders: a rounded frame broken by a bunch of pictures in two corners ----------
+
+def _corner_bunch(big, small=None, extra=None):
+    """big, small and extra draw a picture in a box (p, x, y, size)."""
+    small = small or big
 
     def draw(p: Pen):
-        s = p.h * 0.62
-        y = (p.h - s) / 2
-        left(p, 0.5, y, s)
-        right(p, p.w - s - 0.5, y, s)
-        if small:
-            ss = p.h * 0.32
-            small(p, s + 0.5, p.h - ss - 1, ss)
-            small(p, p.w - s - ss - 0.5, 1, ss)
-        if lines:
-            x0 = s + (p.h * 0.36 if small else 2)
-            x1 = p.w - s - (p.h * 0.36 if small else 2)
-            if x1 > x0:
-                p.line([(x0, 1.2), (x1, 1.2)], 1.6)
-                p.line([(x0, p.h - 1.2), (x1, p.h - 1.2)], 1.6)
+        w, h = p.w, p.h
+        r = h * 0.18
+        gap = h * 0.5
+        # The frame, left open at the top left and bottom right where the pictures sit
+        p.line([(gap, 1), (w - r, 1)], 1.6)
+        p.arc(w - r, r, r - 1, 270, 360, 1.6)
+        p.line([(w - 1, r), (w - 1, h - gap)], 1.6)
+        p.line([(r, h - 1), (w - gap, h - 1)], 1.6)
+        p.arc(r, h - r, r - 1, 90, 180, 1.6)
+        p.line([(1, h - r), (1, gap)], 1.6)
+        s = h * 0.46
+        big(p, 0, 0, s)
+        small(p, s * 0.88, h * 0.02, h * 0.24)
+        if extra:
+            extra(p, 0, s * 0.96, h * 0.24)
+        big(p, w - s, h - s, s)
+        small(p, w - s - h * 0.3, h - h * 0.26, h * 0.24)
+        if extra:
+            extra(p, w - h * 0.24, h - s - h * 0.26, h * 0.24)
     return draw
 
+
+def _leaf_pair(p, x, y, s):
+    _leaf(p, x - s * 0.08, y + s * 0.05, s * 0.75, -60)
+    _leaf(p, x + s * 0.3, y + s * 0.2, s * 0.75, -10)
+
+
+THEMED_BORDERS = [
+    Border("garden", "Garden", "themed", _scene_garden, 0.7, 0.07),
+    Border("winter", "Winter", "themed", _scene_winter, 0.72, 0.07),
+    Border("workshop", "Workshop", "themed", _scene_workshop, 0.95, 0.1),
+    Border("night", "Night sky", "themed", _scene_night, 0.5, 0.07),
+    Border("kitchen", "Kitchen", "themed", _scene_kitchen, 0.92, 0.1),
+    Border("beach", "Beach", "themed", _scene_beach, 0.8, 0.07),
+    Border("town", "Town", "themed", _scene_town, 1.15, 0.07),
+    Border("power", "Power", "themed", _scene_power, 0.74, 0.07),
+    Border("leaf-vine", "Leaf vine", "themed", _garland_leaves, 0.03, 0.22),
+    Border("bunting", "Bunting", "themed", _garland_bunting, 0.03, 0.2),
+    Border("star-chain", "Star chain", "themed", _garland_stars, 0.03, 0.2),
+    Border("heart-chain", "Heart chain", "themed", _garland_hearts, 0.03, 0.17),
+    Border("flower-corners", "Flower corners", "themed", _corner_bunch(_flower, _flower, lambda p, x, y, s: _leaf(p, x, y, s, 60)), 0.82, 0.08),
+    Border("star-corners", "Star corners", "themed", _corner_bunch(_star, _star, _star), 0.82, 0.08),
+    Border("heart-corners", "Heart corners", "themed", _corner_bunch(_heart, _heart), 0.82, 0.08),
+    Border("leaf-corners", "Leaf corners", "themed", _corner_bunch(_leaf_pair, lambda p, x, y, s: _leaf(p, x, y, s, -30)), 0.82, 0.08),
+    Border("music-corners", "Music corners", "themed", _corner_bunch(_note), 0.82, 0.08),
+    Border("snow-corners", "Snow corners", "themed", _corner_bunch(_snowflake), 0.82, 0.08),
+    Border("paw-corners", "Paw corners", "themed", _corner_bunch(_paw), 0.82, 0.08),
+    Border("tool-corners", "Tool corners", "themed", _corner_bunch(_wrench, _bolt), 0.82, 0.08),
+]
 
 BORDERS_LIST = [
     Border("none", "None", "simple", lambda p: None, 0, 0),
@@ -676,24 +966,9 @@ BORDERS_LIST = [
     Border("corner-dot-fill", "Dot corners", "corners", _corner_dot_fill, 0.2, 0.08),
 
 ]
-
-THEMED_BORDERS = [
-    Border("stars", "Stars", "themed", _themed(_star, small=_star), 1.1, 0.07),
-    Border("hearts", "Hearts", "themed", _themed(_heart), 0.72, 0.07),
-    Border("flowers", "Flowers", "themed", _themed(_flower, small=_flower), 1.1, 0.07),
-    Border("leaves", "Leaves", "themed", _themed(lambda p, x, y, s: _leaf(p, x, y, s, -40), lambda p, x, y, s: _leaf(p, x, y, s, 40)), 0.72, 0.07),
-    Border("snow", "Snowflakes", "themed", _themed(_snowflake), 0.72, 0.07),
-    Border("music", "Music", "themed", _themed(_note), 0.72, 0.07),
-    Border("tools", "Tools", "themed", _themed(_wrench, _screwdriver), 0.72, 0.07),
-    Border("power", "Power", "themed", _themed(_bolt), 0.72, 0.07),
-    Border("kitchen", "Kitchen", "themed", _themed(_fork, _knife), 0.72, 0.07),
-    Border("home", "Home", "themed", _themed(_house), 0.72, 0.07),
-    Border("paws", "Paws", "themed", _themed(_paw, small=_paw), 1.1, 0.07),
-    Border("weather", "Sun and cloud", "themed", _themed(_sun, _cloud), 0.72, 0.07),
-]
+BORDERS_LIST += THEMED_BORDERS
 
 BORDERS: Dict[str, Border] = {b.id: b for b in BORDERS_LIST}
-_DRAWABLE: Dict[str, Border] = {b.id: b for b in BORDERS_LIST + THEMED_BORDERS}
 
 
 def get(border_id: str) -> Border:
@@ -705,7 +980,7 @@ def render(border_id: str, w: int, h: int, scale: float = 1.0) -> Image.Image:
     The border as a mask w x h printer dots, 255 where it prints. scale: printer dots per
     180 dpi dot, for a printer with a finer head.
     """
-    b = _DRAWABLE.get(border_id or "none", BORDERS["none"])
+    b = get(border_id)
     p = Pen(max(w, 4), max(h, 4), scale)
     b.draw(p)
     m = p.mask()
