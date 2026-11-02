@@ -1060,6 +1060,18 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   /* Parts: four pictures a row, so the pictures end level with the fields */
   .bin-grid.three.parts .icon-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; }
 }
+/* Date labels: three even columns; the calendar for "Pick a day" opens from under the Made buttons */
+@media (min-width: 1500px) { .bin-grid.three.dates { grid-template-columns: 1fr 1fr 1fr; } }
+/* Two columns on a smaller window: portions and what to show share a row under them, so the
+   card needs no scrolling */
+@media (min-width: 900px) and (max-width: 1499px) {
+  .bin-grid.dates > .bin-col:last-child { grid-column: 1 / -1; flex-direction: row; gap: 24px; }
+  .bin-grid.dates > .bin-col:last-child > .bin-group { flex: 1; min-width: 0; }
+  .bin-grid.dates .field { margin-top: 0; }
+}
+.made-field { position: relative; }
+.made-field .field { margin-top: 0; }
+.day-picker { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
 .bin-kind { margin: 12px 0 14px; }
 .drawer-card .hint { margin: 4px 0 10px; }
 .drawer-card .hint:last-child { margin-bottom: 0; }

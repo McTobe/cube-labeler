@@ -15,10 +15,11 @@ import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import { OutletCard, OutletHelp, OutletStyleSection } from './outlet.js';
 import { KindSheet } from './kinds.js';
+import { DateCard, DateOptions } from './date.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
-  updatePorts, updateOutlet, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
+  updatePorts, updateOutlet, updateDates, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
 } from '../app.js';
 
 // A line's size is the height of its capital letters in mm, like the Text size option. Auto
@@ -67,6 +68,8 @@ export function LabelPage() {
   } else if (mode === 'outlet') {
     options = html`${wide ? html`<${OutletHelp} />` : html`<${OutletCard} />`}<${OutletStyleSection} />
       <${PortFontSection} id="outlet-font" kind="outlet" update=${updateOutlet} />`;
+  } else if (mode === 'date') {
+    options = html`${!wide && html`<${DateCard} />`}<${DateOptions} /><${PortFontSection} id="date-font" kind="dates" update=${updateDates} sizes=${false} />`;
   } else {
     // On a phone the text, codes, picture and these options are tabs of one card
     options = !wide ? html`<${PhoneTextCard} />` : html`
@@ -82,6 +85,7 @@ export function LabelPage() {
       ${mode === 'bin' && wide && html`<${BinCard} />`}
       ${mode === 'ports' && wide && html`<${PortCard} />`}
       ${mode === 'outlet' && wide && html`<${OutletCard} />`}
+      ${mode === 'date' && wide && html`<${DateCard} />`}
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
@@ -104,7 +108,7 @@ export const MODES = [
   { id: 'outlet', name: 'Network outlet', icon: 'outlet' },
   { id: 'breakers', name: 'Breaker strip', icon: 'breaker', soon: true },
   { id: 'asset', name: 'Asset tag', icon: 'asset', soon: true },
-  { id: 'date', name: 'Date label', icon: 'calendar', soon: true },
+  { id: 'date', name: 'Date label', icon: 'calendar' },
 ];
 export const modeName = (mode) => (MODES.find((m) => m.id === mode) || MODES[0]).name;
 
@@ -932,15 +936,16 @@ function PortSection() {
 }
 
 // Font and tape of a label with its own settings: the port strip, or the one under kind (an
-// outlet label) with its update function
-function PortFontSection({ id = 'port-font', kind = 'ports', update = updatePorts }) {
+// outlet or date label) with its update function. A date label has two lines on the tape, which
+// leave no room for a size in mm, so it has no Text size and always fits.
+function PortFontSection({ id = 'port-font', kind = 'ports', update = updatePorts, sizes = true }) {
   const state = useStore(app);
   const { fonts, tapeWidths } = state;
   const label = state[kind];
   const names = fonts.length ? fonts : [label.font_name];
-  return html`<${Section} id=${id} title="Font and tape" summary=${`${label.font_name}, ${label.tape_width_mm} mm tape`}>
+  return html`<${Section} id=${id} title="Font and tape" summary=${`${label.font_name}, ${label.tape_width_mm} mm tape`} defaultOpen=${sizes}>
     <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => update({ font_name })} />
-    <${TextSizeField} label=${label} onChange=${update} />
+    ${sizes && html`<${TextSizeField} label=${label} onChange=${update} />`}
     <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${label.tape_width_mm}
       onChange=${(tape_width_mm) => update({ tape_width_mm: Number(tape_width_mm) })} />
     <${Select} label="Tape colour in the preview" value=${`${label.tape_bg_color}/${label.tape_fg_color}`}
