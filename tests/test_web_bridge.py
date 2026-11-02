@@ -599,6 +599,11 @@ class TestWebTextEditing(unittest.TestCase):
         text = "Plain\n-# << small left"
         self.assertEqual(cube_web.line_style_at(text, 0), ["normal", None])
         self.assertEqual(cube_web.line_style_at(text, len(text)), ["small", "left"])
+        self.assertEqual(cube_web.line_style_at("[2.5mm] >> A", 0), [2.5, "right"])
+
+    def test_restyle_lines_in_mm(self):
+        text = "# Top\nBottom"
+        self.assertEqual(cube_web.restyle_lines(text, 0, 10, {"size": 3.5}), "[3.5mm] Top\n[3.5mm] Bottom")
 
     def test_blank_raster_feeds_the_desktop_length(self):
         from core import protocol

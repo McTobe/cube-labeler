@@ -102,6 +102,7 @@ Select text and use the buttons above the editor (**B**, *I*, U, *Inverted*, *Li
 | Type | Result |
 |---|---|
 | `**bold**`, `*italic*`, `__underline__`, `==inverted==` | Styles inside a line (`Ctrl+B`, `Ctrl+I`, `Ctrl+U`) |
+| `[3.5mm] ` at the start of a line | Capital letters 3.5 mm tall (the size button's − / + or a typed size; Auto follows Text size) |
 | `# `, `## `, `-# ` at the start of a line | Large, medium or small line |
 | `<< `, `>< `, `>> ` at the start of a line | Left, centred or right line, whatever the label's alignment |
 | `---` on its own line | Starts a new column with a divider line |

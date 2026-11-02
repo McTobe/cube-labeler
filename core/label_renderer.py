@@ -43,6 +43,10 @@ class LabelMetrics:
     warning: Optional[str] = None
     max_text_height_mm: Optional[float] = None  # Tallest capital letter the text fits the tape at
     text_height_fell_back: bool = False  # The text_height_mm preset didn't fit, so the text was fitted
+    # Per line of the text as typed (split on line breaks): the capital letter height it prints
+    # at in mm, and the tallest it could be on its own. None for a column break.
+    line_sizes_mm: Optional[List[Optional[float]]] = None
+    line_max_mm: Optional[List[Optional[float]]] = None
 
 
 @dataclass
@@ -238,6 +242,31 @@ class LabelRenderer:
         else:
             return None
 
+    def _line_info(self, text: str, layout, base: int, room_h: int) -> None:
+        """Notes each typed line's letter height and the tallest it could be, for the editor."""
+        sizes, tallest = [], []
+        # The typed lines, a column at a time, so a line's tallest leaves room for the others
+        columns = [[]]
+        for raw in text.split("\n"):
+            if raw.strip() == rich_text.COLUMN_BREAK:
+                columns.append(None)
+                columns.append([])
+            else:
+                columns[-1].append(rich_text.parse_line(raw))
+        for column in columns:
+            if column is None:
+                sizes.append(None)
+                tallest.append(None)
+                continue
+            heights = layout._column_heights(column, base)
+            gaps = sum(layout._gap(a, b) for a, b in zip(heights, heights[1:]))
+            for i, line in enumerate(column):
+                mm = line.mm or layout.cap_height(layout._size(line, base)) * self.DOT_PITCH_MM
+                room = room_h - gaps - (sum(heights) - heights[i])
+                sizes.append(round(mm, 2))
+                tallest.append(round(layout.line_max_mm(line, max(room, 1)), 2))
+        self._line_sizes_mm, self._line_max_mm = sizes, tallest
+
     def _render_base_canvas(
         self, config: LabelConfig
     ) -> Tuple[Image.Image, dict, int, int, int, int]:
@@ -246,6 +275,8 @@ class LabelRenderer:
         self._last_text_overflow = False
         self._max_text_height_mm = None
         self._text_height_fell_back = False
+        self._line_sizes_mm = None
+        self._line_max_mm = None
         self._cut_off_mm = 0.0
         self._barcode_bad_chars = ""
         self._cut_off_at_mm = config.fixed_width_mm
@@ -290,12 +321,13 @@ class LabelRenderer:
             return self._render_turned_text(config, doc, layout, border, spec, print_border, printable_h, canvas_h)
         fit_size = layout.fit_size(inner_h)
         # Without text there is nothing to be too tall (the layout then measures a stand-in "Ag")
-        if doc.has_text:
+        # When every line has its own size in mm, Text size sizes nothing, so no preset is too tall
+        if doc.has_text and not layout._all_mm():
             self._max_text_height_mm = layout.cap_height(fit_size) * self.DOT_PITCH_MM
         text_height_mm = config.text_height_mm
         if text_height_mm:
             effective_size = layout.size_for_cap_height(text_height_mm / self.DOT_PITCH_MM)
-            if config.text_height_fallback and doc.has_text and effective_size > fit_size:
+            if config.text_height_fallback and doc.has_text and effective_size > fit_size and not layout._all_mm():
                 self._text_height_fell_back = True
                 text_height_mm = None
                 effective_size = fit_size
@@ -307,6 +339,8 @@ class LabelRenderer:
             effective_size = max(int(round(effective_size * (config.font_scale / 100.0))), 6)
 
         has_text = doc.has_text
+        if has_text:
+            self._line_info(config.text, layout, effective_size, inner_h)
         text_img = layout.render(effective_size) if has_text else None
         text_w = text_img.width if text_img else 0
         text_h = text_img.height if text_img else 0
@@ -493,6 +527,7 @@ class LabelRenderer:
                 self._text_height_fell_back = True
         elif not config.auto_fit_font:
             size = max(config.fixed_font_size, 6)
+        self._line_info(config.text, layout, size, across)
         if not config.text_height_mm and abs(config.font_scale - 100.0) > 0.5:
             size = max(int(round(size * (config.font_scale / 100.0))), 6)
 
@@ -723,6 +758,9 @@ class LabelRenderer:
         elif getattr(self, "_last_text_overflow", False) and config.text_height_mm and not self._text_height_fell_back:
             warning = (f"Text at {config.text_height_mm:g} mm is taller than this tape prints and will be "
                        "clipped. Pick a smaller size or fewer lines.")
+        elif getattr(self, "_last_text_overflow", False) and any(rich_text.MM_PREFIX.match(raw) for raw in config.text.split("\n")):
+            warning = ("Lines with a size in mm are taller together than this tape prints, so the text "
+                       "will be clipped. Make them smaller or use fewer lines.")
         elif getattr(self, "_last_text_overflow", False) and not config.auto_fit_font:
             warning = "Text is taller than the printable area and will be clipped. Reduce the font size."
 
@@ -740,6 +778,8 @@ class LabelRenderer:
             warning=warning,
             max_text_height_mm=None if self._max_text_height_mm is None else round(self._max_text_height_mm, 2),
             text_height_fell_back=self._text_height_fell_back,
+            line_sizes_mm=self._line_sizes_mm,
+            line_max_mm=self._line_max_mm,
         )
 
         return preview_img, padded_128, raster_bytes, metrics

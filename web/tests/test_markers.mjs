@@ -1,7 +1,7 @@
 // The styled view of the label text box (js/marker-view.js) reads the markers like
 // core/rich_text.py does. Run with: node tests/test_markers.mjs
 import assert from 'node:assert/strict';
-import { textParts, markerHtml, stylesAt } from '../js/marker-view.js';
+import { textParts, markerHtml, stylesAt, everyLineSized } from '../js/marker-view.js';
 
 const words = (text) => textParts(text).filter((p) => !p.mark && !p.newline)
   .map((p) => [p.text, ['bold', 'italic', 'underline', 'invert'].filter((s) => p[s]).join('+')]);
@@ -20,6 +20,11 @@ assert.ok(textParts('==M3==').every((p) => p.invert));
 // Size and alignment, in either order, then a column line
 assert.deepEqual(marks('>> ## Right'), ['>> ', '## ']);
 assert.equal(textParts('---')[0].column, true);
+// A size in mm is a size marker too, and an escaped bracket is text
+assert.deepEqual(marks('[3.5mm] << Shelf'), ['[3.5mm] ', '<< ']);
+assert.deepEqual(marks('>> [2,5mm] Shelf'), ['>> ', '[2,5mm] ']);
+assert.deepEqual(words('\\[3mm] Shelf'), [['[3mm] Shelf', '']]);
+assert.deepEqual(marks('[A1] Shelf'), []);
 // Markers that don't open a style are plain text, like on the label
 assert.deepEqual(words('**open'), [['**open', '']]);
 assert.deepEqual(words('M3 * 8 * 2'), [['M3 * 8 * 2', '']]);
@@ -36,5 +41,9 @@ assert.equal(stylesAt('==M3== and *M4*', 15).italic, true);
 assert.equal(stylesAt('==M3== and *M4*', 9).italic, false);
 assert.equal(stylesAt('==M3== and *M4*', 4).invert, true);
 assert.equal(stylesAt('**a**\nb', 6).bold, false);
+
+assert.equal(everyLineSized('[6mm] A\n---\n>> [2mm] B\n\n'), true);
+assert.equal(everyLineSized('[6mm] A\nB'), false);
+assert.equal(everyLineSized(''), false);
 
 console.log('marker view: ok');

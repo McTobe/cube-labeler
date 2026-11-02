@@ -68,6 +68,16 @@ class TestParsing(unittest.TestCase):
         self.assertEqual([[l.text for l in col] for col in doc.columns], [["M3"], ["8 mm", "DIN 912"]])
         self.assertEqual(len(rt.parse("---\nA").columns), 1)
 
+    def test_size_in_mm(self):
+        line = rt.parse_line("[3.5mm] << Shelf")
+        self.assertEqual((line.mm, line.align, line.text), (3.5, "left", "Shelf"))
+        self.assertEqual(rt.parse_line(">> [2,5mm] A").mm, 2.5)  # either order, comma or point
+        self.assertEqual(rt.parse_line("[3 mm] A").mm, 3.0)
+        # A marker needs its space; an escaped bracket is text
+        self.assertEqual(rt.parse_line("[3mm]A").text, "[3mm]A")
+        self.assertEqual(rt.parse_line("\\[3mm] A").text, "[3mm] A")
+        self.assertIsNone(rt.parse_line("[A1] Shelf").mm)
+
     def test_literal_newline_escape(self):
         self.assertEqual(len(rt.parse("A\\nB").lines), 2)
 
@@ -96,6 +106,14 @@ class TestEditingHelpers(unittest.TestCase):
         self.assertEqual(rt.set_line_style("# >> Shelf", size="small"), "-# >> Shelf")
         self.assertEqual(rt.set_line_style("-# >> Shelf", size="normal", align=None), "Shelf")
         self.assertEqual(rt.line_style(">> # Shelf"), ("large", "right"))
+
+    def test_set_line_size_in_mm(self):
+        self.assertEqual(rt.set_line_style("<< Shelf", size=3.5), "[3.5mm] << Shelf")
+        self.assertEqual(rt.set_line_style("# Shelf", size=2), "[2mm] Shelf")
+        self.assertEqual(rt.set_line_style("[2mm] >> Shelf", size=2.25), "[2.25mm] >> Shelf")
+        self.assertEqual(rt.set_line_style("[2mm] >> Shelf", size="normal"), ">> Shelf")
+        self.assertEqual(rt.set_line_style("[2mm] Shelf", align="left"), "[2mm] << Shelf")
+        self.assertEqual(rt.line_style("[2.5mm] >> Shelf"), (2.5, "right"))
 
 
 class TestStyledFonts(unittest.TestCase):
@@ -172,6 +190,63 @@ class TestRendering(unittest.TestCase):
         # A, the divider and B are three separate groups of ink
         groups = 1 + sum(1 for a, b in zip(dark, dark[1:]) if b > a + 1)
         self.assertEqual(groups, 3)
+
+    def test_columns_share_a_middle(self):
+        # A line box leaves room for every descender in the label ("j" here), so centring the
+        # boxes let a lone capital column ride high next to a two-line one (issue seen in Open Sans)
+        open_sans = os.path.join(BASE_DIR, "web", "fonts", "OpenSans-Regular.ttf")
+        for font in (ROBOTO, open_sans):
+            with self.subTest(font):
+                layout = rt.TextLayout(rt.parse("# BECO\n---\n-# << Tobias Kejonen\n-# << 072 225 27 24"), font)
+                img = layout.render(40)
+                widths = [layout._render_column(col, 40).width for col in layout.doc.columns]
+                left = img.crop((0, 0, widths[0], img.height)).getbbox()
+                right = img.crop((img.width - widths[1], 0, img.width, img.height)).getbbox()
+                self.assertLessEqual(abs((left[1] + left[3]) - (right[1] + right[3])), 2)
+
+    def test_line_in_mm_keeps_its_size_and_the_rest_fits(self):
+        layout = rt.TextLayout(rt.parse("Big\n---\n[2mm] Small\n[2mm] Lines"), ROBOTO)
+        two_mm = layout.size_for_cap_height(2 / rt.DOT_MM)
+        base = layout.fit_size(64)
+        self.assertEqual([layout._size(l, base) for l in layout.doc.lines[1:]], [two_mm, two_mm])
+        self.assertLessEqual(layout.height(base), 64)
+        self.assertGreater(layout.cap_height(base), layout.cap_height(two_mm) * 2)
+
+    def test_lines_in_mm_too_tall_leave_the_rest_readable(self):
+        layout = rt.TextLayout(rt.parse("Big\n---\n[6mm] A\n[6mm] B"), ROBOTO)
+        loose = rt.TextLayout(rt.parse("Big\n---\nA\nB"), ROBOTO)
+        self.assertEqual(layout.fit_size(64), loose.fit_size(64))
+
+    def test_columns_in_mm_keep_a_normal_gap(self):
+        # With every line in mm the base sizes nothing, so the divider's gap follows the biggest line
+        sized = rt.TextLayout(rt.parse("[6mm] BECO\n---\n[2.5mm] Tobias\n[2.5mm] 072"), ROBOTO)
+        base = sized.fit_size(64)
+        big = sized._size(sized.doc.lines[0], base)
+        self.assertEqual(base, big)
+        widths = sum(sized._render_column(c, base).width for c in sized.doc.columns)
+        gap = sized.render(base).width - widths
+        self.assertEqual(gap, 2 * max(6, round(big * 0.3)) + max(1, round(big * 0.05)))
+
+    def test_text_size_leaves_lines_in_mm_alone(self):
+        text = "[6mm] BECO\n---\n[2.5mm] Tobias\n[2.5mm] 072"
+        shots = [self.renderer.render(LabelConfig(text=text, font_name=ROBOTO, text_height_mm=mm, text_height_fallback=True, font_scale=80, cut_line=False))
+                 for mm in (None, 3, 7)]
+        self.assertEqual(shots[0][0].tobytes(), shots[1][0].tobytes())
+        self.assertEqual(shots[0][0].tobytes(), shots[2][0].tobytes())
+        self.assertIsNone(shots[2][3].max_text_height_mm)
+        self.assertFalse(shots[2][3].text_height_fell_back)
+
+    def test_metrics_give_each_line_its_size(self):
+        text = "Big\n---\n[2.5mm] Small\n-# Smaller"
+        _, _, _, metrics = self.renderer.render(LabelConfig(text=text, font_name=ROBOTO))
+        sizes, tallest = metrics.line_sizes_mm, metrics.line_max_mm
+        self.assertEqual(len(sizes), 4)
+        self.assertEqual((sizes[1], tallest[1], sizes[2]), (None, None, 2.5))
+        self.assertGreater(sizes[0], sizes[2])
+        self.assertGreater(tallest[2], sizes[2])
+        self.assertIsNone(metrics.warning)
+        _, _, _, metrics = self.renderer.render(LabelConfig(text="[8mm] A\n[8mm] B", font_name=ROBOTO))
+        self.assertIn("taller together", metrics.warning)
 
     def test_frame_surrounds_the_content(self):
         for frame in ("box", "rounded"):

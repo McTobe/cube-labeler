@@ -11,11 +11,13 @@
 // which draws the label; keep the two in step.
 
 const SIZE_PREFIXES = [['## ', 'medium'], ['# ', 'large'], ['-# ', 'small']];
+// A letter height in mm, as "[3.5mm] " (MM_PREFIX in core/rich_text.py)
+const MM_PREFIX = /^\[\d{1,2}(?:[.,]\d{1,2})? ?mm\] /;
 const ALIGN_PREFIXES = [['<< ', 'left'], ['>< ', 'center'], ['>> ', 'right']];
 const COLUMN_BREAK = '---';
 // Longest first, so "**" is read as bold and not as two italic markers
 const INLINE_MARKERS = [['**', 'bold'], ['__', 'underline'], ['==', 'invert'], ['*', 'italic']];
-const ESCAPABLE = '\\*_=#<>-';
+const ESCAPABLE = '\\*_=#<>-[';
 const STYLES = ['bold', 'italic', 'underline', 'invert'];
 
 // A marker opens a style only if text follows it and the same marker closes it later
@@ -44,6 +46,8 @@ function lineParts(line, out) {
   let found = true;
   while (found) {
     found = false;
+    const mm = !size && rest.match(MM_PREFIX);
+    if (mm) { size = mm[0]; rest = rest.slice(size.length); found = true; out.push({ text: size, mark: true }); }
     if (!size) {
       for (const [prefix] of SIZE_PREFIXES) {
         if (rest.startsWith(prefix)) { size = prefix; rest = rest.slice(prefix.length); found = true; out.push({ text: prefix, mark: true }); break; }
@@ -98,6 +102,12 @@ function lineParts(line, out) {
 
 // The whole text as pieces, with the line breaks as pieces of their own. A typed "\n" is a line
 // break on the label too, so it shows as a marker and the text after it starts a new line.
+// True when every line with text has its own size in mm, so the label's Text size sizes nothing
+export function everyLineSized(text) {
+  const lines = text.split('\n').filter((l) => l.trim() && l.trim() !== COLUMN_BREAK);
+  return lines.length > 0 && lines.every((l) => MM_PREFIX.test(l.replace(/^(<<|><|>>) /, '')));
+}
+
 export function textParts(text) {
   const out = [];
   text.split('\n').forEach((line, n) => {
