@@ -1721,7 +1721,8 @@ input.tape-number { width: 160px; }
   .sheet.wide:has(.kind-grid) { width: min(1040px, 92vw); }
 }
 .kind-card .template-open { gap: 6px; }
-.kind-card.on { box-shadow: 0 0 0 2px var(--accent); }
+/* The ring sits inside the card: a shadow outside it was cut off at the edge of the scrolling sheet */
+.kind-card.on { outline: 2px solid var(--accent); outline-offset: -2px; }
 .kind-card.on .template-open { background: var(--accent-soft); }
 .kind-card .template-thumb .icon { color: var(--muted); }
 .kind-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
