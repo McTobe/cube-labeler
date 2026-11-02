@@ -481,6 +481,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   background: var(--stage);
   min-height: 104px;
 }
+/* On a phone there is room for a full height label (120 px) in every zoom, so switching never
+   moves the page */
+@media (max-width: 899px) {
+  .preview .stage-message, .tape-scroll { min-height: 148px; }
+}
 
 .stage-message {
   display: flex;
@@ -516,12 +521,12 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .tape-strip img { display: block; max-width: 100%; height: auto; max-height: 120px; }
 .fitted .tape-strip img { max-width: none; max-height: none; }
 /* Auto margins centre the label and still let a zoomed one scroll to every edge */
-.zoom-real .tape-strip { max-width: none; margin: auto; }
-.tape-scroll.zoom-real { padding: 14px 12px; }
+.zoom-full .tape-strip { max-width: none; margin: auto; }
+.tape-scroll.zoom-full { padding: 14px 12px; }
 .tape-strip img.dots { image-rendering: pixelated; }
 /* The queue strip: rows are windows onto one image, with a target over each label */
 .tape-rows { display: flex; flex-direction: column; align-items: center; gap: 18px; margin: auto; flex: none; }
-.zoom-real .tape-rows { align-items: flex-start; }
+.zoom-full .tape-rows { align-items: flex-start; }
 .strip-window { position: relative; overflow: hidden; }
 .strip-window img { max-width: none; max-height: none; }
 .strip-label {

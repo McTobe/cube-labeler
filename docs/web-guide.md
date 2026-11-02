@@ -29,7 +29,7 @@ Type in **Label text** and the preview shows the label on the tape, with its len
 
 - **Font and layout** on the right sets the font, weight, text size, alignment and a frame.
 - The tabs next to the text add a **QR code**, a **Barcode** or a **Picture**. Under the QR code content, **Wi-Fi**, **Contact**, **Email** and **More** (phone call, location, text message, WhatsApp, calendar event, social profile) fill it in for you, and a dot says whether the code will scan at this tape width.
-- **Fit** shows the whole label; **Real size** shows it at its printed size.
+- **Fit** shows the whole label; **Full height** makes the tape as tall as the preview and a long label scrolls sideways (swipe on a phone).
 
 ### Styling text
 

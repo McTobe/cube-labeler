@@ -6,10 +6,9 @@ import { app, boot, updateLabel, hush } from './app.js';
 import { Icon } from './icons.js';
 import { useWide } from './ui.js';
 
-const ZOOMS = [['fit', 'Fit'], ['real', 'Real size']];
-// Preview pixels are print dots (0.1411 mm); a CSS millimetre is 96 / 25.4 pixels, about real
-// size on most screens
-const REAL_PX_PER_DOT = 0.1411 * (96 / 25.4);
+// Fit shows the whole label; Full height draws it as tall as the stage allows and a long one
+// scrolls sideways
+const ZOOMS = [['fit', 'Fit'], ['full', 'Full height']];
 // Room Fit leaves around the strip, in pixels, and the share of a tall stage the label may fill
 const FIT_SIDE = 80;
 const FIT_HEIGHT_SHARE = 0.35;
@@ -17,6 +16,12 @@ const PHONE_FIT_HEIGHT = 120;
 // Fit never draws the tape more than this many pixels per millimetre (about 3× real size on a
 // desktop screen), so a short label sits on the stage like a label instead of filling it
 const FIT_MAX_PX_PER_MM = 11;
+// Full height on a wide screen stops at this many pixels per millimetre (264 px for 12 mm tape),
+// so a big window doesn't blow the label up past what is useful
+const FULL_MAX_PX_PER_MM = 22;
+// Room Full height leaves above and below the label on a wide screen, for the padding and a
+// scroll bar
+const FULL_ROOM = 48;
 
 // A strip longer than this wraps onto rows in Fit, at most MAX_ROWS of them
 const WRAP_MM = 150;
@@ -49,6 +54,13 @@ function fitWidth(box, natural, wide, tapeMm, rows) {
   return Math.max(40, Math.floor(natural[0] * scale));
 }
 
+// The width of the strip image that makes the tape as tall as the stage allows (Full height)
+function fullWidth(box, natural, wide, tapeMm) {
+  if (!box || !natural) return null;
+  const height = wide ? Math.min(box[1] - FULL_ROOM, tapeMm * FULL_MAX_PX_PER_MM) : PHONE_FIT_HEIGHT;
+  return Math.max(40, Math.floor((natural[0] * Math.max(40, height)) / natural[1]));
+}
+
 // Splits a long strip at the cut lines into rows of about the same length
 function splitRows(spans, lengthMm) {
   const n = Math.min(MAX_ROWS, spans.length, Math.ceil(lengthMm / WRAP_MM));
@@ -78,13 +90,12 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
   // Rulers are drawn on text labels
   const aids = strip === undefined;
   const { phase, text, error } = useStore(boot);
-  const [zoomChoice, setZoom] = useState('fit');
   const stageRef = useRef(null);
   const [natural, setNatural] = useState(null);
   const wide = useWide();
-  // Phones always use Fit: browsers there don't size CSS millimetres to the screen, so Real
-  // size comes out far too small
-  const zoom = wide ? zoomChoice : 'fit';
+  // The choice is shared by every preview and starts at Fit each time the app opens
+  const zoom = state.previewZoom === 'full' ? 'full' : 'fit';
+  const setZoom = (value) => app.set({ previewZoom: value });
   // Bin labels and queue strips are on 12 mm tape; a label from the history says its own
   const editing = state.mode === 'ports' ? state.ports : label;
   const tapeMm = stripTapeMm || (strip === undefined && state.mode !== 'bin' ? Number(editing.tape_width_mm) || 12 : 12);
@@ -96,11 +107,11 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
   const fitBase = useRef(null);
   if (zoom === 'fit' || !fitBase.current) fitBase.current = fitWidth(box, natural, wide, tapeMm, oneRow);
 
-  // Zooming keeps the middle of the label in the middle of the stage
+  // Full height starts at the start of the label, to swipe along it
   useLayoutEffect(() => {
     const el = stageRef.current;
     if (!el) return;
-    el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    el.scrollLeft = 0;
     el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
   }, [zoom]);
 
@@ -118,9 +129,9 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
     // Only the label being edited can show its dots (Advanced > Show print dots)
     const dots = strip === undefined && state.mode !== 'bin' && state.previewDots;
     const tape = dots ? '#ffffff' : render.tape_bg_color;
-    // Real size draws each dot at its size on paper; a long strip scrolls inside the stage
+    // In Full height a long strip scrolls inside the stage
     const fit = rows.length > 1 ? fitWidth(box, natural, wide, tapeMm, rows)
-      : zoom === 'real' ? (natural ? Math.round(natural[0] * REAL_PX_PER_DOT) : null) : fitBase.current;
+      : zoom === 'full' ? fullWidth(box, natural, wide, tapeMm) : fitBase.current;
     const src = dots ? render.dotsUrl : render.previewUrl;
     const sample = strip === undefined && render.sample;
     const alt = dots ? 'The dots the printer will print' : 'Label preview';
@@ -171,9 +182,10 @@ export function Preview({ strip, empty, spans, active, onPoint, onPick, tapeMm: 
           <button class=${label.show_rulers ? 'on' : ''} aria-pressed=${label.show_rulers}
             onClick=${() => updateLabel({ show_rulers: !label.show_rulers })}>Rulers</button>
         </span>`}
-        ${wide && html`<span class="chip-group" role="group" aria-label="Zoom">
-          ${ZOOMS.map(([value, name]) => html`<button class=${zoom === value ? 'on' : ''} onClick=${() => setZoom(value)}>${name}</button>`)}
-        </span>`}
+        <span class="chip-group" role="group" aria-label="Zoom">
+          ${ZOOMS.map(([value, name]) => html`<button class=${zoom === value ? 'on' : ''} aria-pressed=${zoom === value}
+            onClick=${() => setZoom(value)}>${name}</button>`)}
+        </span>
       </span>
     </div>
     ${m && m.warning && html`<p class="warning">${m.warning}</p>`}
