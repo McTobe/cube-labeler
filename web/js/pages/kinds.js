@@ -6,7 +6,7 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { Sheet } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS } from '../app.js';
+import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS, DEFAULT_OUTLET } from '../app.js';
 import { templates, thumbnail } from '../templates.js';
 
 // What each kind is for, in one line
@@ -30,6 +30,7 @@ export const KIND_EXAMPLES = {
   },
   flag: () => ({ mode: 'text', label: { ...DEFAULT_LABEL, layout: 'flag', text: 'NAS', font_name: 'Arimo Bold' } }),
   ports: () => ({ mode: 'text', label: { ...DEFAULT_PORTS, port_count: 6 } }),
+  outlet: () => ({ mode: 'text', label: { ...DEFAULT_OUTLET, text: 'DA01P02 3/4' } }),
 };
 
 function KindCard({ kind, on, pick }) {

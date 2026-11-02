@@ -11,6 +11,7 @@ import { SerialTransport, queryStatus, printRaster, feedTape, errorMessage } fro
 import {
   tapeKey, newRoll, correctRoll, countPrint, rollLeft, formatTape, planParts, partItems,
 } from './tape.js';
+import { outletText, outletParts, nextFirst } from './outlet-code.js';
 
 const RENDER_DELAY_MS = 120;
 const SAVE_DELAY_MS = 400;
@@ -76,6 +77,29 @@ export const DEFAULT_PORTS = {
   port_divider_every: 0,
 };
 
+// A network outlet label is a text label whose text is made from the parts of its code (see
+// outlet-code.js); like the port strip it keeps its own settings apart from the text label
+export const DEFAULT_OUTLET = {
+  ...DEFAULT_LABEL,
+  layout: 'outlet',
+  text: '',
+  font_name: 'Arimo Bold',
+  outlet_building: '',
+  outlet_floor: '',
+  outlet_room: '',
+  outlet_rack: 'DA01',
+  outlet_panel_kind: 'P',  // what the panel is called: P (panel), M or U (rack unit)
+  outlet_panel: '01',
+  outlet_ports: 2,  // ports on the outlet: 1, 2 or 4
+  outlet_first: 1,  // the first of them
+  outlet_row: 1,  // labels added at once, each for the next ports
+  outlet_sep: '',  // between the parts: '', ' ', '-' or '.'
+  outlet_pair: '/',  // two ports as 3/4, 3-4 or 3+4
+  outlet_digits: 0,  // numbers as typed, or padded to 2 or 3 digits
+  outlet_lines: 1,  // 2 puts building, floor and room small over the code
+};
+DEFAULT_OUTLET.text = outletText(DEFAULT_OUTLET);
+
 export const DEFAULT_SETTINGS = {
   ai_provider: 'gemini',
   ai_models: {},
@@ -103,9 +127,10 @@ export const BIN_TAPE_MM = 12;
 export const boot = createStore({ phase: 'loading', text: 'Starting...', error: null });
 
 export const app = createStore({
-  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports' or 'flag' (a cable flag of the text label)
+  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet' or 'flag' (a cable flag of the text label)
   label: DEFAULT_LABEL,
   ports: DEFAULT_PORTS,  // the port strip being edited
+  outlet: DEFAULT_OUTLET,  // the network outlet label being edited
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
   languages: [['en', 'English']],
@@ -164,7 +189,7 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue, device, ports] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device, ports, outlet] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
@@ -173,6 +198,7 @@ export async function start() {
     storage.load('queue', []),
     storage.load('deviceId', null),
     storage.load('ports', {}),
+    storage.load('outlet', {}),
   ]);
   // The tape counter counts each device's prints apart, so syncing never counts one twice
   deviceId = device || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -182,6 +208,7 @@ export async function start() {
     // The printable-area guides no longer have a switch, so a label saved with them on drops them
     label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     ports: { ...DEFAULT_PORTS, ...ports, layout: 'ports' },
+    outlet: withOutletText({ ...DEFAULT_OUTLET, ...outlet }),
     mode,
     bin,
     queue: mergeCopies(queue),
@@ -290,6 +317,13 @@ export function updatePorts(change) {
   changed('ports');
 }
 
+const withOutletText = (outlet) => ({ ...outlet, layout: 'outlet', text: outletText(outlet) });
+
+export function updateOutlet(change) {
+  app.set({ outlet: withOutletText({ ...app.get().outlet, ...change }) });
+  changed('outlet');
+}
+
 // change applies to the bin label being edited (fastener or part); {kind} switches between them
 export function updateBin(change) {
   const bin = app.get().bin;
@@ -324,12 +358,21 @@ export const RESET_NOTES = {
   text: 'Reset font, size, QR code, picture and tape settings? Your text is kept.',
   flag: 'Reset the cable, font, size, QR code, picture and tape settings? Your text is kept.',
   ports: 'Reset ports, spacing, font, size and tape? Your numbers and names are kept.',
+  outlet: 'Reset the code style, font, size and tape? The parts of your code are kept.',
   bin: 'Reset the label length and drive icon? What is on the label is kept.',
 };
 
+// What Reset keeps on an outlet label: the code itself
+const OUTLET_PART_KEYS = ['outlet_building', 'outlet_floor', 'outlet_room', 'outlet_rack', 'outlet_panel_kind',
+  'outlet_panel', 'outlet_ports', 'outlet_first', 'outlet_row'];
+
 export function resetSettings() {
-  const { mode, label, ports, bin, settings } = app.get();
-  if (mode === 'ports') {
+  const { mode, label, ports, outlet, bin, settings } = app.get();
+  if (mode === 'outlet') {
+    const keep = Object.fromEntries(OUTLET_PART_KEYS.map((k) => [k, outlet[k]]));
+    updateOutlet({ ...DEFAULT_OUTLET, tape_width_mm: labelDefaults().tape_width_mm, ...keep });
+    say('Settings reset. The parts of your code are kept.');
+  } else if (mode === 'ports') {
     const { port_use_names, port_names, port_prefix } = ports;
     updatePorts({ ...DEFAULT_PORTS, tape_width_mm: labelDefaults().tape_width_mm, port_use_names, port_names, port_prefix });
     say('Settings reset. Your numbers and names are kept.');
@@ -385,16 +428,18 @@ export function itemOptions(item) {
 }
 
 export function currentItem() {
-  const { mode, label, bin, ports } = app.get();
+  const { mode, label, bin, ports, outlet } = app.get();
   if (mode === 'bin' && bin) return { mode, bin: bin[bin.kind] };
   if (mode === 'ports') return { mode: 'text', label: ports };
+  if (mode === 'outlet') return { mode: 'text', label: outlet };
   return { mode: 'text', label: { ...label, layout: mode === 'flag' ? 'flag' : 'text' } };
 }
 
 // The kind of label on the Label page that edits a queued or saved label
 export function editorMode(item) {
   if (item.mode === 'bin') return 'bin';
-  return item.label.layout === 'ports' ? 'ports' : item.label.layout === 'flag' ? 'flag' : 'text';
+  const { layout } = item.label;
+  return layout === 'ports' || layout === 'outlet' || layout === 'flag' ? layout : 'text';
 }
 
 // What goes over each port of a port strip, as the Python core draws it
@@ -422,6 +467,7 @@ export function itemTitle(item) {
     const named = portTexts(item.label).filter((t) => t);
     return named.length ? `Ports ${named[0]}${named.length > 1 ? ` to ${named[named.length - 1]}` : ''}` : 'Port strip';
   }
+  if (item.mode === 'text' && item.label.layout === 'outlet') return outletParts(item.label).code || textLines(item.label)[0] || 'Network outlet';
   if (item.mode === 'bin') {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
@@ -434,9 +480,10 @@ export function itemTitle(item) {
 function fitTooTallPreset(item, metrics) {
   if (item.mode !== 'text' || !metrics.text_height_fell_back) return;
   const ports = item.label.layout === 'ports';
-  const label = ports ? app.get().ports : app.get().label;
+  const outlet = item.label.layout === 'outlet';
+  const label = ports ? app.get().ports : outlet ? app.get().outlet : app.get().label;
   if (label.text_height_mm !== item.label.text_height_mm) return;
-  (ports ? updatePorts : updateLabel)({ text_height_mm: null });
+  (ports ? updatePorts : outlet ? updateOutlet : updateLabel)({ text_height_mm: null });
   say(`${item.label.text_height_mm} mm is too big for this text ${ports ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
 }
 
@@ -836,8 +883,29 @@ async function makeThumb(item) {
 }
 
 export function addToQueue() {
+  if (app.get().mode === 'outlet') return addOutlets();
   const item = currentItem();
   return queueItem(item.mode === 'bin' ? { ...item, font: binFont() } : item);
+}
+
+export const MAX_OUTLET_ROW = 48;
+
+// Adds the network outlet labels: one, or a row of them for the next ports (3/4, 5/6, 7/8).
+// next moves the first port on past them, ready for the next outlet.
+export function addOutlets(next = false) {
+  const { outlet } = app.get();
+  const numbered = Number.isFinite(parseInt(outlet.outlet_first, 10));
+  const rows = numbered ? Math.min(MAX_OUTLET_ROW, Math.max(1, parseInt(outlet.outlet_row, 10) || 1)) : 1;
+  for (let i = 0; i < rows; i++) {
+    const label = withOutletText({ ...outlet, outlet_first: numbered ? nextFirst(outlet, i) : outlet.outlet_first });
+    if (!queueItem({ mode: 'text', label })) return false;
+  }
+  if (rows > 1) {
+    const last = outletParts(outlet, nextFirst(outlet, rows - 1)).code;
+    say(`Added ${rows} labels to the queue, ${outletParts(outlet).code} to ${last}.`);
+  }
+  if (next && numbered) updateOutlet({ outlet_first: nextFirst(outlet, rows) });
+  return true;
 }
 
 // Adds a label ({mode, label} or {mode, bin, font}) to the queue, like one from the history
@@ -849,6 +917,9 @@ export function queueItem(label) {
       say('Give at least one port a name first.', true);
       return false;
     }
+  } else if (item.mode === 'text' && item.label.layout === 'outlet' && !item.label.text.trim()) {
+    say('Fill in at least one part of the code first.', true);
+    return false;
   } else if (item.mode === 'text' && !item.label.text.trim() && !hasQr(item.label) && !hasBarcode(item.label) && !item.label.image) {
     say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
@@ -926,6 +997,9 @@ export function openItem(item) {
   } else if (editorMode(item) === 'ports') {
     app.set({ mode: 'ports', ports: { ...DEFAULT_PORTS, ...item.label } });
     storage.save('ports', app.get().ports);
+  } else if (editorMode(item) === 'outlet') {
+    app.set({ mode: 'outlet', outlet: withOutletText({ ...DEFAULT_OUTLET, ...item.label }) });
+    storage.save('outlet', app.get().outlet);
   } else {
     // A cable flag is the text label drawn twice, so it opens as the text label in Cable flag
     app.set({ mode: editorMode(item), label: { ...DEFAULT_LABEL, ...item.label, layout: 'text' } });

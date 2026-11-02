@@ -13,11 +13,12 @@ import { markerHtml, stylesAt, everyLineSized } from '../marker-view.js';
 import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel } from '../qr-helpers.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
+import { OutletCard, OutletHelp, OutletStyleSection } from './outlet.js';
 import { KindSheet } from './kinds.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
-  updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
+  updatePorts, updateOutlet, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
 } from '../app.js';
 
 // A line's size is the height of its capital letters in mm, like the Text size option. Auto
@@ -63,6 +64,9 @@ export function LabelPage() {
     options = html`${!wide && html`<${BinCard} />`}<${BinOptions} />`;
   } else if (mode === 'ports') {
     options = html`${!wide && html`<${PortCard} />`}<${PortSection} /><${PortFontSection} />`;
+  } else if (mode === 'outlet') {
+    options = html`${wide ? html`<${OutletHelp} />` : html`<${OutletCard} />`}<${OutletStyleSection} />
+      <${PortFontSection} id="outlet-font" kind="outlet" update=${updateOutlet} />`;
   } else {
     // On a phone the text, codes, picture and these options are tabs of one card
     options = !wide ? html`<${PhoneTextCard} />` : html`
@@ -77,6 +81,7 @@ export function LabelPage() {
       ${text && wide && html`<${TextCard} />`}
       ${mode === 'bin' && wide && html`<${BinCard} />`}
       ${mode === 'ports' && wide && html`<${PortCard} />`}
+      ${mode === 'outlet' && wide && html`<${OutletCard} />`}
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
@@ -96,7 +101,7 @@ export const MODES = [
   { id: 'bin', name: 'Bin label', icon: 'bin' },
   { id: 'flag', name: 'Cable flag', icon: 'flag' },
   { id: 'ports', name: 'Port strip', icon: 'ports' },
-  { id: 'outlet', name: 'Network outlet', icon: 'outlet', soon: true },
+  { id: 'outlet', name: 'Network outlet', icon: 'outlet' },
   { id: 'breakers', name: 'Breaker strip', icon: 'breaker', soon: true },
   { id: 'asset', name: 'Asset tag', icon: 'asset', soon: true },
   { id: 'date', name: 'Date label', icon: 'calendar', soon: true },
@@ -926,16 +931,20 @@ function PortSection() {
   <//>`;
 }
 
-function PortFontSection() {
-  const { ports, fonts, tapeWidths } = useStore(app);
-  const names = fonts.length ? fonts : [ports.font_name];
-  return html`<${Section} id="port-font" title="Font and tape" summary=${`${ports.font_name}, ${ports.tape_width_mm} mm tape`}>
-    <${FontField} label="Font" value=${ports.font_name} fonts=${names} onChange=${(font_name) => updatePorts({ font_name })} />
-    <${TextSizeField} label=${ports} onChange=${updatePorts} />
-    <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${ports.tape_width_mm}
-      onChange=${(tape_width_mm) => updatePorts({ tape_width_mm: Number(tape_width_mm) })} />
-    <${Select} label="Tape colour in the preview" value=${`${ports.tape_bg_color}/${ports.tape_fg_color}`}
-      options=${TAPE_COLOURS} onChange=${(v) => { const [bg, fg] = v.split('/'); updatePorts({ tape_bg_color: bg, tape_fg_color: fg }); }} />
+// Font and tape of a label with its own settings: the port strip, or the one under kind (an
+// outlet label) with its update function
+function PortFontSection({ id = 'port-font', kind = 'ports', update = updatePorts }) {
+  const state = useStore(app);
+  const { fonts, tapeWidths } = state;
+  const label = state[kind];
+  const names = fonts.length ? fonts : [label.font_name];
+  return html`<${Section} id=${id} title="Font and tape" summary=${`${label.font_name}, ${label.tape_width_mm} mm tape`}>
+    <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => update({ font_name })} />
+    <${TextSizeField} label=${label} onChange=${update} />
+    <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${label.tape_width_mm}
+      onChange=${(tape_width_mm) => update({ tape_width_mm: Number(tape_width_mm) })} />
+    <${Select} label="Tape colour in the preview" value=${`${label.tape_bg_color}/${label.tape_fg_color}`}
+      options=${TAPE_COLOURS} onChange=${(v) => { const [bg, fg] = v.split('/'); update({ tape_bg_color: bg, tape_fg_color: fg }); }} />
   <//>`;
 }
 

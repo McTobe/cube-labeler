@@ -985,6 +985,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   color: var(--muted);
 }
 .mode-switch > button.on { background: var(--accent-soft); color: var(--accent); }
+.mode-switch > button { white-space: nowrap; min-width: 0; padding-left: 6px; padding-right: 6px; }
 .mode-switch > button .icon + .icon { margin-left: -2px; opacity: 0.7; }
 
 /* The port strip's card: what goes over each port */
@@ -1682,3 +1683,13 @@ input.tape-number { width: 160px; }
 .kind-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .kind-name .icon { flex: none; color: var(--accent); }
 .kind-card.on .template-name { color: var(--accent); }
+
+/* The network outlet card: its three columns of plain fields fit from a small desktop window up */
+@media (min-width: 900px) {
+  .bin-grid.three.outlet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .bin-grid.three.outlet-grid > .bin-col { padding: 2px 16px; min-width: 0; gap: 0; }
+  .bin-grid.three.outlet-grid > .bin-col:first-child { padding-left: 0; }
+  .bin-grid.three.outlet-grid > .bin-col:last-child { padding-right: 0; }
+  .bin-grid.three.outlet-grid > .bin-col + .bin-col { border-left: 1px solid var(--border); }
+}
+.outlet-card .card-head { align-items: center; }
