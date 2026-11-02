@@ -4,9 +4,10 @@ import { useEffect, useState } from 'preact/hooks';
 import { html } from './html.js';
 import { Icon } from './icons.js';
 import { PrinterChip } from './printer-ui.js';
-import { LabelPage, kindItems } from './pages/label.js';
+import { LabelPage, readyKinds } from './pages/label.js';
+import { KindSheet } from './pages/kinds.js';
 import { SettingsPage, SyncPanel, JoinSheet } from './pages/settings.js';
-import { Menu, Sheet, useWide } from './ui.js';
+import { Sheet, useWide } from './ui.js';
 import { QueuePage } from './pages/queue.js';
 import { IconsPage } from './pages/icons.js';
 import { TemplatesPage } from './pages/templates.js';
@@ -112,8 +113,7 @@ function App() {
         // On a phone the Label button goes back to the label, and on the Label page it asks
         // which kind of label to edit
         return html`<span class="menu-anchor nav-label">${link}
-          <${Menu} variant="tiles kinds" open=${kinds} onClose=${() => setKinds(false)}
-            items=${kindItems(mode)} /></span>`;
+          <${KindSheet} open=${kinds} onClose=${() => setKinds(false)} kinds=${readyKinds()} /></span>`;
       })}
     </nav>
     <div class="main-col">

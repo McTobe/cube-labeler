@@ -13,6 +13,7 @@ import { markerHtml, stylesAt, everyLineSized } from '../marker-view.js';
 import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel } from '../qr-helpers.js';
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
+import { KindSheet } from './kinds.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
@@ -90,14 +91,14 @@ export function LabelPage() {
   </div>`;
 }
 
-// The kinds of label. The side panel shows the main ones as tiles, two to a row, with a More
-// tile that opens all of them as a menu, the same menu the phone's Label button opens
-// (main.js). A kind marked soon is still being built and stays out of the menus until it is
-// ready, so each new kind only has to drop its soon.
+// The kinds of label. The side panel shows the main one, Text label, next to a More tile that
+// opens all of them as cards (kinds.js), as the phone's Label button does (main.js). A kind
+// marked soon is still being built and stays out of the sheet until it is ready, so each new
+// kind only has to drop its soon.
 export const MODES = [
   { id: 'text', name: 'Text label', icon: 'text', main: true },
-  { id: 'bin', name: 'Bin label', icon: 'bin', main: true },
-  { id: 'flag', name: 'Cable flag', icon: 'flag', main: true },
+  { id: 'bin', name: 'Bin label', icon: 'bin' },
+  { id: 'flag', name: 'Cable flag', icon: 'flag' },
   { id: 'ports', name: 'Port strip', icon: 'ports' },
   { id: 'outlet', name: 'Network outlet', icon: 'outlet', soon: true },
   { id: 'breakers', name: 'Breaker strip', icon: 'breaker' },
@@ -106,9 +107,8 @@ export const MODES = [
 ];
 export const modeName = (mode) => (MODES.find((m) => m.id === mode) || MODES[0]).name;
 
-// Every kind of label that is ready, as items for a tiles menu
-export const kindItems = (mode) => MODES.filter((m) => !m.soon)
-  .map((m) => ({ label: m.name, icon: m.icon, on: mode === m.id, action: () => setMode(m.id) }));
+// Every kind of label that is ready
+export const readyKinds = () => MODES.filter((m) => !m.soon);
 
 // A slim line over the settings with Reset, which works the same for every kind of label. On a
 // phone it names the kind of label, which the Label button changes.
@@ -122,20 +122,19 @@ function SettingsHead({ mode, phone = false }) {
   </div>`;
 }
 
+// The side panel's picker: Text label, and More for every other kind, which shows the kind
+// picked from it
 function ModePicker({ mode }) {
   const [open, setOpen] = useState(false);
   const other = MODES.find((m) => m.id === mode && !m.main);
   return html`<div class="mode-switch" role="tablist" aria-label="Kind of label">
     ${MODES.filter((m) => m.main).map((m) => html`<button role="tab" aria-selected=${mode === m.id} class=${mode === m.id ? 'on' : ''}
       onClick=${() => setMode(m.id)}><${Icon} name=${m.icon} size=${20} /> ${m.name}</button>`)}
-    <span class="menu-anchor mode-more">
-      <button role="tab" aria-selected=${!!other} aria-haspopup="menu" aria-expanded=${open} class=${other ? 'on' : ''}
-        onClick=${() => setOpen(true)}>
-        <${Icon} name=${other ? other.icon : 'more'} size=${20} /> ${other ? other.name : 'More'}
-        <${Icon} name="chevron" size=${16} /></button>
-      <${Menu} variant="tiles kinds" open=${open} onClose=${() => setOpen(false)} items=${kindItems(mode)} />
-    </span>
-  </div>`;
+    <button role="tab" aria-selected=${!!other} aria-haspopup="dialog" class=${other ? 'on' : ''} onClick=${() => setOpen(true)}>
+      <${Icon} name=${other ? other.icon : 'more'} size=${20} /> ${other ? other.name : 'More'}
+      <${Icon} name="chevron" size=${16} /></button>
+  </div>
+  <${KindSheet} open=${open} onClose=${() => setOpen(false)} kinds=${readyKinds()} />`;
 }
 
 // --- Text ----------------------------------------------------------------------------------
