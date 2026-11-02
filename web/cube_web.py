@@ -265,7 +265,8 @@ def border_tiles(tape_width_mm: float = 12.0, font_name: str = "Arimo") -> List[
         if border.id == "none":
             continue
         config = LabelConfig(text="Abc", font_name=font_name, tape_width_mm=float(tape_width_mm),
-                             frame=border.id, cut_line=False)
+                             frame=border.id, cut_line=False, font_scale=75.0)
+        # The sample text is kept smaller than Fit, so it stands clear of every border
         label = renderer.render(config)[0]
         # Every tile the same size and scale, the label in the middle
         width = max(label.width, round(label.height * 40 / 13))

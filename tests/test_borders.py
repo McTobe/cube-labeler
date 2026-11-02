@@ -9,6 +9,8 @@ import unittest
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
+from PIL import Image
+
 from core import borders
 from core.label_renderer import LabelConfig, LabelRenderer
 
@@ -57,6 +59,24 @@ class TestBorders(unittest.TestCase):
                 ix, iy = b.insets(64)
                 inner = mask.crop((ix + 1, iy + 1, 300 - ix - 1, 64 - iy - 1))
                 self.assertIsNone(inner.getbbox(), "draws where the text goes")
+
+    def test_text_never_touches_its_border(self):
+        from PIL import ImageChops, ImageFilter
+        for b in borders.BORDERS_LIST + borders.THEMED_BORDERS:
+            if b.id == "none" or b.category == "themed":
+                continue
+            for text in ("Spices", "WMgy|", "A\nB"):
+                with self.subTest(b.id, text=text):
+                    cfg = LabelConfig(text=text, font_name=ROBOTO, cut_line=False, frame=b.id)
+                    canvas, _, border_y, printable_h, _, _ = self.renderer._render_base_canvas(cfg)
+                    ink = _ink(canvas)
+                    width = canvas.width - 2 * cfg.h_padding - cfg.end_margin
+                    frame = borders.render(b.id, width, printable_h)
+                    placed = Image.new("L", canvas.size, 0)
+                    placed.paste(frame, (cfg.h_padding, border_y))
+                    text_ink = ImageChops.subtract(ink, placed)
+                    near = placed.filter(ImageFilter.MaxFilter(3))
+                    self.assertIsNone(ImageChops.multiply(text_ink, near).getbbox())
 
     def test_a_finer_head_gets_the_same_border_sharper(self):
         # Twice the dots per mm: the same design, its lines twice as many dots thick

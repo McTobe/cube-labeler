@@ -14,6 +14,7 @@ from typing import Callable, Dict, List, Tuple
 from PIL import Image, ImageDraw, ImageFilter
 
 SS = 4  # drawn this many times bigger, then reduced to printer dots
+CLEAR_GAP = 0.03  # room between a border and the text, as a share of the printable height
 
 CATEGORIES = [
     ("simple", "Simple"),
@@ -115,7 +116,11 @@ class Border:
     trace: int = 0
 
     def insets(self, h: int) -> Tuple[int, int]:
-        return int(round(self.inset_x * h)), int(round(self.inset_y * h))
+        if self.id == "none":
+            return 0, 0
+        # A little clear room on top of the border's own size, so text never touches it
+        gap = h * CLEAR_GAP
+        return int(round(self.inset_x * h + 2 * gap)), int(round(self.inset_y * h + gap))
 
 
 # --- Helpers ------------------------------------------------------------------------------
