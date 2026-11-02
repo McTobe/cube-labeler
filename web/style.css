@@ -640,10 +640,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .menu.tiles button { flex-direction: column; justify-content: flex-start; white-space: nowrap; gap: 8px; padding: 12px 6px 10px; text-align: center; font-size: 0.86rem; line-height: 1.2; }
 .menu.tiles .menu-icon { width: 40px; height: 40px; align-items: center; justify-content: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
 .menu.tiles .menu-icon svg { width: 20px; height: 20px; }
-/* The kinds of label, from the Label button in the phone's page tabs */
-.menu.tiles.kinds { grid-template-columns: repeat(2, 132px); }
-.menu.tiles.kinds button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.menu.tiles.kinds button.on .menu-icon { background: var(--accent); color: var(--accent-text); }
 .nav .nav-label { flex: 1; display: flex; }
 .nav .nav-label > a { flex: 1; }
 /* The caret hangs to the right of "Label", so the word stays centred under its icon */
@@ -961,7 +957,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 
 /* --- Bin labels and the queue -------------------------------------------------------------- */
 
-/* The main kinds of label as tiles, two to a row, the last one opening the menu of all kinds */
+/* The kind of label: Text label, and More for every other kind (the sheet in kinds.js) */
 /* The line over the settings column: what the picker is for, and Reset for every kind of label */
 .settings-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -4px 2px 6px; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
 .settings-head .reset-settings { display: inline-flex; align-items: center; gap: 6px; padding: 4px 2px; color: var(--muted); font-size: 0.85rem; }
@@ -976,7 +972,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   border: 1px solid var(--border);
   border-radius: 12px;
 }
-.mode-switch > button, .mode-more > button {
+.mode-switch > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -988,10 +984,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   font-weight: 600;
   color: var(--muted);
 }
-.mode-switch > button.on, .mode-more > button.on { background: var(--accent-soft); color: var(--accent); }
-.mode-more { display: block; }
-.mode-more > button { width: 100%; }
-.mode-more > button .icon:last-child { margin-left: -2px; opacity: 0.7; }
+.mode-switch > button.on { background: var(--accent-soft); color: var(--accent); }
+.mode-switch > button .icon + .icon { margin-left: -2px; opacity: 0.7; }
 
 /* The port strip's card: what goes over each port */
 .port-card .segmented { margin-bottom: 0; }
@@ -1673,3 +1667,18 @@ input.tape-number { width: 160px; }
 @media (max-width: 639px) {
   .border-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
 }
+
+/* The kind of label sheet: every kind as a card like the Templates page's starting points,
+   two a row on a phone and four on a wide screen */
+.template-grid.kind-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 900px) {
+  .template-grid.kind-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sheet.wide:has(.kind-grid) { width: min(1040px, 92vw); }
+}
+.kind-card .template-open { gap: 6px; }
+.kind-card.on { box-shadow: 0 0 0 2px var(--accent); }
+.kind-card.on .template-open { background: var(--accent-soft); }
+.kind-card .template-thumb .icon { color: var(--muted); }
+.kind-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.kind-name .icon { flex: none; color: var(--accent); }
+.kind-card.on .template-name { color: var(--accent); }
