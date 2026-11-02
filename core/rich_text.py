@@ -217,6 +217,8 @@ class TextLayout:
         """Largest base size whose text fits target_height. Lines with a size in mm keep it, so the
         other lines fill what is left. If those lines are too tall on their own, the others get
         the size they would have without them, rather than shrinking to nothing."""
+        if self._all_mm():
+            return self._space_size(6)
         low, high, best = 6, max(target_height * 2, 6), 6
         while low <= high:
             mid = (low + high) // 2
@@ -228,6 +230,16 @@ class TextLayout:
             loose = RichText([[Line(l.runs, l.size, l.align) for l in col] for col in self.doc.columns])
             return TextLayout(loose, self.font_name, self.stroke, self.spacing, self.align).fit_size(target_height)
         return best
+
+    def _all_mm(self) -> bool:
+        return all(line.mm for line in self.doc.lines if line.text.strip())
+
+    def _space_size(self, base: int) -> int:
+        """The size the room between columns follows: the base, or when every line has its own
+        size in mm (so the base sizes nothing), the biggest of those lines."""
+        if self._all_mm():
+            return max(self._size(line, base) for line in self.doc.lines)
+        return base
 
     def line_max_mm(self, line: Line, target_height: int) -> float:
         """The tallest letter height in mm this line can have on its own in target_height."""
@@ -364,8 +376,9 @@ class TextLayout:
         if len(cols) == 1:
             return cols[0]
         height = max(c.height for c in cols)
-        gap = max(6, round(base * 0.3))
-        line_w = max(1, round(base * 0.05))
+        space = self._space_size(base)
+        gap = max(6, round(space * 0.3))
+        line_w = max(1, round(space * 0.05))
         width = sum(c.width for c in cols) + (len(cols) - 1) * (2 * gap + line_w)
         out = Image.new("L", (width, height), 0)
         draw = ImageDraw.Draw(out)

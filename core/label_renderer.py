@@ -321,12 +321,13 @@ class LabelRenderer:
             return self._render_turned_text(config, doc, layout, border, spec, print_border, printable_h, canvas_h)
         fit_size = layout.fit_size(inner_h)
         # Without text there is nothing to be too tall (the layout then measures a stand-in "Ag")
-        if doc.has_text:
+        # When every line has its own size in mm, Text size sizes nothing, so no preset is too tall
+        if doc.has_text and not layout._all_mm():
             self._max_text_height_mm = layout.cap_height(fit_size) * self.DOT_PITCH_MM
         text_height_mm = config.text_height_mm
         if text_height_mm:
             effective_size = layout.size_for_cap_height(text_height_mm / self.DOT_PITCH_MM)
-            if config.text_height_fallback and doc.has_text and effective_size > fit_size:
+            if config.text_height_fallback and doc.has_text and effective_size > fit_size and not layout._all_mm():
                 self._text_height_fell_back = True
                 text_height_mm = None
                 effective_size = fit_size

@@ -217,6 +217,25 @@ class TestRendering(unittest.TestCase):
         loose = rt.TextLayout(rt.parse("Big\n---\nA\nB"), ROBOTO)
         self.assertEqual(layout.fit_size(64), loose.fit_size(64))
 
+    def test_columns_in_mm_keep_a_normal_gap(self):
+        # With every line in mm the base sizes nothing, so the divider's gap follows the biggest line
+        sized = rt.TextLayout(rt.parse("[6mm] BECO\n---\n[2.5mm] Tobias\n[2.5mm] 072"), ROBOTO)
+        base = sized.fit_size(64)
+        big = sized._size(sized.doc.lines[0], base)
+        self.assertEqual(base, big)
+        widths = sum(sized._render_column(c, base).width for c in sized.doc.columns)
+        gap = sized.render(base).width - widths
+        self.assertEqual(gap, 2 * max(6, round(big * 0.3)) + max(1, round(big * 0.05)))
+
+    def test_text_size_leaves_lines_in_mm_alone(self):
+        text = "[6mm] BECO\n---\n[2.5mm] Tobias\n[2.5mm] 072"
+        shots = [self.renderer.render(LabelConfig(text=text, font_name=ROBOTO, text_height_mm=mm, text_height_fallback=True, font_scale=80, cut_line=False))
+                 for mm in (None, 3, 7)]
+        self.assertEqual(shots[0][0].tobytes(), shots[1][0].tobytes())
+        self.assertEqual(shots[0][0].tobytes(), shots[2][0].tobytes())
+        self.assertIsNone(shots[2][3].max_text_height_mm)
+        self.assertFalse(shots[2][3].text_height_fell_back)
+
     def test_metrics_give_each_line_its_size(self):
         text = "Big\n---\n[2.5mm] Small\n-# Smaller"
         _, _, _, metrics = self.renderer.render(LabelConfig(text=text, font_name=ROBOTO))
