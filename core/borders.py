@@ -485,7 +485,7 @@ THEMED_BORDERS = [
     Border("music", "Music", "themed", border_art.music, 0.95, 0.07),
     Border("party", "Party", "themed", border_art.party, 0.95, 0.07),
     Border("scroll-corners", "Scroll corners", "themed", border_art.scrolls, 0.6, 0.09),
-    Border("bunting", "Bunting", "themed", border_art.bunting, 0.84, 0.07),
+    Border("bunting", "Bunting", "themed", border_art.bunting, 0.12, 0.26),
     Border("laurels", "Laurels", "themed", border_art.laurels, 0.46, 0.12),
     Border("deco-fans", "Deco fans", "themed", border_art.deco, 0.48, 0.1),
 ]

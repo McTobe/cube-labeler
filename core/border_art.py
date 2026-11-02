@@ -322,17 +322,26 @@ def tree(a, cx, base, H, trunk=True):
         a.box(cx - 1.3, base - H * 0.2, cx + 1.3, base)
 
 
-def mitten(a, x, y, flip=False):
-    """An upright mitten pinned to a line by its fingertips."""
-    m = Art(a.p, ox=x, oy=y, mirror=flip)
-    m.box(-6, 0, 6, 20, 6)
-    m.oval(7.0, 10.5, 2.6, 5.0, -28, on=False)
-    m.oval(7.0, 10.5, 4.0, 6.4, -28, on=False)
-    m.oval(7.2, 10.2, 2.5, 4.9, -28)
-    m.box(-6.6, 20.8, 6.6, 27, 1.2)
-    for k in range(-5, 6, 2):
-        m.erase([(k * 1.0, 21.8), (k * 1.0, 26)], 0.9)
-    m.box(-1.3, -4, 1.3, 2.2, 0.5)
+def snowflake(a, cx, cy, r, w=1.4):
+    for i in range(6):
+        t = math.radians(90 + i * 60)
+        ux, uy = math.cos(t), math.sin(t)
+        a.stroke([(cx, cy), (cx + ux * r, cy + uy * r)], w)
+        for side in (1, -1):
+            b = t + side * math.radians(45)
+            bx, by = cx + ux * r * 0.55, cy + uy * r * 0.55
+            a.stroke([(bx, by), (bx + math.cos(b) * r * 0.36, by + math.sin(b) * r * 0.36)], w * 0.8)
+    a.dot(cx, cy, w * 1.1)
+
+
+def sled(a, x, base):
+    """A wooden sled on the snow, its runner curling up at the front (on the right)."""
+    a.stroke([(x, base - 2)] + [(x + 36 + 5 * math.sin(math.radians(t)), base - 7 + 5 * math.cos(math.radians(t))) for t in range(0, 271, 15)], 1.6)
+    for sx in (x + 5, x + 16, x + 27):
+        a.stroke([(sx, base - 2), (sx, base - 8)], 1.4)
+    a.box(x - 1, base - 11.5, x + 34, base - 7.5, 1)
+    for sx in (x + 10.5, x + 22.5):
+        a.erase([(sx, base - 11), (sx, base - 8)], 0.9)
 
 
 def winter(p):
@@ -353,13 +362,12 @@ def winter(p):
     a.stroke([(0, B), (W, B)], 2.0)
     for x, y in ((46, 8), (52, 22), (4, 6), (30, 6), (8, 34), (58, 12)):
         a.dot(x, y, 1.1)
-    line = bez((W - 64, 3), (W - 45, 9), (W - 20, 9), (W - 1, 2))
-    a.stroke(line, 1.0)
-    mitten(a, W - 52, 6.6)
-    mitten(a, W - 27, 7.8, flip=True)
-    for cx, H in ((W - 7, 24), (W - 15, 16)):
-        tree(a, cx, B, H)
-    for x, y in ((W - 60, 22), (W - 58, 42), (W - 40, 40), (W - 30, 50), (W - 46, 52), (W - 4, 26)):
+    # a sled carrying a little pine, a big snowflake, falling snow
+    sled(a, W - 47, B)
+    tree(a, W - 30, B - 11.5, 26)
+    snowflake(a, W - 9, 12, 8)
+    snowflake(a, W - 52, 24, 5.5, 1.2)
+    for x, y in ((W - 58, 34), (W - 40, 6), (W - 20, 30), (W - 6, 34), (W - 52, 50), (W - 26, 4)):
         a.dot(x, y, 1.1)
 
 
@@ -646,58 +654,54 @@ def flag(a, x, y, ang, kind):
     """A pennant hanging from the string at (x, y), turned to follow it; kind picks its pattern."""
     # placed through the parent drawing, which may be mirrored for the right-hand end
     f = Art(a.p, ox=a.ox + (-x if a.mirror else x), oy=a.oy + y, rot=-ang if a.mirror else ang, mirror=a.mirror)
-    f.fill([(-4.8, 0), (4.8, 0), (0, 12.5)])
+    f.fill([(-4.4, 0), (4.4, 0), (0, 11.0)])
     if kind == 0:  # a white dot
-        f.hole(0, 4.0, 1.8)
+        f.hole(0, 3.6, 1.7)
     elif kind == 1:  # white inside a black edge, with a black dot
-        f.clear([(-2.9, 1.3), (2.9, 1.3), (0, 8.8)])
-        f.dot(0, 3.4, 1.0)
+        f.clear([(-2.6, 1.3), (2.6, 1.3), (0, 7.6)])
+        f.dot(0, 3.2, 0.9)
     elif kind == 2:  # a white star
-        f.fill(sparkle_pts(0, 4.2, 2.8, 0.3), on=False)
+        f.fill(sparkle_pts(0, 3.8, 2.6, 0.3), on=False)
     else:  # a white heart
-        f.fill(heart_pts(0, 4.3, 5.6), on=False)
-
-
-def bunting_end(a, kinds):
-    """A pole, and a swag of flags draped from its top to the wire."""
-    B = 62
-    a.stroke([(3.5, 4), (3.5, B)], 2.0)
-    a.dot(3.5, 2.6, 2.4)
-    a.box(0.8, B - 2.8, 6.2, B, 0.6)
-    x0, x1, top, sag = 3.5, 52.0, 2.6, 15.0
-    def at(t):
-        return x0 + (x1 - x0) * t, top + sag * math.sin(math.pi * t)
-    a.stroke([at(i / 40) for i in range(41)], 1.1)
-    for kind, t in zip(kinds, (0.17, 0.39, 0.61, 0.83)):
-        x, y = at(t)
-        ang = math.degrees(math.atan(sag * math.pi * math.cos(math.pi * t) / (x1 - x0)))
-        flag(a, x, y - 0.4, ang, kind)
-    a.dot(x1, top, 1.4)
-    for gx, gh, lean in ((8, 4, 1), (10.5, 6, -1), (13, 3.5, 1.5)):
-        a.fill([(gx - 1.1, B), (gx + lean, B - gh), (gx + 1.1, B)])
-    # a little confetti falling under the flags
-    for x, y, ang in ((16, 36, 20), (30, 44, -30), (40, 30, 60), (22, 52, 10)):
-        a.fill([(x + 1.7 * math.cos(math.radians(ang + d)), y + 1.7 * math.sin(math.radians(ang + d))) for d in (30, 150, 210, 330)])
-    for x, y in ((34, 36), (12, 44), (44, 50)):
-        a.dot(x, y, 0.9)
-    a.fill(sparkle_pts(46, 40, 2.6))
+        f.fill(heart_pts(0, 3.9, 5.0), on=False)
 
 
 def bunting(p):
-    a = Art(p); W = a.W
-    a.stroke([(3.5, 2.6), (W - 3.5, 2.6)], 1.0)
-    a.stroke([(0, 62), (W, 62)], 1.6)
-    bunting_end(a, (0, 1, 2, 3))
-    bunting_end(Art(p, ox=W, mirror=True), (0, 1, 2, 3))
+    """Flags strung along the top from pole to pole, in swags, over a line on the ground."""
+    a = Art(p); W = a.W; B = 62
+    left, right = 3.5, W - 3.5
+    top, sag = 4.0, 3.2
+    n = max(1, int(round((right - left) / 48)))
+    seg = (right - left) / n
+    k = 0
+    for i in range(n):
+        x0 = left + i * seg
+        a.stroke([(x0 + t * seg, top + sag * math.sin(math.pi * t)) for t in [j / 30 for j in range(31)]], 1.0)
+        m = max(3, int(round(seg / 11)))
+        for j in range(m):
+            t = (j + 0.5) / m
+            ang = math.degrees(math.atan(sag * math.pi * math.cos(math.pi * t) / seg))
+            flag(a, x0 + t * seg, top + sag * math.sin(math.pi * t) - 0.4, ang, k % 4)
+            k += 1
+        if i:
+            a.dot(x0, top, 1.4)
+    for side in (Art(p), Art(p, ox=W, mirror=True)):
+        side.stroke([(3.5, 4), (3.5, B)], 2.0)
+        side.dot(3.5, 2.6, 2.4)
+        side.box(0.8, B - 2.8, 6.2, B, 0.6)
+        for gx, gh, lean in ((8, 4, 1), (10.5, 6, -1), (13, 3.5, 1.5)):
+            side.fill([(gx - 1.1, B), (gx + lean, B - gh), (gx + 1.1, B)])
+    a.stroke([(0, B), (W, B)], 1.6)
 
 
 # --- Laurel ends ------------------------------------------------------------------------------
 
 def laurel(a):
-    cx, cy, R = 33, 32, 27
-    stem = [(cx + R * math.cos(math.radians(t)), cy + R * math.sin(math.radians(t))) for t in range(124, 241, 3)]
+    """A laurel branch curving up the end of the label, drawn round its middle at (0, 0)."""
+    cx, cy, R = 13, 0, 27
+    stem = [(cx + R * math.cos(math.radians(t)), cy + R * math.sin(math.radians(t))) for t in range(128, 237, 3)]
     a.stroke(stem, 1.5)
-    for t in range(132, 236, 17):
+    for t in range(135, 230, 16):
         r = math.radians(t)
         x, y = cx + R * math.cos(r), cy + R * math.sin(r)
         tang = math.degrees(r) + 90
@@ -705,21 +709,22 @@ def laurel(a):
             ang = tang + side * 42
             L = 5.0
             leaf(a, x + math.cos(math.radians(ang)) * L, y + math.sin(math.radians(ang)) * L, 5.4, 2.3, ang)
-    tx, ty = cx + R * math.cos(math.radians(242)), cy + R * math.sin(math.radians(242))
-    leaf(a, tx + 3, ty - 3.5, 5.0, 2.2, 242 + 90 - 10)
-    for t in (150, 184, 218):
+    tx, ty = cx + R * math.cos(math.radians(238)), cy + R * math.sin(math.radians(238))
+    leaf(a, tx + 2.6, ty - 3.2, 4.8, 2.1, 238 + 90 - 10)
+    for t in (152, 184, 216):
         r = math.radians(t)
         a.dot(cx + (R - 4.5) * math.cos(r), cy + (R - 4.5) * math.sin(r), 1.3)
 
 
 def laurels(p):
     a = Art(p); W = a.W
-    laurel(a)
-    laurel(Art(p, ox=W, mirror=True))
+    tilt, down = 7, 1.8
+    laurel(Art(p, ox=21, oy=32 + down, rot=-tilt))
+    laurel(Art(p, ox=W - 21, oy=32 + down, rot=tilt, mirror=True))
     for y in (3, 61):
-        a.stroke([(26, y), (W - 26, y)], 0.9)
+        a.stroke([(30, y), (W - 30, y)], 0.9)
     for y in (6, 58):
-        a.dots_along([(30, y), (W - 30, y)], 4.0, 0.6)
+        a.dots_along([(33, y), (W - 33, y)], 4.0, 0.6)
 
 
 # --- Deco fans ------------------------------------------------------------------------------
