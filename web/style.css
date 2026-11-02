@@ -831,7 +831,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
   .action-bar { display: flex; flex-direction: column-reverse; }
   /* The text and bin cards share one fixed height (what the fastener editor needs), so the preview keeps its size when
      switching kinds of label; on a short or narrow window the card scrolls, never the column */
-  .label-preview-col .text-card, .label-preview-col .bin-card, .label-preview-col .port-card {
+  .label-preview-col .text-card, .label-preview-col .bin-card, .label-preview-col .port-card, .label-preview-col .breaker-card {
     margin: 0; flex: none; height: clamp(280px, 100vh - 500px, 416px); overflow-y: auto;
   }
   .label-preview-col .text-card, .label-preview-col .port-card { display: flex; flex-direction: column; }
@@ -1002,6 +1002,38 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .port-card .hint { margin: 8px 0 14px; }
 .port-card .field { margin: 0; }
 .port-names { width: 100%; font-family: inherit; }
+
+/* The breaker strip's card: the breakers as tiles on the left, the picked one on the right */
+.breaker-card .card-head { margin-bottom: 4px; }
+.breaker-card .hint { margin: 0 0 12px; }
+.breaker-grid { display: grid; gap: 18px; }
+.breaker-col { min-width: 0; }
+.breaker-col .field { margin: 0 0 14px; }
+.breaker-col .toggle { margin: 0 0 14px; }
+@media (min-width: 900px) {
+  .breaker-grid { grid-template-columns: 1fr 1fr; gap: 0; }
+  .breaker-col:first-child { padding-right: 20px; }
+  .breaker-col + .breaker-col { padding-left: 20px; border-left: 1px solid var(--border); }
+}
+/* Five modules a row; a wide breaker spans as many as it takes */
+.breaker-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 56px; gap: 6px; }
+.breaker-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0;
+  padding: 4px; border-radius: 10px; background: var(--raised); border: 1px solid var(--border);
+  color: var(--text); font-size: 0.85rem; line-height: 1.2;
+}
+.breaker-tile strong { font-size: 0.9rem; }
+.breaker-tile > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breaker-tile:hover { border-color: var(--accent); }
+.breaker-tile.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.breaker-tile.blank { border-style: dashed; color: var(--muted); }
+.breaker-tile.blank.on { color: var(--accent); }
+.breaker-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.breaker-actions button { min-width: 0; padding-left: 4px; padding-right: 4px; }
+/* The number is short, so it sits beside the name */
+.breaker-fields { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+/* Two short fields side by side */
+.field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .length-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .length-grid.one { grid-template-columns: 1fr 2fr; }

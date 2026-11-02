@@ -122,7 +122,8 @@ class LabelConfig:
     inventory_config: Optional[object] = None  # FastenerLabelConfig or ComponentLabelConfig
 
     # Kind of text label: "text"; "ports", one strip with a number or name over each port of a
-    # patch panel or switch; or "flag", the text twice with room between to fold round a cable
+    # patch panel or switch; "breakers", one strip over a row of breakers in a fuse box; or
+    # "flag", the text twice with room between to fold round a cable
     layout: str = "text"
 
     # Port strip: the ports are port_pitch_mm apart, exactly, and numbered from port_first
@@ -133,6 +134,16 @@ class LabelConfig:
     port_use_names: bool = False  # port_names instead of numbers
     port_names: str = ""  # one per line; an empty line leaves its port blank
     port_divider_every: int = 0  # a thicker divider after every this many ports; 0 for none
+
+    # Breaker strip: one cell per breaker, as wide as its modules (breaker_module_mm each, exactly).
+    # Each breaker is {"name": str, "number": str, "modules": 1-4, "blank": bool}; an empty number
+    # counts up from breaker_first with breaker_prefix before it, and a blank one is a gap in the
+    # row (a cover plate) that gets no number.
+    breakers: List[dict] = field(default_factory=list)
+    breaker_module_mm: float = 17.5
+    breaker_prefix: str = ""
+    breaker_first: int = 1
+    breaker_show: str = "both"  # "both" (number over name), "name" or "number"
 
     # Cable flag: each side is the label's text (flag_side_mm long, or as long as it needs), and
     # the tape between them goes once round a cable this thick
@@ -146,6 +157,9 @@ PORT_DIVIDER_DOTS = 2
 PORT_THICK_DIVIDER_DOTS = 5
 PORT_TEXT_MARGIN_DOTS = 8
 PORT_TEXT_V_MARGIN_DOTS = 4
+# A breaker's name next to its number, as a share of the number's size
+BREAKER_NAME_FACTOR = 0.72
+BREAKER_MAX_MODULES = 4
 # How far the marks where a cable flag folds reach in from the edges of the print
 FLAG_MARK_DOTS = 8
 
@@ -303,6 +317,8 @@ class LabelRenderer:
 
         if config.layout == "ports":
             return self._render_port_strip(config, spec, print_border, printable_h, canvas_h)
+        if config.layout == "breakers":
+            return self._render_breaker_strip(config, spec, print_border, printable_h, canvas_h)
 
         # 1. Parse the styled text and leave room for a frame
         doc = rich_text.parse(config.text)
@@ -672,6 +688,118 @@ class LabelRenderer:
                 y = print_border + (printable_h - cap) // 2 - (-top - cap) + config.v_shift
                 img_canvas.paste("black", (x, y), mask)
 
+        return img_canvas, spec, print_border, printable_h, canvas_h, size
+
+    def breaker_cells(self, config: LabelConfig) -> List[Tuple[int, str, str]]:
+        """Each breaker as (modules, number, name), with the numbers counted up as the app shows them."""
+        cells = []
+        count = int(config.breaker_first)
+        prefix = (config.breaker_prefix or "").strip()
+        for b in config.breakers or [{}]:
+            modules = min(max(int(b.get("modules") or 1), 1), BREAKER_MAX_MODULES)
+            if b.get("blank"):
+                cells.append((modules, "", ""))
+                continue
+            number = (b.get("number") or "").strip() or f"{prefix}{count}"
+            count += 1
+            show = config.breaker_show
+            cells.append((modules, number if show != "name" else "", (b.get("name") or "").strip() if show != "number" else ""))
+        return cells
+
+    def _render_breaker_strip(
+        self, config: LabelConfig, spec: dict, print_border: int, printable_h: int, canvas_h: int
+    ) -> Tuple[Image.Image, dict, int, int, int, int]:
+        """
+        A strip with one cell per breaker, as wide as its modules. Like the port strip, the cell
+        edges are rounded from the start of the strip, so every divider is within half a dot of
+        its place over the row. Every number is the same size; a name too long for its cell gets
+        smaller on its own, so one long name doesn't shrink the whole strip.
+        """
+        cells = self.breaker_cells(config)
+        module = max(float(config.breaker_module_mm), 5.0) / self.DOT_PITCH_MM
+        starts = [0]
+        for modules, _, _ in cells:
+            starts.append(starts[-1] + modules)
+        edges = [int(round(m * module)) for m in starts]
+        img_canvas = Image.new("RGB", (edges[-1], canvas_h), "white")
+        draw = ImageDraw.Draw(img_canvas)
+        for x in edges[1:-1]:
+            left = x - PORT_DIVIDER_DOTS // 2
+            draw.rectangle([left, print_border, left + PORT_DIVIDER_DOTS - 1, print_border + printable_h - 1], fill="black")
+
+        font = config.font_name
+        number_line = lambda t: rich_text.Line([rich_text.Run(t, bold=True)])
+        name_line = lambda t: rich_text.Line([rich_text.Run(t)])
+        # One reference text for every line, with a descender, so all lines share one baseline
+        layout = rich_text.TextLayout(rich_text.RichText([[number_line("Hg")]]), font, config.stroke_width, 1.0, "center")
+        rooms = [max(b - a - PORT_DIVIDER_DOTS - 2 * PORT_TEXT_MARGIN_DOTS, 4) for a, b in zip(edges, edges[1:])]
+        room_h = printable_h - 2 * PORT_TEXT_V_MARGIN_DOTS
+        numbers = any(n for _, n, _ in cells)
+        names = any(n for _, _, n in cells)
+        if not numbers and not names:
+            return img_canvas, spec, print_border, printable_h, canvas_h, 0
+
+        def width(line, size):
+            return layout.render_line(line, size).width if line.text.strip() else 0
+
+        def name_size(size):
+            return max(int(round(size * BREAKER_NAME_FACTOR)), 4) if numbers else size
+
+        def block(size):
+            """(cap of the main line, gap, cap of the name line, below the name's baseline) in dots."""
+            cap = layout.cap_height(size)
+            if not numbers:
+                return cap, 0, 0, int(round(0.22 * size))
+            if not names:
+                return cap, 0, 0, 0
+            small = name_size(size)
+            return cap, int(round(0.38 * cap)), layout.cap_height(small), int(round(0.22 * small))
+
+        def fits(size):
+            if sum(block(size)) > room_h:
+                return False
+            # Every number fits its cell, and names may shrink on their own; without numbers the
+            # names are what the strip is sized by, so they all get the same size
+            if numbers:
+                return all(width(number_line(n), size) <= room for (_, n, _), room in zip(cells, rooms) if n)
+            return all(width(name_line(n), size) <= room for (_, _, n), room in zip(cells, rooms) if n)
+
+        low, high, fit = 4, room_h * 2, 4
+        while low <= high:
+            mid = (low + high) // 2
+            if fits(mid):
+                fit, low = mid, mid + 1
+            else:
+                high = mid - 1
+        self._max_text_height_mm = layout.cap_height(fit) * self.DOT_PITCH_MM
+        size = fit
+        if config.text_height_mm:
+            wanted = layout.size_for_cap_height(config.text_height_mm / self.DOT_PITCH_MM)
+            if config.text_height_fallback and wanted > fit:
+                self._text_height_fell_back = True
+            else:
+                size = wanted
+                self._last_text_overflow = sum(block(size)) > printable_h
+
+        cap, gap, small_cap, below = block(size)
+        top = print_border + (printable_h - (cap + gap + small_cap + below)) // 2 + config.v_shift
+        for (_, number, name), room, a, b in zip(cells, rooms, edges, edges[1:]):
+            middle = (a + b) // 2
+            if number:
+                line = number_line(number)
+                mask = layout.render_line(line, size)
+                line_top, _ = layout._line_box(line, size)
+                img_canvas.paste("black", (middle - mask.width // 2, top + cap + line_top), mask)
+            if name:
+                line = name_line(name)
+                own = name_size(size)
+                while own > 4 and width(line, own) > room:
+                    own -= 1
+                mask = layout.render_line(line, own)
+                line_top, _ = layout._line_box(line, own)
+                # A smaller name keeps its baseline, so the names stay on one line
+                baseline = top + cap + (gap + small_cap if numbers else 0)
+                img_canvas.paste("black", (middle - mask.width // 2, baseline + line_top), mask)
         return img_canvas, spec, print_border, printable_h, canvas_h, size
 
     def _render_cable_flag(self, config: LabelConfig) -> Tuple[Image.Image, dict, int, int, int, int]:

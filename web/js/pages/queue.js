@@ -13,13 +13,16 @@ import {
   app, boot, printer, connectPrinter, itemTitle, moveQueueItem, removeQueueItem, clearQueue,
   editQueueItem, printQueue, keepPrintedQueue, showingQueue, savePicture, setQueueCopies,
   undoQueueRemoval, copiesOf, queueLabelCount, textLines, hasBarcode, hasQr, BIN_FONT, MAX_TAPE_MM, checkStatus,
-  hideQueueRun, stopQueueRun,
+  hideQueueRun, stopQueueRun, breakerModules,
 } from '../app.js';
 
 function itemDetail(item) {
   // The font tells otherwise equal labels apart
   if (item.mode === 'bin') return `${binSummary(item.bin)} · ${item.font?.bin_font || BIN_FONT}`;
   const l = item.label;
+  if (l.layout === 'breakers') {
+    return `${breakerModules(l)} modules, ${Number(l.breaker_module_mm).toFixed(1)} mm each · ${l.tape_width_mm} mm tape · ${l.font_name}`;
+  }
   if (l.layout === 'ports') {
     return `${l.port_count} ports, ${Number(l.port_pitch_mm).toFixed(1)} mm apart · ${l.tape_width_mm} mm tape · ${l.font_name}`;
   }

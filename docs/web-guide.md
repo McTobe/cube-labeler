@@ -58,6 +58,7 @@ markers and back. The **?** next to **Clear** explains the markers.
 |---|---|
 | ![A bin label: M3 SCREWS with two lengths and a hex drive icon](images/guide/kind-bin.png) | **Bin label.** For drawers of screws, nuts and parts on 12 mm tape. Pick the size, name, lengths and drive or part icon. *Add to queue and start the next* keeps what stays the same, for filling a whole drawer. |
 | ![A port strip numbered 1 to 12](images/guide/kind-ports.png) | **Port strip.** One strip that lines up with the ports on a patch panel or switch: numbers or names, 6 to 24 ports, with the spacing measured for you. |
+| ![A breaker strip with F1 to F11 and a name under each number](images/guide/kind-breakers.png) | **Breaker strip.** One strip for a row of breakers in a fuse box. Each breaker gets its number and name, wide breakers take 2 to 4 modules, and blank covers leave a gap. Pick the module width (17.5 mm on most DIN rails). |
 | ![A cable flag reading Switch → NAS twice](images/guide/kind-flag.png) | **Cable flag.** The text printed twice with a gap that wraps round the cable, so the flag reads from both sides. Pick the cable thickness. |
 
 ## 4. Print several labels as one strip

@@ -19,7 +19,7 @@ function Thumb({ thumbKey, item }) {
   return html`<span class="template-thumb">${thumbs[thumbKey] ? html`<img src=${thumbs[thumbKey]} alt="" />` : null}</span>`;
 }
 
-const KIND_NAMES = { text: 'Text label', bin: 'Bin label', ports: 'Port strip', flag: 'Cable flag' };
+const KIND_NAMES = { text: 'Text label', bin: 'Bin label', ports: 'Port strip', breakers: 'Breaker strip', flag: 'Cable flag' };
 
 function MyTemplate({ entry }) {
   const [menu, setMenu] = useState(false);

@@ -7,7 +7,7 @@ import { IconPickerSheet } from './icons.js';
 import { SaveTemplateSheet } from './templates.js';
 import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
-import { useStore } from '../state.js';
+import { createStore, useStore } from '../state.js';
 import { Preview } from '../preview.js';
 import { markerHtml, stylesAt, everyLineSized } from '../marker-view.js';
 import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel } from '../qr-helpers.js';
@@ -17,6 +17,7 @@ import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
   updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
+  updateBreakers, breakerTexts, breakerModules, newBreaker, BREAKER_MODULES, BREAKER_MAX, isStrip,
 } from '../app.js';
 
 // A line's size is the height of its capital letters in mm, like the Text size option. Auto
@@ -62,6 +63,8 @@ export function LabelPage() {
     options = html`${!wide && html`<${BinCard} />`}<${BinOptions} />`;
   } else if (mode === 'ports') {
     options = html`${!wide && html`<${PortCard} />`}<${PortSection} /><${PortFontSection} />`;
+  } else if (mode === 'breakers') {
+    options = html`${wide ? html`<${BreakerHowTo} />` : html`<${BreakerCard} />`}<${BreakerSection} /><${BreakerFontSection} />`;
   } else {
     // On a phone the text, codes, picture and these options are tabs of one card
     options = !wide ? html`<${PhoneTextCard} />` : html`
@@ -76,6 +79,7 @@ export function LabelPage() {
       ${text && wide && html`<${TextCard} />`}
       ${mode === 'bin' && wide && html`<${BinCard} />`}
       ${mode === 'ports' && wide && html`<${PortCard} />`}
+      ${mode === 'breakers' && wide && html`<${BreakerCard} />`}
       <${ActionBar} />
     </div>
     <div class="label-edit-col">
@@ -96,7 +100,7 @@ export const MODES = [
   { id: 'flag', name: 'Cable flag', icon: 'flag', main: true },
   { id: 'ports', name: 'Port strip', icon: 'ports' },
   { id: 'outlet', name: 'Network outlet', icon: 'outlet', soon: true },
-  { id: 'breakers', name: 'Breaker strip', icon: 'breaker', soon: true },
+  { id: 'breakers', name: 'Breaker strip', icon: 'breaker' },
   { id: 'asset', name: 'Asset tag', icon: 'asset', soon: true },
   { id: 'date', name: 'Date label', icon: 'calendar', soon: true },
 ];
@@ -225,7 +229,7 @@ function TextEditor() {
 
   // The caret's line: its letter height (set, or what Auto or a Large/Small marker comes to on the
   // label) and the tallest it can be next to the other lines
-  const metrics = render && render.item.mode === 'text' && render.item.label.layout !== 'ports' ? render.metrics : null;
+  const metrics = render && render.item.mode === 'text' && !isStrip(render.item.label) ? render.metrics : null;
   const shown = (list) => (list && list[lineNo] != null ? list[lineNo] : null);
   const set = typeof lineStyle[0] === 'number' ? lineStyle[0] : null;
   const lineSize = {
@@ -595,8 +599,8 @@ function TextSizeField({ label, onChange }) {
   const { render } = useStore(app);
   const mm = label.text_height_mm;
   const chosen = TEXT_SIZES.includes(mm) ? String(mm) : 'fit';
-  const ports = label.layout === 'ports';
-  const metrics = render && render.item.mode === 'text' && (render.item.label.layout === 'ports') === ports ? render.metrics : null;
+  const ports = isStrip(label);
+  const metrics = render && render.item.mode === 'text' && render.item.label.layout === label.layout ? render.metrics : null;
   const max = metrics && metrics.max_text_height_mm;
   const fits = (v) => max == null || v <= max || String(v) === chosen;
   const options = [['fit', 'Fit'], ...TEXT_SIZES.filter(fits).map((v) => [String(v), `${v} mm`])];
@@ -607,6 +611,7 @@ function TextSizeField({ label, onChange }) {
     <p class="hint">${sized ? 'Every line has its own size in the text, so this has no effect. Set a line to Auto to use it again.'
       : TEXT_SIZES.some((v) => !fits(v))
       ? `Sizes over ${Math.floor(max * 10) / 10} mm don't fit this text ${ports ? 'between the dividers' : 'on the tape'}, so they're left out.`
+      : label.layout === 'breakers' ? 'Fit makes the numbers as big as the breakers and the tape allow. A long name gets smaller on its own.'
       : ports ? 'Fit makes the text as big as the ports and the tape allow. Every port gets the same size.'
       : 'Fit fills the tape height. A size in mm is the height of a capital letter. Lines given their own size in the text keep it.'}</p>`;
 }
@@ -927,17 +932,156 @@ function PortSection() {
   <//>`;
 }
 
-function PortFontSection() {
-  const { ports, fonts, tapeWidths } = useStore(app);
-  const names = fonts.length ? fonts : [ports.font_name];
-  return html`<${Section} id="port-font" title="Font and tape" summary=${`${ports.font_name}, ${ports.tape_width_mm} mm tape`}>
-    <${FontField} label="Font" value=${ports.font_name} fonts=${names} onChange=${(font_name) => updatePorts({ font_name })} />
-    <${TextSizeField} label=${ports} onChange=${updatePorts} />
-    <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${ports.tape_width_mm}
-      onChange=${(tape_width_mm) => updatePorts({ tape_width_mm: Number(tape_width_mm) })} />
-    <${Select} label="Tape colour in the preview" value=${`${ports.tape_bg_color}/${ports.tape_fg_color}`}
-      options=${TAPE_COLOURS} onChange=${(v) => { const [bg, fg] = v.split('/'); updatePorts({ tape_bg_color: bg, tape_fg_color: fg }); }} />
+// Font and tape of a strip (port or breaker): its own, apart from the text label's
+function StripFontSection({ id, label, update }) {
+  const { fonts, tapeWidths } = useStore(app);
+  const names = fonts.length ? fonts : [label.font_name];
+  return html`<${Section} id=${id} title="Font and tape" summary=${`${label.font_name}, ${label.tape_width_mm} mm tape`}>
+    <${FontField} label="Font" value=${label.font_name} fonts=${names} onChange=${(font_name) => update({ font_name })} />
+    <${TextSizeField} label=${label} onChange=${update} />
+    <${Segmented} label="Tape width" options=${tapeWidths.map((w) => [w, `${w} mm`])} value=${label.tape_width_mm}
+      onChange=${(tape_width_mm) => update({ tape_width_mm: Number(tape_width_mm) })} />
+    <${Select} label="Tape colour in the preview" value=${`${label.tape_bg_color}/${label.tape_fg_color}`}
+      options=${TAPE_COLOURS} onChange=${(v) => { const [bg, fg] = v.split('/'); update({ tape_bg_color: bg, tape_fg_color: fg }); }} />
   <//>`;
+}
+
+function PortFontSection() {
+  const { ports } = useStore(app);
+  return html`<${StripFontSection} id="port-font" label=${ports} update=${updatePorts} />`;
+}
+
+// --- Breaker strip -------------------------------------------------------------------------
+
+const BREAKER_WIDTHS = [1, 2, 3, 4].map((n) => [n, String(n)]);
+const BREAKER_SHOW = [['both', 'Both'], ['name', 'Name'], ['number', 'Number']];
+
+// The breaker being changed; kept outside the card so it stays picked when the card redraws
+const breakerPick = createStore({ index: 0 });
+
+// The breakers as tiles that line up like the strip (a wide breaker takes more room), and the
+// picked one's number, name and width next to them
+function BreakerCard() {
+  const { breakers: strip } = useStore(app);
+  const { phase } = useStore(boot);
+  const { index: picked } = useStore(breakerPick);
+  const list = strip.breakers;
+  const index = Math.min(picked, list.length - 1);
+  const shown = breakerTexts(strip);
+  const breaker = list[index];
+  const nameRef = useRef(null);
+  const change = (patch) => updateBreakers({ breakers: list.map((b, i) => (i === index ? { ...b, ...patch } : b)) });
+  const pick = (i) => breakerPick.set({ index: i });
+  const add = () => {
+    if (list.length >= BREAKER_MAX) return say(`A strip holds up to ${BREAKER_MAX} breakers.`, true);
+    updateBreakers({ breakers: [...list.slice(0, index + 1), newBreaker(), ...list.slice(index + 1)] });
+    pick(index + 1);
+    requestAnimationFrame(() => nameRef.current && nameRef.current.focus());
+  };
+  const remove = () => {
+    if (list.length <= 1) return;
+    updateBreakers({ breakers: list.filter((_, i) => i !== index) });
+    pick(Math.max(0, Math.min(index, list.length - 2)));
+  };
+  const move = (step) => {
+    const to = index + step;
+    if (to < 0 || to >= list.length) return;
+    const next = [...list];
+    [next[index], next[to]] = [next[to], next[index]];
+    updateBreakers({ breakers: next });
+    pick(to);
+  };
+  const auto = `${strip.breaker_prefix.trim()}${shown.slice(0, index).filter((b) => !b.blank).length + strip.breaker_first}`;
+  return html`<section class="card breaker-card">
+    <div class="card-head">
+      <h2 class="card-title">Breakers</h2>
+      <button class="secondary" disabled=${phase !== 'ready'} onClick=${add}>Add a breaker</button>
+    </div>
+    <div class="breaker-grid">
+      <div class="breaker-col">
+        <p class="hint">Tap a breaker to change it. The tiles line up like the strip.</p>
+        <div class="breaker-tiles" role="listbox" aria-label="Breakers">
+          ${list.map((b, i) => html`<button role="option" aria-selected=${i === index}
+            class=${`breaker-tile${i === index ? ' on' : ''}${b.blank ? ' blank' : ''}`}
+            style=${`grid-column: span ${b.modules || 1}`} onClick=${() => pick(i)}>
+            ${b.blank ? html`<span class="breaker-name">Blank</span>` : html`
+              <strong>${shown[i].number}</strong><span class="breaker-name">${shown[i].name || '\u00a0'}</span>`}
+          </button>`)}
+        </div>
+      </div>
+      <div class="breaker-col">
+        <div class="breaker-fields">
+        <${Field} label="Number">
+          <input type="text" value=${breaker.number} placeholder=${breaker.blank ? 'No number' : auto} spellcheck="false"
+            disabled=${breaker.blank} onInput=${(e) => change({ number: e.currentTarget.value })} />
+        <//>
+        <${Field} label="Name">
+          <input ref=${nameRef} type="text" value=${breaker.name} placeholder="Lights, Oven, Washer ..." disabled=${breaker.blank}
+            onInput=${(e) => change({ name: e.currentTarget.value })} />
+        <//>
+        </div>
+        <${Segmented} label="Width in modules" options=${BREAKER_WIDTHS} value=${breaker.modules || 1}
+          onChange=${(modules) => change({ modules: Number(modules) })} />
+        <${Toggle} label="Blank cover, no breaker" checked=${!!breaker.blank} onChange=${(blank) => change({ blank })} />
+        <div class="breaker-actions">
+          <button class="secondary" disabled=${index === 0} onClick=${() => move(-1)}>Move left</button>
+          <button class="secondary" disabled=${index === list.length - 1} onClick=${() => move(1)}>Move right</button>
+          <button class="secondary" disabled=${list.length <= 1} onClick=${remove}>Remove</button>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
+function BreakerHowTo() {
+  return html`<section class="card drawer-card">
+    <h2 class="card-title">Breaker strip labels</h2>
+    <p class="hint">One strip for a row of breakers in a fuse box, with each name lined up over its breaker.</p>
+    <ol class="how-to">
+      <li>Pick how wide one module is. Most are 17.5 mm.</li>
+      <li>Tap each breaker and type its name. Wide breakers take 2 or more modules.</li>
+      <li>Print the strip and stick it above the row.</li>
+    </ol>
+  </section>`;
+}
+
+function BreakerSection() {
+  const { breakers: strip } = useStore(app);
+  const module = BREAKER_MODULES.find(([id]) => id === strip.breaker_module) || BREAKER_MODULES[0];
+  const [moduleText, onModule] = useNumberText(strip.breaker_module_mm, (v) => { if (v >= 5 && v <= 60) updateBreakers({ breaker_module_mm: v }); });
+  const [firstText, onFirst] = useNumberText(strip.breaker_first, (v) => { if (v != null) updateBreakers({ breaker_first: v }); },
+    (t) => (/^\s*-?\d+\s*$/.test(t) ? parseInt(t, 10) : NaN));
+  const [prefix, setPrefix] = useState(strip.breaker_prefix);
+  useEffect(() => { if (strip.breaker_prefix !== prefix) setPrefix(strip.breaker_prefix); }, [strip.breaker_prefix]);
+  const pickModule = (id) => {
+    const preset = BREAKER_MODULES.find(([v]) => v === id);
+    updateBreakers(preset[2] ? { breaker_module: id, breaker_module_mm: preset[2] } : { breaker_module: id });
+  };
+  const count = breakerModules(strip);
+  const mm = Number(strip.breaker_module_mm).toFixed(1).replace(/\.0$/, '');
+  return html`<${Section} id="breakers" title="Breaker strip" summary=${`${count} module${count === 1 ? '' : 's'}, ${mm} mm wide`}>
+    <${Segmented} label="Module width" options=${BREAKER_MODULES.map(([id, name]) => [id, name])} value=${module[0]} onChange=${pickModule} />
+    ${module[2] ? html`<p class="hint">Measure 6 breakers and divide by 6 if yours differ.</p>`
+      : html`<${Field} label="One module in mm" hint="Measure across 6 single breakers and divide by 6.">
+        <input type="text" inputmode="decimal" value=${moduleText} placeholder="17.5" onInput=${onModule} />
+      <//>`}
+    <${Segmented} label="On each breaker" options=${BREAKER_SHOW} value=${strip.breaker_show}
+      onChange=${(breaker_show) => updateBreakers({ breaker_show })} />
+    ${strip.breaker_show !== 'name' && html`<div class="field-pair">
+      <${Field} label="Before each number">
+        <input type="text" value=${prefix} placeholder="Nothing, or F for F1" spellcheck="false"
+          onInput=${(e) => { setPrefix(e.currentTarget.value); updateBreakers({ breaker_prefix: e.currentTarget.value }); }} />
+      <//>
+      <${Field} label="First number">
+        <input type="text" inputmode="numeric" value=${firstText} placeholder="1" onInput=${onFirst} />
+      <//>
+    </div>`}
+  <//>`;
+}
+
+function BreakerFontSection() {
+  const { breakers } = useStore(app);
+  return html`<${StripFontSection} id="breaker-font" label=${breakers} update=${updateBreakers} />`;
 }
 
 // --- Cable flag ----------------------------------------------------------------------------

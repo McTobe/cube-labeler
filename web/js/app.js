@@ -76,6 +76,31 @@ export const DEFAULT_PORTS = {
   port_divider_every: 0,
 };
 
+// Breaker module widths: [id, name, mm]. DIN rail breakers are 17.5 mm a module; Custom takes
+// the user's own measurement.
+export const BREAKER_MODULES = [['din', '17.5 mm', 17.5], ['wide', '18 mm', 18.0], ['custom', 'Custom', null]];
+export const BREAKER_MAX = 40;
+export const newBreaker = () => ({ name: '', number: '', modules: 1, blank: false });
+
+// A breaker strip is a text label with its own settings too, like the port strip
+export const DEFAULT_BREAKERS = {
+  ...DEFAULT_LABEL,
+  layout: 'breakers',
+  text: '',
+  font_name: 'Arimo',
+  breakers: Array.from({ length: 8 }, newBreaker),
+  breaker_module: 'din',
+  breaker_module_mm: 17.5,
+  breaker_prefix: '',
+  breaker_first: 1,
+  breaker_show: 'both',
+};
+
+// Strips that line up with something (ports, breakers): their cells are fixed, so they have no
+// sample text, and the preview offers rulers
+export const STRIP_LAYOUTS = ['ports', 'breakers'];
+export const isStrip = (label) => STRIP_LAYOUTS.includes(label.layout);
+
 export const DEFAULT_SETTINGS = {
   ai_provider: 'gemini',
   ai_models: {},
@@ -103,9 +128,10 @@ export const BIN_TAPE_MM = 12;
 export const boot = createStore({ phase: 'loading', text: 'Starting...', error: null });
 
 export const app = createStore({
-  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports' or 'flag' (a cable flag of the text label)
+  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'breakers' or 'flag' (a cable flag of the text label)
   label: DEFAULT_LABEL,
   ports: DEFAULT_PORTS,  // the port strip being edited
+  breakers: DEFAULT_BREAKERS,  // the breaker strip being edited
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
   languages: [['en', 'English']],
@@ -164,7 +190,7 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue, device, ports] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device, ports, breakers] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
@@ -173,6 +199,7 @@ export async function start() {
     storage.load('queue', []),
     storage.load('deviceId', null),
     storage.load('ports', {}),
+    storage.load('breakers', {}),
   ]);
   // The tape counter counts each device's prints apart, so syncing never counts one twice
   deviceId = device || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -182,6 +209,7 @@ export async function start() {
     // The printable-area guides no longer have a switch, so a label saved with them on drops them
     label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     ports: { ...DEFAULT_PORTS, ...ports, layout: 'ports' },
+    breakers: { ...DEFAULT_BREAKERS, ...breakers, layout: 'breakers' },
     mode,
     bin,
     queue: mergeCopies(queue),
@@ -290,6 +318,11 @@ export function updatePorts(change) {
   changed('ports');
 }
 
+export function updateBreakers(change) {
+  app.set({ breakers: { ...app.get().breakers, ...change } });
+  changed('breakers');
+}
+
 // change applies to the bin label being edited (fastener or part); {kind} switches between them
 export function updateBin(change) {
   const bin = app.get().bin;
@@ -324,12 +357,17 @@ export const RESET_NOTES = {
   text: 'Reset font, size, QR code, picture and tape settings? Your text is kept.',
   flag: 'Reset the cable, font, size, QR code, picture and tape settings? Your text is kept.',
   ports: 'Reset ports, spacing, font, size and tape? Your numbers and names are kept.',
+  breakers: 'Reset module width, font, size and tape? Your breakers, numbers and names are kept.',
   bin: 'Reset the label length and drive icon? What is on the label is kept.',
 };
 
 export function resetSettings() {
-  const { mode, label, ports, bin, settings } = app.get();
-  if (mode === 'ports') {
+  const { mode, label, ports, breakers, bin, settings } = app.get();
+  if (mode === 'breakers') {
+    const { breakers: list, breaker_prefix, breaker_first, breaker_show } = breakers;
+    updateBreakers({ ...DEFAULT_BREAKERS, tape_width_mm: labelDefaults().tape_width_mm, breakers: list, breaker_prefix, breaker_first, breaker_show });
+    say('Settings reset. Your breakers are kept.');
+  } else if (mode === 'ports') {
     const { port_use_names, port_names, port_prefix } = ports;
     updatePorts({ ...DEFAULT_PORTS, tape_width_mm: labelDefaults().tape_width_mm, port_use_names, port_names, port_prefix });
     say('Settings reset. Your numbers and names are kept.');
@@ -385,17 +423,32 @@ export function itemOptions(item) {
 }
 
 export function currentItem() {
-  const { mode, label, bin, ports } = app.get();
+  const { mode, label, bin, ports, breakers } = app.get();
   if (mode === 'bin' && bin) return { mode, bin: bin[bin.kind] };
   if (mode === 'ports') return { mode: 'text', label: ports };
+  if (mode === 'breakers') return { mode: 'text', label: breakers };
   return { mode: 'text', label: { ...label, layout: mode === 'flag' ? 'flag' : 'text' } };
 }
 
 // The kind of label on the Label page that edits a queued or saved label
 export function editorMode(item) {
   if (item.mode === 'bin') return 'bin';
-  return item.label.layout === 'ports' ? 'ports' : item.label.layout === 'flag' ? 'flag' : 'text';
+  return ['ports', 'breakers', 'flag'].includes(item.label.layout) ? item.label.layout : 'text';
 }
+
+// What goes on each breaker of a breaker strip, as the Python core draws it: [{number, name}],
+// with the numbers counted up from the first one, past blanks
+export function breakerTexts(label) {
+  let count = label.breaker_first;
+  return label.breakers.map((b) => {
+    if (b.blank) return { number: '', name: '', blank: true };
+    const number = (b.number || '').trim() || `${label.breaker_prefix.trim()}${count}`;
+    count += 1;
+    return { number, name: (b.name || '').trim(), blank: false };
+  });
+}
+
+export const breakerModules = (label) => label.breakers.reduce((sum, b) => sum + (b.modules || 1), 0);
 
 // What goes over each port of a port strip, as the Python core draws it
 export function portTexts(label) {
@@ -418,6 +471,10 @@ export function textLines(label) {
 }
 
 export function itemTitle(item) {
+  if (item.mode === 'text' && item.label.layout === 'breakers') {
+    const shown = breakerTexts(item.label).filter((b) => !b.blank);
+    return shown.length ? `Breakers ${shown[0].number}${shown.length > 1 ? ` to ${shown[shown.length - 1].number}` : ''}` : 'Breaker strip';
+  }
   if (item.mode === 'text' && item.label.layout === 'ports') {
     const named = portTexts(item.label).filter((t) => t);
     return named.length ? `Ports ${named[0]}${named.length > 1 ? ` to ${named[named.length - 1]}` : ''}` : 'Port strip';
@@ -433,11 +490,12 @@ export function itemTitle(item) {
 // so the label switches to Fit to match
 function fitTooTallPreset(item, metrics) {
   if (item.mode !== 'text' || !metrics.text_height_fell_back) return;
-  const ports = item.label.layout === 'ports';
-  const label = ports ? app.get().ports : app.get().label;
+  const strip = isStrip(item.label);
+  const { layout } = item.label;
+  const label = layout === 'ports' ? app.get().ports : layout === 'breakers' ? app.get().breakers : app.get().label;
   if (label.text_height_mm !== item.label.text_height_mm) return;
-  (ports ? updatePorts : updateLabel)({ text_height_mm: null });
-  say(`${item.label.text_height_mm} mm is too big for this text ${ports ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
+  (layout === 'ports' ? updatePorts : layout === 'breakers' ? updateBreakers : updateLabel)({ text_height_mm: null });
+  say(`${item.label.text_height_mm} mm is too big for this text ${strip ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
 }
 
 const SAMPLE_TEXT = 'Your text here';
@@ -458,9 +516,9 @@ export async function renderNow() {
         // The rulers are only for this preview, so a bin label takes the text label's choice
         // here and not in its queue item
         const options = itemOptions(item);
-        if (item.mode === 'bin' || item.label.layout === 'ports') options.show_rulers = app.get().label.show_rulers;
+        if (item.mode === 'bin' || isStrip(item.label)) options.show_rulers = app.get().label.show_rulers;
         // An empty text label shows faded sample text, not a blank piece of tape (it can't print)
-        const sample = item.mode === 'text' && item.label.layout !== 'ports' && options.text === ' ';
+        const sample = item.mode === 'text' && !isStrip(item.label) && options.text === ' ';
         if (sample) options.text = SAMPLE_TEXT;
         const result = await py.render_label(options);
         const old = app.get().render;
@@ -849,6 +907,12 @@ export function queueItem(label) {
       say('Give at least one port a name first.', true);
       return false;
     }
+  } else if (item.mode === 'text' && item.label.layout === 'breakers') {
+    const shown = breakerTexts(item.label);
+    if (!shown.some((b) => item.label.breaker_show === 'name' ? b.name : b.number)) {
+      say('Give at least one breaker a name first.', true);
+      return false;
+    }
   } else if (item.mode === 'text' && !item.label.text.trim() && !hasQr(item.label) && !hasBarcode(item.label) && !item.label.image) {
     say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
@@ -926,6 +990,9 @@ export function openItem(item) {
   } else if (editorMode(item) === 'ports') {
     app.set({ mode: 'ports', ports: { ...DEFAULT_PORTS, ...item.label } });
     storage.save('ports', app.get().ports);
+  } else if (editorMode(item) === 'breakers') {
+    app.set({ mode: 'breakers', breakers: { ...DEFAULT_BREAKERS, ...item.label } });
+    storage.save('breakers', app.get().breakers);
   } else {
     // A cable flag is the text label drawn twice, so it opens as the text label in Cable flag
     app.set({ mode: editorMode(item), label: { ...DEFAULT_LABEL, ...item.label, layout: 'text' } });

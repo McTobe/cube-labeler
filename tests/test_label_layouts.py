@@ -123,6 +123,55 @@ class TestPortStrip(unittest.TestCase):
         self.assertEqual(end - start, round(12 * 19.0 / DOT_PITCH_MM))
 
 
+class TestBreakerStrip(unittest.TestCase):
+    """A strip over a row of breakers: one cell per breaker, as wide as its modules."""
+
+    def setUp(self):
+        self.renderer = LabelRenderer()
+
+    def _strip(self, breakers, **options):
+        return self.renderer._render_base_canvas(LabelConfig(layout="breakers", breakers=breakers, **options))
+
+    def test_the_strip_is_as_long_as_its_modules(self):
+        breakers = [{"name": "Oven", "modules": 2}] + [{"name": f"B{i}"} for i in range(9)] + [{"blank": True, "modules": 3}]
+        for module in (17.5, 18.0):
+            canvas = self._strip(breakers, breaker_module_mm=module)[0]
+            self.assertEqual(canvas.width, round(14 * module / DOT_PITCH_MM))
+
+    def test_dividers_sit_between_breakers_not_inside_wide_ones(self):
+        module = 17.5
+        breakers = [{"modules": 1}, {"modules": 2}, {"modules": 1}]
+        canvas, _, border, printable_h, _, _ = self._strip(breakers, breaker_module_mm=module, breaker_show="name")
+        dividers = _runs(_ink_columns(canvas, border, border + printable_h))
+        self.assertEqual(len(dividers), 2)
+        for (first, last), modules in zip(dividers, (1, 3)):
+            self.assertAlmostEqual((first + last + 1) / 2 * DOT_PITCH_MM, modules * module, delta=DOT_PITCH_MM)
+
+    def test_numbers_count_up_past_blanks_and_keep_typed_ones(self):
+        config = LabelConfig(layout="breakers", breaker_prefix="F", breaker_first=5, breakers=[
+            {"name": "Lights"}, {"blank": True}, {"name": "Oven", "number": "Q9", "modules": 2}, {"name": "Bath"},
+        ])
+        cells = self.renderer.breaker_cells(config)
+        self.assertEqual([c[1] for c in cells], ["F5", "", "Q9", "F7"])
+        self.assertEqual([c[0] for c in cells], [1, 1, 2, 1])
+        config.breaker_show = "number"
+        self.assertEqual([c[2] for c in self.renderer.breaker_cells(config)], ["", "", "", ""])
+
+    def test_a_long_name_does_not_shrink_the_numbers(self):
+        short = [{"name": "Bath"}, {"name": "Oven"}]
+        long = [{"name": "Bath"}, {"name": "Garden lights and the shed"}]
+        self.assertEqual(self._strip(short, tape_width_mm=12)[5], self._strip(long, tape_width_mm=12)[5])
+
+    def test_text_stays_inside_the_printable_area(self):
+        for tape in (12, 9, 6, 3.5):
+            canvas, _, border, printable_h, canvas_h, _ = self._strip(
+                [{"name": "Lights up"}, {"name": "Garage"}], breaker_prefix="F", tape_width_mm=tape)
+            gray = canvas.convert("L")
+            outside = [y for y in list(range(border)) + list(range(border + printable_h, canvas_h))
+                       if any(gray.getpixel((x, y)) < 128 for x in range(gray.width))]
+            self.assertEqual(outside, [], tape)
+
+
 class TestCableFlag(unittest.TestCase):
     def setUp(self):
         self.renderer = LabelRenderer()
