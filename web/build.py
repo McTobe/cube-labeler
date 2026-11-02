@@ -52,6 +52,9 @@ MANIFEST = {
     "description": "Design and print labels on the Brother PT-P300BT.",
     "start_url": ".",
     "display": "standalone",
+    # The installed app stays upright on phones (Android Chrome). A browser tab can't be locked,
+    # so index.html shows a "turn your phone upright" note there instead.
+    "orientation": "portrait",
     "background_color": "#1f2430",
     "theme_color": "#1f2430",
     "icons": [
