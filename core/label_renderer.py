@@ -12,6 +12,7 @@ from typing import List, Optional, Tuple
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import qrcode
 
+from core import asset_tag
 from core import barcode
 
 from core import rich_text
@@ -149,6 +150,17 @@ class LabelConfig:
     date_portions: str = ""
     date_show: str = "both"  # "both", "use" (use-by only) or "made"
     date_style: str = "words"  # "words" (2 Nov 2026), "dots" (02.11.26) or "iso" (2026-11-02)
+
+    # Asset tag: the tag (asset_prefix + asset_number, as PC-0042) over or under the owner, with
+    # a barcode or QR code of the tag or of asset_link beside it (see core/asset_tag.py)
+    asset_owner: str = ""
+    asset_prefix: str = ""
+    asset_number: str = ""  # as typed, so leading zeros stay
+    asset_code: str = "barcode"  # "barcode", "qr" or "none"
+    asset_code_holds: str = "tag"  # "tag", or "link": asset_link with {tag} filled in
+    asset_link: str = ""
+    asset_big: str = "number"  # "number": the tag big and the owner small, or "owner"
+    asset_code_side: str = "left"  # "left" or "right" of the text
 
 
 # Port strip dividers, and the room kept between a port's text and its dividers
@@ -290,6 +302,8 @@ class LabelRenderer:
         self._cut_off_mm = 0.0
         self._barcode_bad_chars = ""
         self._cut_off_at_mm = config.fixed_width_mm
+        if config.layout == "asset" and not is_inventory:
+            config = asset_tag.as_text_label(config)
         if config.layout == "flag" and not is_inventory:
             return self._render_cable_flag(config)
         # Hardware inventory layouts are designed for 64 printable dots, so they always use 12 mm tape

@@ -31,6 +31,10 @@ function itemDetail(item) {
   if (l.layout === 'date') {
     return `${textLines(l).slice(1).join(' · ')} · ${l.tape_width_mm} mm tape · ${l.font_name}`;
   }
+  if (l.layout === 'asset') {
+    const code = { barcode: 'Barcode', qr: 'QR code' }[l.asset_code];
+    return `${l.asset_owner.trim() ? `${l.asset_owner.trim()} · ` : ''}${code ? `${code} · ` : ''}${l.tape_width_mm} mm tape · ${l.font_name}`;
+  }
   // The lines after the title tell labels with the same first line apart
   const more = textLines(l).slice(1).join(' · ');
   return `${l.layout === 'flag' ? `Cable flag, ${l.flag_cable_mm} mm cable · ` : ''}${more ? `${more} · ` : ''}${l.tape_width_mm} mm tape${l.fixed_width_mm ? `, ${l.fixed_width_mm} mm long` : ''}${hasQr(l) ? ', QR code' : ''}${hasBarcode(l) ? ', barcode' : ''} · ${l.font_name}`;
