@@ -115,6 +115,38 @@ export const DEFAULT_DATES = {
   date_style: 'words',  // 'words' (2 Nov 2026), 'dots' (02.11.26) or 'iso' (2026-11-02)
 };
 
+// An asset tag is a text label worked out from these fields by core/asset_tag.py: the tag
+// (asset_prefix and asset_number, as PC-0042) and the owner, with a barcode or QR code
+export const DEFAULT_ASSET = {
+  ...DEFAULT_LABEL,
+  layout: 'asset',
+  text: '',
+  asset_owner: '',
+  asset_prefix: 'PC-',
+  asset_number: '0001',  // the next tag's number, as typed, so leading zeros stay
+  asset_code: 'barcode',  // 'barcode', 'qr' or 'none'
+  asset_code_holds: 'tag',  // 'tag', or 'link': asset_link with {tag} filled in
+  asset_link: '',
+  asset_big: 'number',  // 'number' (the tag big, the owner small) or 'owner'
+  asset_code_side: 'left',
+  barcode_show_text: false,
+  asset_count: 1,  // tags "Add to queue and start the next" adds in a row
+  asset_count_on: true,  // and then the number counts on past them
+};
+export const ASSET_CODES = [['barcode', 'Barcode'], ['qr', 'QR'], ['none', 'None']];
+
+// The tag as printed, as PC-0042
+export const assetTag = (label) => `${(label.asset_prefix || '').trim()}${(label.asset_number || '').trim()}`;
+
+// The number step tags on, keeping its width (0042, 0043 ... 0099, 0100), as core/asset_tag.py
+export function nextAssetNumber(number, step = 1) {
+  const match = /(\d+)(\D*)$/.exec(number || '');
+  if (!match) return number || '';
+  const digits = match[1];
+  const value = String(BigInt(digits) + BigInt(step)).padStart(digits.length, '0');
+  return number.slice(0, match.index) + value + match[2];
+}
+
 export const DEFAULT_SETTINGS = {
   ai_provider: 'gemini',
   ai_models: {},
@@ -142,11 +174,12 @@ export const BIN_TAPE_MM = 12;
 export const boot = createStore({ phase: 'loading', text: 'Starting...', error: null });
 
 export const app = createStore({
-  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet', 'date' or 'flag' (a cable flag of the text label)
+  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet', 'date', 'asset' or 'flag' (a cable flag of the text label)
   label: DEFAULT_LABEL,
   ports: DEFAULT_PORTS,  // the port strip being edited
   outlet: DEFAULT_OUTLET,  // the network outlet label being edited
   dates: DEFAULT_DATES,  // the date label being edited
+  asset: DEFAULT_ASSET,  // the asset tag being edited
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
   languages: [['en', 'English']],
@@ -205,7 +238,7 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue, device, ports, outlet, dates] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device, ports, outlet, dates, asset] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
@@ -216,6 +249,7 @@ export async function start() {
     storage.load('ports', {}),
     storage.load('outlet', {}),
     storage.load('dates', {}),
+    storage.load('asset', {}),
   ]);
   // The tape counter counts each device's prints apart, so syncing never counts one twice
   deviceId = device || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -227,6 +261,7 @@ export async function start() {
     ports: { ...DEFAULT_PORTS, ...ports, layout: 'ports' },
     outlet: withOutletText({ ...DEFAULT_OUTLET, ...outlet }),
     dates: { ...DEFAULT_DATES, ...dates, layout: 'date' },
+    asset: { ...DEFAULT_ASSET, ...asset, layout: 'asset' },
     mode,
     bin,
     queue: mergeCopies(queue),
@@ -347,6 +382,11 @@ export function updateDates(change) {
   changed('dates');
 }
 
+export function updateAsset(change) {
+  app.set({ asset: { ...app.get().asset, ...change } });
+  changed('asset');
+}
+
 // change applies to the bin label being edited (fastener or part); {kind} switches between them
 export function updateBin(change) {
   const bin = app.get().bin;
@@ -383,6 +423,7 @@ export const RESET_NOTES = {
   ports: 'Reset ports, spacing, font, size and tape? Your numbers and names are kept.',
   outlet: 'Reset the code style, font, size and tape? The parts of your code are kept.',
   date: 'Reset the date style, font, size and tape? What is on the label is kept.',
+  asset: 'Reset the code, tag style, font and tape? The owner, numbers and link are kept.',
   bin: 'Reset the label length and drive icon? What is on the label is kept.',
 };
 
@@ -391,7 +432,7 @@ const OUTLET_PART_KEYS = ['outlet_building', 'outlet_floor', 'outlet_room', 'out
   'outlet_panel', 'outlet_ports', 'outlet_first', 'outlet_row'];
 
 export function resetSettings() {
-  const { mode, label, ports, outlet, dates, bin, settings } = app.get();
+  const { mode, label, ports, outlet, dates, asset, bin, settings } = app.get();
   if (mode === 'outlet') {
     const keep = Object.fromEntries(OUTLET_PART_KEYS.map((k) => [k, outlet[k]]));
     updateOutlet({ ...DEFAULT_OUTLET, tape_width_mm: labelDefaults().tape_width_mm, ...keep });
@@ -400,6 +441,10 @@ export function resetSettings() {
     const kept = ['date_name', 'date_made', 'date_keeps', 'date_portions', 'date_show'];
     updateDates({ ...DEFAULT_DATES, ...labelDefaults(), ...Object.fromEntries(kept.map((k) => [k, dates[k]])) });
     say('Settings reset. What is on the label is kept.');
+  } else if (mode === 'asset') {
+    const { asset_owner, asset_prefix, asset_number, asset_link } = asset;
+    updateAsset({ ...DEFAULT_ASSET, tape_width_mm: labelDefaults().tape_width_mm, asset_owner, asset_prefix, asset_number, asset_link });
+    say('Settings reset. The owner, numbers and link are kept.');
   } else if (mode === 'ports') {
     const { port_use_names, port_names, port_prefix } = ports;
     updatePorts({ ...DEFAULT_PORTS, tape_width_mm: labelDefaults().tape_width_mm, port_use_names, port_names, port_prefix });
@@ -456,12 +501,13 @@ export function itemOptions(item) {
 }
 
 export function currentItem() {
-  const { mode, label, bin, ports, outlet, dates } = app.get();
+  const { mode, label, bin, ports, outlet, dates, asset } = app.get();
   if (mode === 'bin' && bin) return { mode, bin: bin[bin.kind] };
   if (mode === 'ports') return { mode: 'text', label: ports };
   if (mode === 'outlet') return { mode: 'text', label: outlet };
   // The text is worked out each time, so "Today" is the day the label is printed
   if (mode === 'date') return { mode: 'text', label: { ...dates, text: dateText(dates) } };
+  if (mode === 'asset') return { mode: 'text', label: asset };
   return { mode: 'text', label: { ...label, layout: mode === 'flag' ? 'flag' : 'text' } };
 }
 
@@ -469,7 +515,7 @@ export function currentItem() {
 export function editorMode(item) {
   if (item.mode === 'bin') return 'bin';
   const { layout } = item.label;
-  return ['ports', 'outlet', 'flag', 'date'].includes(layout) ? layout : 'text';
+  return ['ports', 'outlet', 'flag', 'date', 'asset'].includes(layout) ? layout : 'text';
 }
 
 // What goes over each port of a port strip, as the Python core draws it
@@ -493,6 +539,7 @@ export function textLines(label) {
 }
 
 export function itemTitle(item) {
+  if (item.mode === 'text' && item.label.layout === 'asset') return assetTag(item.label) || item.label.asset_owner.trim() || 'Asset tag';
   if (item.mode === 'text' && item.label.layout === 'ports') {
     const named = portTexts(item.label).filter((t) => t);
     return named.length ? `Ports ${named[0]}${named.length > 1 ? ` to ${named[named.length - 1]}` : ''}` : 'Port strip';
@@ -539,9 +586,9 @@ export async function renderNow() {
         // The rulers are only for this preview, so a bin label takes the text label's choice
         // here and not in its queue item
         const options = itemOptions(item);
-        if (item.mode === 'bin' || ['ports', 'date'].includes(item.label.layout)) options.show_rulers = app.get().label.show_rulers;
+        if (item.mode === 'bin' || ['ports', 'date', 'asset'].includes(item.label.layout)) options.show_rulers = app.get().label.show_rulers;
         // An empty text label shows faded sample text, not a blank piece of tape (it can't print)
-        const sample = item.mode === 'text' && item.label.layout !== 'ports' && options.text === ' ';
+        const sample = item.mode === 'text' && item.label.layout === 'text' && options.text === ' ';
         if (sample) options.text = SAMPLE_TEXT;
         const result = await py.render_label(options);
         const old = app.get().render;
@@ -954,6 +1001,11 @@ export function queueItem(label) {
   } else if (item.mode === 'text' && item.label.layout === 'outlet' && !item.label.text.trim()) {
     say('Fill in at least one part of the code first.', true);
     return false;
+  } else if (item.mode === 'text' && item.label.layout === 'asset') {
+    if (!assetTag(item.label) && !item.label.asset_owner.trim()) {
+      say('Type a tag number or an owner first.', true);
+      return false;
+    }
   } else if (item.mode === 'text' && !item.label.text.trim() && !hasQr(item.label) && !hasBarcode(item.label) && !item.label.image) {
     say('Add some text, a QR code, a barcode or a picture first.', true);
     return false;
@@ -1037,6 +1089,9 @@ export function openItem(item) {
   } else if (editorMode(item) === 'date') {
     app.set({ mode: 'date', dates: { ...DEFAULT_DATES, ...item.label } });
     storage.save('dates', app.get().dates);
+  } else if (editorMode(item) === 'asset') {
+    app.set({ mode: 'asset', asset: { ...DEFAULT_ASSET, ...item.label } });
+    storage.save('asset', app.get().asset);
   } else {
     // A cable flag is the text label drawn twice, so it opens as the text label in Cable flag
     app.set({ mode: editorMode(item), label: { ...DEFAULT_LABEL, ...item.label, layout: 'text' } });
@@ -1201,4 +1256,26 @@ async function printWholeQueue() {
       say(`Queue of ${strip.count} labels sent, but the printer did not confirm completion.`, true);
     }
   });
+}
+
+// The asset tags in a row from the next number: asset_count of them, PC-0042 to PC-0051
+export function assetRow(asset) {
+  const count = Math.max(1, Math.min(500, Math.floor(Number(asset.asset_count)) || 1));
+  return Array.from({ length: count }, (_, i) => ({ ...asset, asset_number: nextAssetNumber(asset.asset_number, i) }));
+}
+
+// Adds the row of asset tags to the queue and, with Count on after adding, moves the next
+// number on past them, so the next row (or tomorrow's) carries on where this one ended
+export function addAssetRow() {
+  const { asset } = app.get();
+  const row = assetRow(asset);
+  for (const label of row) if (!queueItem({ mode: 'text', label })) return false;
+  const first = assetTag(row[0]);
+  const last = assetTag(row[row.length - 1]);
+  if (asset.asset_count_on && /\d/.test(asset.asset_number)) {
+    updateAsset({ asset_number: nextAssetNumber(asset.asset_number, row.length) });
+  }
+  const count = queueLabelCount(app.get().queue);
+  say(`Added ${row.length > 1 ? `${first} to ${last}` : first || 'the tag'} to the queue (${count} label${count === 1 ? '' : 's'}).${asset.asset_count_on && /\d/.test(asset.asset_number) ? ` Next is ${assetTag(app.get().asset)}.` : ''}`);
+  return true;
 }

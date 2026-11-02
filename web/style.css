@@ -1705,3 +1705,17 @@ input.tape-number { width: 160px; }
   .bin-grid.three.outlet-grid > .bin-col + .bin-col { border-left: 1px solid var(--border); }
 }
 .outlet-card .card-head { align-items: center; }
+
+/* The asset tag card: three even columns with dividers from the desktop width on, since its
+   fields are short */
+@media (min-width: 900px) {
+  .bin-grid.three.asset-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .bin-grid.three.asset-grid > .bin-col { padding: 2px 16px; min-width: 0; }
+  .bin-grid.three.asset-grid > .bin-col:first-child { padding-left: 0; }
+  .bin-grid.three.asset-grid > .bin-col:last-child { padding-right: 0; }
+  .bin-grid.three.asset-grid > .bin-col + .bin-col { border-left: 1px solid var(--border); }
+}
+.asset-grid .bin-group { display: flex; flex-direction: column; gap: 8px; }
+.asset-grid .bin-group > .field, .asset-grid .bin-group > .hint, .asset-grid .bin-group > .toggle { margin: 0; }
+.asset-grid .hint { margin: 8px 0 0; }
+.asset-grid input:disabled { opacity: 0.5; }

@@ -6,7 +6,7 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { Sheet } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS, DEFAULT_OUTLET, DEFAULT_DATES } from '../app.js';
+import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS, DEFAULT_OUTLET, DEFAULT_DATES, DEFAULT_ASSET } from '../app.js';
 import { dateText } from '../dates.js';
 import { templates, thumbnail } from '../templates.js';
 
@@ -36,6 +36,7 @@ export const KIND_EXAMPLES = {
     const label = { ...DEFAULT_DATES, date_name: 'Chili', date_portions: '2', date_show: 'use' };
     return { mode: 'text', label: { ...label, text: dateText(label) } };
   },
+  asset: () => ({ mode: 'text', label: { ...DEFAULT_ASSET, asset_owner: 'Workshop', asset_number: '0042' } }),
 };
 
 function KindCard({ kind, on, pick }) {
