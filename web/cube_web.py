@@ -251,6 +251,35 @@ def queue_lengths(labels: Any) -> Dict[str, Any]:
     return _get_renderer().tape_lengths([_label_config(label) for label in labels])
 
 
+def border_tiles(tape_width_mm: float = 12.0, font_name: str = "Arimo") -> List[Dict[str, Any]]:
+    """
+    Every border for the picker, in order: id, name, category and a PNG of a short sample
+    label with it, drawn like the print (see core/borders.py).
+    """
+    from PIL import Image
+    from core import borders
+    from core.label_renderer import LabelConfig
+    renderer = _get_renderer()
+    tiles = []
+    for border in borders.BORDERS_LIST:
+        if border.id == "none":
+            continue
+        config = LabelConfig(text="Abc", font_name=font_name, tape_width_mm=float(tape_width_mm),
+                             frame=border.id, cut_line=False)
+        label = renderer.render(config)[0]
+        # Every tile the same size and scale, the label in the middle
+        width = max(label.width, round(label.height * 40 / 13))
+        preview = Image.new("RGB", (width, label.height), "white")
+        preview.paste(label, ((width - label.width) // 2, 0))
+        tiles.append({"id": border.id, "name": border.name, "category": border.category, "png": _png(preview)})
+    return tiles
+
+
+def border_categories() -> List[List[str]]:
+    from core import borders
+    return [list(c) for c in borders.CATEGORIES]
+
+
 def label_thumbnail(options: Any, height: int = 48) -> bytes:
     """A small preview PNG of one label, for lists."""
     from PIL import Image

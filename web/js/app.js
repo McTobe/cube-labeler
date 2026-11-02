@@ -23,7 +23,8 @@ export const DEFAULT_LABEL = {
   auto_fit_font: true,
   fixed_font_size: 36,
   alignment: 'center',
-  frame: 'none',
+  frame: 'none',  // a border from core/borders.py
+  direction: 'horizontal',  // or 'vertical' (letters stacked) or 'turned' (a quarter turn)
   qr_enabled: false,
   qr_data: '',
   qr_position: 'left',
@@ -584,6 +585,19 @@ export const editIcon = (original, edit, touch) => py.edit_icon(original, edit, 
 
 export const labelThumbnail = (item, height = 48) => py.label_thumbnail(itemOptions(item), height);
 export const templatePresets = () => py.template_presets();
+
+// The border picker's tiles, drawn once per tape width and font
+const borderTiles = new Map();
+export function getBorderTiles(tapeWidth, font) {
+  const key = `${tapeWidth}|${font}`;
+  if (!borderTiles.has(key)) {
+    borderTiles.set(key, Promise.all([py.border_categories(), py.border_tiles(tapeWidth, font)]).then(([categories, tiles]) => ({
+      categories,
+      tiles: tiles.map((t) => ({ ...t, url: URL.createObjectURL(new Blob([t.png], { type: 'image/png' })) })),
+    })).catch((err) => { borderTiles.delete(key); throw err; }));
+  }
+  return borderTiles.get(key);
+}
 export const templateFromDesktop = (data) => py.template_from_desktop(data);
 export const templateToDesktop = (item) => py.template_to_desktop(item);
 export const makeBackup = (data) => py.make_backup(data);

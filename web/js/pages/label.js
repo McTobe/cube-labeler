@@ -15,7 +15,7 @@ import { BinCard, BinOptions } from './bin.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
-  updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit,
+  updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
 } from '../app.js';
 
 const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
@@ -25,7 +25,12 @@ const SIZE_MARKS = { large: 'L', medium: 'M', normal: 'N', small: 'S' };
 // Toolbar buttons don't take the focus, so the phone keyboard and the selection stay put
 const keepFocus = (e) => e.preventDefault();
 const ALIGNS = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
-const FRAMES = [['none', 'None'], ['box', 'Box'], ['rounded', 'Rounded']];
+const DIRECTIONS = [['horizontal', 'Horizontal'], ['vertical', 'Vertical'], ['turned', 'Turned']];
+const DIRECTION_HINTS = {
+  horizontal: 'The text runs along the tape.',
+  vertical: 'Letters stand one under another, for tape stuck on upright. Each line is a column.',
+  turned: 'The text is turned a quarter, so it reads across tape stuck on upright. Best for short text.',
+};
 const SIDES = [['left', 'Left of text'], ['right', 'Right of text']];
 const TAPE_COLOURS = [
   ['#FFFFFF/#000000', 'White tape, black text'],
@@ -436,8 +441,63 @@ function FontSection() {
     <${TextSizeField} label=${label} onChange=${updateLabel} />
     <${Segmented} label="Alignment" options=${ALIGNS} value=${label.alignment}
       onChange=${(alignment) => updateLabel({ alignment })} />
-    <${Segmented} label="Frame" options=${FRAMES} value=${label.frame}
-      onChange=${(frame) => updateLabel({ frame })} />
+    <${Segmented} label="Direction" options=${DIRECTIONS} value=${label.direction || 'horizontal'}
+      onChange=${(direction) => updateLabel({ direction })} />
+    <p class="hint">${DIRECTION_HINTS[label.direction || 'horizontal']}${label.direction && label.direction !== 'horizontal' && (hasQr(label) || hasBarcode(label) || label.image) ? ' Codes and pictures are left out.' : ''}</p>
+    <${BorderField} />
+  <//>`;
+}
+
+// The border: a button showing the one on the label, which opens the picker
+function BorderField() {
+  const { label } = useStore(app);
+  const { phase } = useStore(boot);
+  const [open, setOpen] = useState(false);
+  const [data, setData] = useState(null);
+  const tape = label.tape_width_mm;
+  useEffect(() => {
+    if (phase !== 'ready') return undefined;
+    let live = true;
+    getBorderTiles(tape, 'Arimo').then((d) => { if (live) setData(d); }).catch(() => {});
+    return () => { live = false; };
+  }, [tape, phase]);
+  const current = data && data.tiles.find((t) => t.id === label.frame);
+  const pick = (frame) => { updateLabel({ frame }); setOpen(false); };
+  return html`<${Field} label="Border">
+    <button type="button" class="border-button" onClick=${() => setOpen(true)} aria-haspopup="dialog">
+      <span class="border-thumb">${current ? html`<img src=${current.url} alt="" />` : html`<span class="muted">${label.frame === 'none' ? '' : '…'}</span>`}</span>
+      <span class="border-name">${current ? current.name : 'None'}</span>
+      <${Icon} name="chevron" size=${18} />
+    </button>
+    <${BorderSheet} open=${open} data=${data} value=${label.frame} onPick=${pick} onClose=${() => setOpen(false)} />
+  <//>`;
+}
+
+let lastBorderCategory = null;
+function BorderSheet({ open, data, value, onPick, onClose }) {
+  const wide = useWide();
+  const chosen = data && data.tiles.find((t) => t.id === value);
+  const [category, setCategory] = useState(lastBorderCategory || (chosen && chosen.category) || 'simple');
+  useEffect(() => { if (open && chosen) setCategory(chosen.category); }, [open]);
+  const pickCategory = (c) => { lastBorderCategory = c; setCategory(c); };
+  const tiles = data ? data.tiles.filter((t) => t.category === category) : [];
+  return html`<${Sheet} open=${open} title="Border" onClose=${onClose} wide=${wide}>
+    ${!data ? html`<p class="hint">Drawing the borders…</p>` : html`
+      <div class="border-categories" role="tablist" aria-label="Kinds of border">
+        ${data.categories.map(([id, name]) => html`<button type="button" role="tab" aria-selected=${id === category}
+          class=${id === category ? 'on' : ''} onClick=${() => pickCategory(id)}>${name}</button>`)}
+      </div>
+      <div class="border-grid">
+        ${tiles.map((t) => html`<button type="button" class=${t.id === value ? 'border-tile on' : 'border-tile'}
+          aria-pressed=${t.id === value} onClick=${() => onPick(t.id)}>
+          <span class="border-art"><img src=${t.url} alt="" /></span>
+          <span class="border-tile-name">${t.name}</span>
+          ${t.id === value && html`<span class="border-check" aria-hidden="true">✓</span>`}
+        </button>`)}
+      </div>
+      <div class="sheet-actions">
+        <button type="button" class="secondary" disabled=${value === 'none'} onClick=${() => onPick('none')}>No border</button>
+      </div>`}
   <//>`;
 }
 
