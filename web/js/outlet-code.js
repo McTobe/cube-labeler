@@ -2,7 +2,9 @@
 // room), then the rack, the panel and the ports its cables go to. Empty parts are left out.
 // Pure functions, so tests can run them without the app.
 
-export const OUTLET_PANEL_KINDS = [['P', 'Panel P'], ['M', 'M'], ['U', 'U']];
+// How the rack counts the place of a panel: by panel (P), by metric position from the top (M)
+// or by rack unit (U)
+export const OUTLET_PANEL_KINDS = [['P', 'Panel P'], ['M', 'Metric M'], ['U', 'Unit U']];
 export const OUTLET_PORTS = [[1, 'One'], [2, 'Two'], [4, 'Four']];
 export const OUTLET_SEPARATORS = [['', 'None'], [' ', 'Space'], ['-', '-'], ['.', '.']];
 export const OUTLET_PAIRS = [['/', '3/4'], ['-', '3-4'], ['+', '3+4']];

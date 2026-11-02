@@ -89,7 +89,7 @@ export const DEFAULT_OUTLET = {
   outlet_floor: '',
   outlet_room: '',
   outlet_rack: 'DA01',
-  outlet_panel_kind: 'P',  // what the panel is called: P (panel), M or U (rack unit)
+  outlet_panel_kind: 'P',  // how the rack counts places: P (panel), M (metric position) or U (rack unit)
   outlet_panel: '01',
   outlet_ports: 2,  // ports on the outlet: 1, 2 or 4
   outlet_first: 1,  // the first of them
