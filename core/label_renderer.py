@@ -15,6 +15,7 @@ import qrcode
 from core import barcode
 
 from core import rich_text
+from core import borders
 from core.font_manager import font_manager
 from core.specs import (
     DOT_PITCH_MM,
@@ -70,7 +71,10 @@ class LabelConfig:
     def h_padding_dots(self, value: int):
         self.h_padding = value
     
-    frame: str = "none"  # "none", "box", "rounded"
+    frame: str = "none"  # a border from core/borders.py: "none", "box", "rounded", "wave", "stars"...
+    # "horizontal"; "vertical", each letter upright under the one before, for tape stuck on
+    # upright; or "turned", the whole text a quarter turn round, across the tape
+    direction: str = "horizontal"
 
     # Sizing & Stretching
     fixed_width_mm: Optional[float] = None
@@ -132,10 +136,6 @@ class LabelConfig:
     flag_side_mm: Optional[float] = None
     flag_fold_marks: bool = True
 
-
-# A frame is drawn this thick, with this much space between it and the content
-FRAME_WIDTH_DOTS = 2
-FRAME_GAP_DOTS = 3
 
 # Port strip dividers, and the room kept between a port's text and its dividers
 PORT_DIVIDER_DOTS = 2
@@ -275,16 +275,19 @@ class LabelRenderer:
 
         # 1. Parse the styled text and leave room for a frame
         doc = rich_text.parse(config.text)
-        frame_inset = FRAME_WIDTH_DOTS + FRAME_GAP_DOTS if config.frame in ("box", "rounded") else 0
+        border = borders.get(config.frame)
+        inset_x, inset_y = border.insets(printable_h)
+        frame_inset = inset_y
         inner_h = printable_h - 2 * frame_inset
-        # Rounded corners cut into the sides, so keep the content further in
-        frame_inset_x = frame_inset + (printable_h // 8 if config.frame == "rounded" else 0)
+        frame_inset_x = inset_x
         layout = rich_text.TextLayout(
             doc, config.font_name, config.stroke_width, config.line_spacing, config.alignment
         )
 
         # 2. Determine font size. A letter height in mm is exact, so Text scale leaves it alone,
         # unless it is a preset that is too tall for this text and tape: then the text fits instead.
+        if config.direction in ("vertical", "turned") and doc.has_text:
+            return self._render_turned_text(config, doc, layout, border, spec, print_border, printable_h, canvas_h)
         fit_size = layout.fit_size(inner_h)
         # Without text there is nothing to be too tall (the layout then measures a stand-in "Ag")
         if doc.has_text:
@@ -406,19 +409,120 @@ class LabelRenderer:
             edge = img_canvas.width - config.end_margin - config.h_padding - frame_inset_x
             draw.rectangle([max(edge, 0), 0, img_canvas.width, canvas_h], fill="white")
 
-        if frame_inset:
-            box = [
-                config.h_padding,
-                print_border,
-                img_canvas.width - config.h_padding - config.end_margin - 1,
-                print_border + printable_h - 1,
-            ]
-            if config.frame == "rounded":
-                draw.rounded_rectangle(box, radius=printable_h // 4, outline="black", width=FRAME_WIDTH_DOTS)
-            else:
-                draw.rectangle(box, outline="black", width=FRAME_WIDTH_DOTS)
+        self._draw_border(img_canvas, border, config, print_border, printable_h)
 
         return img_canvas, spec, print_border, printable_h, canvas_h, effective_size
+
+    def _draw_border(self, canvas: Image.Image, border, config: LabelConfig, print_border: int, printable_h: int):
+        """Draws the label's border round the printable band, inside the side padding."""
+        if border.id == "none":
+            return
+        width = canvas.width - 2 * config.h_padding - config.end_margin
+        if width < 4:
+            return
+        # Borders are designed for the 180 dpi head; a finer head draws them at the same size
+        scale = (25.4 / 180) / self.DOT_PITCH_MM
+        mask = borders.render(border.id, width, printable_h, scale)
+        canvas.paste("black", (config.h_padding, print_border), mask)
+
+    def _vertical_block(self, doc, layout, size: int) -> Image.Image:
+        """
+        Every line of the text as a column of upright letters, the first line on the left, as
+        the label reads when the tape is stuck on upright. Returns the block as it reads then.
+        """
+        cells = []
+        for line in doc.lines:
+            column = []
+            for run in line.runs:
+                for ch in run.text:
+                    single = rich_text.Line(runs=[dataclasses.replace(run, text=ch)], size=line.size)
+                    column.append(layout.render_line(single, size) if ch.strip() else None)
+            cells.append(column)
+        cap = max(layout.cap_height(size), 1)
+        step = int(round(cap * 1.3))
+        col_w = max([img.width for col in cells for img in col if img is not None] + [cap])
+        col_gap = max(2, int(round(cap * 0.25)))
+        rows = max([len(col) for col in cells] + [1])
+        width = len(cells) * col_w + (len(cells) - 1) * col_gap
+        out = Image.new("L", (max(width, 1), max(rows * step, 1)), 0)
+        for c, column in enumerate(cells):
+            x0 = c * (col_w + col_gap)
+            for r, img in enumerate(column):
+                if img is None:
+                    continue
+                box = img.getbbox()
+                if not box:
+                    continue
+                ink = img.crop(box)
+                # Each letter sits in the middle of its cell, so round and tall letters line up
+                out.paste(ink, (x0 + (col_w - ink.width) // 2, r * step + (step - ink.height) // 2))
+        return out
+
+    def _turned_block(self, doc, layout, size: int, vertical: bool) -> Image.Image:
+        """The text block as the tape reads when stuck on upright (before turning it onto the tape)."""
+        return self._vertical_block(doc, layout, size) if vertical else layout.render(size)
+
+    def _render_turned_text(self, config, doc, layout, border, spec, print_border, printable_h, canvas_h):
+        """
+        A label for tape stuck on upright: the text block is drawn as it reads then and turned a
+        quarter onto the tape, so its width runs across the tape. Codes and pictures are left
+        out; the border goes round the text.
+        """
+        vertical = config.direction == "vertical"
+        inset_x, inset_y = border.insets(printable_h)
+        across = printable_h - 2 * inset_y  # the room across the tape, for the block's width
+
+        def width_at(size):
+            return self._turned_block(doc, layout, size, vertical).width
+
+        # Fit: the largest size whose block is as wide as the tape allows
+        low, high, fit = 6, max(printable_h * 2, 6), 6
+        while low <= high:
+            mid = (low + high) // 2
+            if width_at(mid) <= across:
+                fit, low = mid, mid + 1
+            else:
+                high = mid - 1
+        self._max_text_height_mm = layout.cap_height(fit) * self.DOT_PITCH_MM
+        size = fit
+        if config.text_height_mm:
+            wanted = layout.size_for_cap_height(config.text_height_mm / self.DOT_PITCH_MM)
+            if wanted <= fit or not config.text_height_fallback:
+                size = wanted
+            else:
+                self._text_height_fell_back = True
+        elif not config.auto_fit_font:
+            size = max(config.fixed_font_size, 6)
+        if not config.text_height_mm and abs(config.font_scale - 100.0) > 0.5:
+            size = max(int(round(size * (config.font_scale / 100.0))), 6)
+
+        block = self._turned_block(doc, layout, size, vertical)
+        self._last_text_overflow = block.width > across
+        # A quarter turn to the left: the top of the upright label is the start of the tape
+        text_img = block.rotate(90, expand=True)
+
+        length = text_img.width + 2 * (config.h_padding + inset_x) + config.end_margin
+        cut_dots = 0
+        if config.fixed_width_mm:
+            target = int(round(config.fixed_width_mm / self.DOT_PITCH_MM))
+            if config.cut_line:
+                target -= 2 * (BATCH_GAP_DOTS // 2)
+            target = max(target, 10)
+            cut_dots = max(length - target, 0)
+            self._cut_off_mm = cut_dots * self.DOT_PITCH_MM
+            length = target
+        canvas = Image.new("RGB", (max(length, 10), canvas_h), "white")
+        if config.fixed_width_mm and not cut_dots:
+            x = (length - config.end_margin - text_img.width) // 2
+        else:
+            x = config.h_padding + inset_x
+        y = print_border + (printable_h - text_img.height) // 2 + config.v_shift
+        canvas.paste("black", (x, y), text_img)
+        if cut_dots:
+            edge = canvas.width - config.end_margin - config.h_padding - inset_x
+            ImageDraw.Draw(canvas).rectangle([max(edge, 0), 0, canvas.width, canvas_h], fill="white")
+        self._draw_border(canvas, border, config, print_border, printable_h)
+        return canvas, spec, print_border, printable_h, canvas_h, size
 
     def _single_pad(self, config: LabelConfig) -> int:
         """

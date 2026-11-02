@@ -48,6 +48,18 @@ export function fontFamilies(fonts) {
   return families;
 }
 
+// The font menus list the bundled families in groups, like a label maker's font list.
+// Added fonts and any others go last, under "More fonts".
+const FONT_GROUPS = [
+  ['Everyday', ['Arimo', 'Inter', 'Roboto', 'Open Sans', 'Montserrat', 'Lexend', 'Nunito', 'Atkinson Hyperlegible', 'Varela Round']],
+  ['Bold and condensed', ['Barlow Condensed', 'Oswald', 'Bebas Neue', 'Anton', 'Bungee', 'Lilita One', 'Black Ops One', 'Bangers', 'Shrikhand', 'Righteous', 'Fredoka']],
+  ['Script and handwriting', ['Pacifico', 'Great Vibes', 'Caveat', 'Kaushan Script', 'Parisienne', 'Allura', 'Sacramento', 'Patrick Hand', 'Comic Neue', 'Indie Flower', 'Amatic SC']],
+  ['Classic and decorative', ['EB Garamond', 'Zilla Slab', 'Cinzel', 'UnifrakturMaguntia', 'Uncial Antiqua', 'Poiret One', 'Monoton']],
+  ['Typewriter and digital', ['JetBrains Mono', 'Courier Prime', 'Space Mono', 'VT323', 'Silkscreen', 'Audiowide', 'Allerta Stencil']],
+];
+const GROUP_OF = new Map(FONT_GROUPS.flatMap(([group, names], i) => names.map((n, j) => [n, { group, rank: i * 100 + j }])));
+const OTHER_GROUP = { group: 'More fonts', rank: 10000 };
+
 // The font a family switch lands on: the same style if the family has it, else its Regular
 function inFamily(styles, style) {
   return (styles.find((s) => s.style === style) || styles.find((s) => s.style === 'Regular') || styles[0]).name;
@@ -69,6 +81,8 @@ function Option({ option, selected, onPick }) {
 // A button with a list under it, used like a select: arrow keys, Enter, Escape.
 // options: [{ key, text, face, note }], each shown in the font named by face.
 function Picker({ id, value, options, onChange, ariaLabel, disabled = false }) {
+  // Headers only when the list has more than one group
+  const grouped = new Set(options.map((o) => o.group).filter(Boolean)).size > 1;
   const [open, setOpen] = useState(false);
   const buttonRef = useRef(null);
   const listRef = useRef(null);
@@ -126,7 +140,8 @@ function Picker({ id, value, options, onChange, ariaLabel, disabled = false }) {
     </button>
     ${open && html`<div class="menu-backdrop" onClick=${() => close(false)}></div>
       <div ref=${listRef} class="font-list" role="listbox" aria-label=${ariaLabel} onKeyDown=${onListKey}>
-        ${options.map((option) => html`<${Option} key=${option.key} option=${option}
+        ${options.map((option, i) => html`${grouped && option.group !== (options[i - 1] || {}).group
+          && html`<div class="font-group" role="presentation">${option.group}</div>`}<${Option} key=${option.key} option=${option}
           selected=${option.key === value} onPick=${pick} />`)}
       </div>`}
   </span>`;
@@ -136,9 +151,10 @@ function useFamilies(value, fonts, standard) {
   const families = fontFamilies(fonts.includes(value) ? fonts : [...fonts, value]);
   const { family, style } = splitFont(value);
   const standardFamily = standard && splitFont(standard).family;
-  const familyOptions = [...families].map(([name, styles]) => ({
-    key: name, text: name, face: inFamily(styles, 'Regular'), note: name === standardFamily ? 'standard' : null,
-  }));
+  const familyOptions = [...families].map(([name, styles], i) => {
+    const { group, rank } = GROUP_OF.get(name) || { ...OTHER_GROUP, rank: OTHER_GROUP.rank + i };
+    return { key: name, text: name, face: inFamily(styles, 'Regular'), note: name === standardFamily ? 'standard' : null, group, rank };
+  }).sort((a, b) => a.rank - b.rank);
   const styles = families.get(family);
   const styleOptions = styles.map((s) => ({ key: s.name, text: s.style, face: s.name, note: s.name === standard ? 'standard' : null }));
   const pickFamily = (name, onChange) => onChange(inFamily(families.get(name), style));

@@ -1500,6 +1500,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 .font-list button:hover, .font-list button:focus-visible { background: var(--raised); }
 .font-list button.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .font-list .font-sample { font-size: 1.15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.font-list .font-group { padding: 10px 12px 4px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
 .font-list .font-note { flex: none; font-size: 0.8rem; color: var(--muted); }
 
 
@@ -1581,3 +1582,65 @@ input.tape-number { width: 160px; }
 .phone-tabs .insert-tab-bar .tab-name { display: inline; }
 .phone-options > :first-child { margin-top: 14px; }
 .code-panel > .field:first-child { margin-top: 14px; }
+
+/* Border picker (Font and layout > Border): a field like the font menu, then a sheet of tiles */
+.border-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 10px 4px 6px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: left;
+  font-weight: 400;
+}
+.border-button .icon { flex: none; color: var(--muted); }
+.border-thumb { flex: none; display: flex; align-items: center; justify-content: center; width: 84px; height: 34px; background: #fff; border-radius: 6px; }
+.border-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.border-thumb .muted { color: var(--muted); font-size: 0.85rem; }
+.border-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.05rem; }
+.border-categories { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; padding: 4px; margin-bottom: 14px; background: var(--bg); border-radius: 12px; }
+.border-categories button {
+  min-height: 36px;
+  padding: 6px 4px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+}
+.border-categories button.on { background: var(--card); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+.border-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.border-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-weight: 400;
+  min-width: 0;
+}
+.border-tile:hover { border-color: var(--accent); }
+.border-tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.border-art { position: relative; display: block; aspect-ratio: 40 / 13; background: #fff; border-radius: 6px; }
+.border-art img { position: absolute; left: 5%; top: 5%; width: 90%; height: 90%; object-fit: contain; }
+.border-tile-name { font-size: 0.85rem; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.border-check {
+  position: absolute; top: 4px; right: 4px;
+  display: flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--accent); color: #fff; font-size: 12px; font-weight: 700;
+}
+@media (max-width: 639px) {
+  .border-categories button { font-size: 0.85rem; padding: 6px 2px; }
+  .border-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+}

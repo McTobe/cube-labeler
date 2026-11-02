@@ -37,6 +37,7 @@ CORE_MODULES = [
     "ptcbp.py",
     "ptstatus.py",
     "rich_text.py",
+    "borders.py",
     "secret_store.py",
     "specs.py",
 ]
