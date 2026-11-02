@@ -11,11 +11,13 @@
 // which draws the label; keep the two in step.
 
 const SIZE_PREFIXES = [['## ', 'medium'], ['# ', 'large'], ['-# ', 'small']];
+// A letter height in mm, as "[3.5mm] " (MM_PREFIX in core/rich_text.py)
+const MM_PREFIX = /^\[\d{1,2}(?:[.,]\d{1,2})? ?mm\] /;
 const ALIGN_PREFIXES = [['<< ', 'left'], ['>< ', 'center'], ['>> ', 'right']];
 const COLUMN_BREAK = '---';
 // Longest first, so "**" is read as bold and not as two italic markers
 const INLINE_MARKERS = [['**', 'bold'], ['__', 'underline'], ['==', 'invert'], ['*', 'italic']];
-const ESCAPABLE = '\\*_=#<>-';
+const ESCAPABLE = '\\*_=#<>-[';
 const STYLES = ['bold', 'italic', 'underline', 'invert'];
 
 // A marker opens a style only if text follows it and the same marker closes it later
@@ -44,6 +46,8 @@ function lineParts(line, out) {
   let found = true;
   while (found) {
     found = false;
+    const mm = !size && rest.match(MM_PREFIX);
+    if (mm) { size = mm[0]; rest = rest.slice(size.length); found = true; out.push({ text: size, mark: true }); }
     if (!size) {
       for (const [prefix] of SIZE_PREFIXES) {
         if (rest.startsWith(prefix)) { size = prefix; rest = rest.slice(prefix.length); found = true; out.push({ text: prefix, mark: true }); break; }

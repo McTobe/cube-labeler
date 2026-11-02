@@ -38,6 +38,7 @@ Select text and use the buttons above the editor, or type the markers yourself:
 | Type | Result |
 |---|---|
 | `**bold**`, `*italic*`, `__underline__`, `==inverted==` | Bold, italic, underlined, or white on black |
+| `[3.5mm] ` at the start of a line | Capital letters 3.5 mm tall (the size button's − / + or a typed size; Auto follows Text size) |
 | `# `, `## `, `-# ` at the start of a line | Large, medium or small line |
 | `<< `, `>< `, `>> ` at the start of a line | Left, centred or right line |
 | `---` on its own line | A new column with a divider line |

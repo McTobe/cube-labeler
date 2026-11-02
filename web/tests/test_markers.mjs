@@ -20,6 +20,11 @@ assert.ok(textParts('==M3==').every((p) => p.invert));
 // Size and alignment, in either order, then a column line
 assert.deepEqual(marks('>> ## Right'), ['>> ', '## ']);
 assert.equal(textParts('---')[0].column, true);
+// A size in mm is a size marker too, and an escaped bracket is text
+assert.deepEqual(marks('[3.5mm] << Shelf'), ['[3.5mm] ', '<< ']);
+assert.deepEqual(marks('>> [2,5mm] Shelf'), ['>> ', '[2,5mm] ']);
+assert.deepEqual(words('\\[3mm] Shelf'), [['[3mm] Shelf', '']]);
+assert.deepEqual(marks('[A1] Shelf'), []);
 // Markers that don't open a style are plain text, like on the label
 assert.deepEqual(words('**open'), [['**open', '']]);
 assert.deepEqual(words('M3 * 8 * 2'), [['M3 * 8 * 2', '']]);

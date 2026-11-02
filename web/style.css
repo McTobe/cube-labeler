@@ -736,6 +736,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 4px 0; m
 /* The size and alignment choices open under the toolbar, or above it when it sits on the keyboard */
 .fmt-picker { order: 2; display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; scrollbar-width: none; }
 .fmt-picker .fmt { flex: 1 0 auto; font-size: 0.95rem; }
+/* Line size: Auto, −, the letter height in mm (typed or stepped), + as four even boxes */
+.fmt-picker.line-size { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.fmt-picker.line-size .fmt { font-size: 1.15rem; }
+.fmt-picker.line-size .fmt .fmt-text { font-size: 0.95rem; }
+.mm-box { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 40px; padding: 0 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--card); cursor: text; }
+.mm-box.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.mm-box:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mm-box input, .mm-box input:focus-visible { width: 2.4em; height: auto; min-height: 0; padding: 0; border: 0; outline: none; background: none; color: inherit; font-weight: 600; font-size: 0.95rem; line-height: 1.2; text-align: right; }
+.mm-box span { font-size: 0.85rem; line-height: 1.2; }
+.size-mm { font-weight: 700; font-size: 0.95rem; }
 .marker-tips { margin: 8px 0 0; font-size: 0.8rem; line-height: 1.8; }
 .marker-tips code { padding: 1px 6px; border-radius: 5px; background: var(--raised); font-size: 0.78rem; white-space: nowrap; }
 .text-card .card-head { gap: 12px; }

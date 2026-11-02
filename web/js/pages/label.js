@@ -18,10 +18,16 @@ import {
   updatePorts, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
 } from '../app.js';
 
-const LINE_SIZES = [['large', 'Large'], ['medium', 'Medium'], ['normal', 'Normal'], ['small', 'Small']];
+// A line's size is the height of its capital letters in mm, like the Text size option. Auto
+// follows that option; − and + step by half a millimetre, and the number can be typed.
+const LINE_MM_STEP = 0.5;
+const LINE_MM_MIN = 1.5;
+const LINE_MM_MAX = 30;  // as core/rich_text.py reads a marker
+const LINE_SIZE_NAMES = { large: 'Large', medium: 'Medium', small: 'Small' };
+const mmText = (v) => String(Math.round(v * 100) / 100);
+const roundTenth = (v) => (v == null ? null : Math.round(v * 10) / 10);
 const LINE_ALIGNS = [['', 'Like the label'], ['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
 const ALIGN_ICONS = { '': 'align-auto', left: 'align-left', center: 'align-center', right: 'align-right' };
-const SIZE_MARKS = { large: 'L', medium: 'M', normal: 'N', small: 'S' };
 // Toolbar buttons don't take the focus, so the phone keyboard and the selection stay put
 const keepFocus = (e) => e.preventDefault();
 const ALIGNS = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
@@ -124,11 +130,12 @@ const textRows = (text) => Math.min(8, Math.max(3, text.split('\n').length));
 const NO_STYLES = { bold: false, italic: false, underline: false, invert: false };
 
 function TextEditor() {
-  const { label } = useStore(app);
+  const { label, render } = useStore(app);
   const { phase } = useStore(boot);
   const ref = useRef(null);
   const viewRef = useRef(null);
   const [lineStyle, setLineStyle] = useState(['normal', null]);
+  const [lineNo, setLineNo] = useState(0);
   const [styles, setStyles] = useState(NO_STYLES);
   const [styled, setStyled] = useState(loadStyled);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -143,6 +150,7 @@ function TextEditor() {
     const area = ref.current;
     if (!area) return;
     setStyles(stylesAt(area.value, area.selectionStart));
+    setLineNo(area.value.slice(0, area.selectionStart).split('\n').length - 1);
     setLineStyle(await lineStyleAt(area.value, area.selectionStart));
   };
 
@@ -194,6 +202,21 @@ function TextEditor() {
     }
   };
 
+  // The caret's line: its letter height (set, or what Auto or a Large/Small marker comes to on the
+  // label) and the tallest it can be next to the other lines
+  const metrics = render && render.item.mode === 'text' && render.item.label.layout !== 'ports' ? render.metrics : null;
+  const shown = (list) => (list && list[lineNo] != null ? list[lineNo] : null);
+  const set = typeof lineStyle[0] === 'number' ? lineStyle[0] : null;
+  const lineSize = {
+    set,
+    auto: lineStyle[0] === 'normal',
+    // A size the text asks for shows as typed; one the label works out, to a tenth of a mm
+    mm: set != null ? set : roundTenth(shown(metrics && metrics.line_sizes_mm)),
+    max: shown(metrics && metrics.line_max_mm),
+  };
+  lineSize.title = lineSize.mm == null ? 'Auto'
+    : `${mmText(lineSize.mm)} mm${lineSize.auto ? ' (Auto)' : LINE_SIZE_NAMES[lineStyle[0]] ? ` (${LINE_SIZE_NAMES[lineStyle[0]]})` : ''}`;
+
   // One even row: the four styles, the line's size, alignment and a new column, then the view
   const styleButton = (style, title, mark) => html`<button class=${`fmt${styles[style] ? ' on' : ''}`} title=${title}
     aria-label=${title.replace(/ \(.*/, '')} aria-pressed=${styles[style]} disabled=${!ready}
@@ -210,12 +233,13 @@ function TextEditor() {
       </span>
     </div>
     <div class="format-tools">
-      ${picker && html`<div class="fmt-picker" role="group" aria-label=${picker === 'size' ? 'Line size' : 'Line alignment'}>
-        ${(picker === 'size' ? LINE_SIZES : LINE_ALIGNS).map(([v, t]) => {
-          const on = picker === 'size' ? lineStyle[0] === v : (lineStyle[1] || '') === v;
+      ${picker === 'size' && html`<${LineSizePicker} size=${lineSize} ready=${ready} onChange=${(v) => restyle({ size: v })} />`}
+      ${picker === 'align' && html`<div class="fmt-picker" role="group" aria-label="Line alignment">
+        ${LINE_ALIGNS.map(([v, t]) => {
+          const on = (lineStyle[1] || '') === v;
           return html`<button class=${`fmt${on ? ' on' : ''}`} aria-pressed=${on} onPointerDown=${keepFocus}
-            onClick=${() => { setPicker(null); restyle(picker === 'size' ? { size: v } : { align: v || null }); }}>
-            ${picker === 'align' && html`<${Icon} name=${ALIGN_ICONS[v]} size=${18} />`}<span class="fmt-text">${t}</span></button>`;
+            onClick=${() => { setPicker(null); restyle({ align: v || null }); }}>
+            <${Icon} name=${ALIGN_ICONS[v]} size=${18} /><span class="fmt-text">${t}</span></button>`;
         })}
       </div>`}
       <div class="format-bar" role="toolbar" aria-label="Text style">
@@ -224,10 +248,11 @@ function TextEditor() {
         ${styleButton('underline', 'Underline (Ctrl+U)', html`<u>U</u>`)}
         ${styleButton('invert', 'Inverted: white text on black', html`<span class="inv-mark">A</span>`)}
         <span class="fmt-sep" aria-hidden="true"></span>
-        <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title=${`Size of this line: ${LINE_SIZES.find(([v]) => v === lineStyle[0])[1]}`}
-          aria-label=${`Line size: ${lineStyle[0]}`} aria-expanded=${picker === 'size'}
+        <button class=${`fmt${picker === 'size' ? ' on' : ''}`} title=${`Size of this line: ${lineSize.title}`}
+          aria-label=${`Line size: ${lineSize.title}`} aria-expanded=${picker === 'size'}
           disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'size' ? null : 'size')}>
-          <span class="size-mark">A<small>a</small></span><span class="caret" aria-hidden="true">▾</span></button>
+          ${lineSize.mm == null ? html`<span class="size-mark">A<small>a</small></span>` : html`<span class="size-mm">${mmText(lineSize.mm)}</span>`}
+          <span class="caret" aria-hidden="true">▾</span></button>
         <button class=${`fmt${picker === 'align' ? ' on' : ''}`} title="Alignment of this line" aria-label="Line alignment" aria-expanded=${picker === 'align'}
           disabled=${!ready} onPointerDown=${keepFocus} onClick=${() => setPicker(picker === 'align' ? null : 'align')}>
           <${Icon} name=${ALIGN_ICONS[lineStyle[1] || '']} size=${20} /><span class="caret" aria-hidden="true">▾</span></button>
@@ -248,10 +273,51 @@ function TextEditor() {
         onSelect=${syncLineStyle}></textarea>
     </div>
     <p class="hint marker-tips">Or type: <code>**bold**</code> <code>*italic*</code> <code>__underline__</code>
-      <code>==inverted==</code> <code># big</code> <code>---</code> new column</p>
+      <code>==inverted==</code> <code>[5mm]</code> size <code>---</code> new column</p>
     <${Sheet} open=${helpOpen} title="Styling label text" onClose=${() => setHelpOpen(false)}>
       <${StylingHelp} />
     <//>
+  </div>`;
+}
+
+// The size row under the toolbar: Auto, then − / the letter height in mm / +. The number can be
+// typed (a comma works too); Enter or leaving the box sets it.
+function LineSizePicker({ size, ready, onChange }) {
+  const [draft, setDraftState] = useState(null);
+  // The typed text, also as a ref so Enter and the blur that follows set it only once
+  const typed = useRef(null);
+  const setDraft = (v) => { typed.current = v; setDraftState(v); };
+  const { mm, max, auto } = size;
+  const top = max == null ? LINE_MM_MAX : Math.max(LINE_MM_MIN, max);
+  // − and + land on the half-millimetre steps, from wherever the line is now
+  const down = mm == null ? null : Math.ceil(mm / LINE_MM_STEP - 1e-6) * LINE_MM_STEP - LINE_MM_STEP;
+  const up = mm == null ? null : Math.floor(mm / LINE_MM_STEP + 1e-6) * LINE_MM_STEP + LINE_MM_STEP;
+  const commit = () => {
+    if (typed.current == null) return;
+    const v = parseFloat(typed.current.replace(',', '.'));
+    setDraft(null);
+    if (Number.isFinite(v) && v > 0) onChange(Math.min(Math.max(Math.round(v * 100) / 100, LINE_MM_MIN), LINE_MM_MAX));
+  };
+  const onKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(); }
+    if (e.key === 'Escape') { e.preventDefault(); setDraft(null); e.currentTarget.blur(); }
+    if (e.key === 'ArrowUp' && up != null && up <= top + 0.01) { e.preventDefault(); setDraft(null); onChange(up); }
+    if (e.key === 'ArrowDown' && down != null && down >= LINE_MM_MIN - 0.01) { e.preventDefault(); setDraft(null); onChange(down); }
+  };
+  return html`<div class="fmt-picker line-size" role="group" aria-label="Line size">
+    <button class=${`fmt${auto ? ' on' : ''}`} aria-pressed=${auto} title="Follow the label's Text size" disabled=${!ready}
+      onPointerDown=${keepFocus} onClick=${() => onChange('normal')}><span class="fmt-text">Auto</span></button>
+    <button class="fmt" aria-label="Smaller" title="Half a millimetre smaller" onPointerDown=${keepFocus}
+      disabled=${!ready || down == null || down < LINE_MM_MIN - 0.01} onClick=${() => onChange(down)}>−</button>
+    <label class=${`mm-box${auto ? '' : ' on'}`} title="Height of the capital letters. Type a size or use − and +">
+      <input type="text" inputmode="decimal" aria-label="Letter height in mm" disabled=${!ready}
+        value=${draft != null ? draft : mm == null ? '' : mmText(mm)} placeholder="–"
+        onFocus=${(e) => e.currentTarget.select()} onInput=${(e) => setDraft(e.currentTarget.value)}
+        onKeyDown=${onKeyDown} onBlur=${commit} />
+      <span aria-hidden="true">mm</span>
+    </label>
+    <button class="fmt" aria-label="Bigger" title=${up != null && up > top + 0.01 ? 'As tall as this line fits next to the others' : 'Half a millimetre bigger'}
+      onPointerDown=${keepFocus} disabled=${!ready || up == null || up > top + 0.01} onClick=${() => onChange(up)}>+</button>
   </div>`;
 }
 
@@ -409,8 +475,9 @@ function StylingHelp() {
       <tr><td><code>__underline__</code></td><td><u>underline</u></td></tr>
       <tr><td><code>==inverted==</code></td><td><span class="inverted-sample">inverted</span></td></tr>
     </table>
-    <p>At the start of a line: <code>#</code> large, <code>##</code> medium, <code>-#</code> small,
-      <code>&lt;&lt;</code> left, <code>&gt;&lt;</code> centre, <code>&gt;&gt;</code> right.</p>
+    <p>At the start of a line: <code>[3.5mm]</code> letters 3.5 mm tall (the size button sets it, Auto
+      follows Text size), <code>&lt;&lt;</code> left, <code>&gt;&lt;</code> centre, <code>&gt;&gt;</code> right.
+      The older <code>#</code> large, <code>##</code> medium and <code>-#</code> small still work.</p>
     <p>A line with only <code>---</code> starts a new column with a divider line.</p>
     <p>Put a backslash before a marker to print it as it is, as in <code>M3 \\* 8</code>.</p>
     <p>The text box shows the styles, with the markers in pale grey. The <code>**</code> button at the
@@ -501,7 +568,7 @@ function BorderSheet({ open, data, value, onPick, onClose }) {
 }
 
 // Fit fills the tape; a size in mm is the height of a capital letter, the same on every label.
-// The size menu above the text still makes a line bigger or smaller than that. Sizes too tall
+// A line with its own size in the editor ([3.5mm]) keeps it; with Fit the other lines fill the rest. Sizes too tall
 // for the text are left out, and one that stops fitting goes back to Fit (see renderNow).
 function TextSizeField({ label, onChange }) {
   const { render } = useStore(app);
@@ -517,7 +584,7 @@ function TextSizeField({ label, onChange }) {
     <p class="hint">${TEXT_SIZES.some((v) => !fits(v))
       ? `Sizes over ${Math.floor(max * 10) / 10} mm don't fit this text ${ports ? 'between the dividers' : 'on the tape'}, so they're left out.`
       : ports ? 'Fit makes the text as big as the ports and the tape allow. Every port gets the same size.'
-      : 'Fit fills the tape height. A size in mm is the height of a capital letter, the same on every label.'}</p>`;
+      : 'Fit fills the tape height. A size in mm is the height of a capital letter. Lines given their own size in the text keep it.'}</p>`;
 }
 
 // --- Extras next to the text ---------------------------------------------------------------

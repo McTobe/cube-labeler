@@ -4,19 +4,21 @@ Styled text for text labels. The styling is simple markdown written in the label
 itself, so templates, the queue and the web version keep it as plain text.
 
 Inside a line:   **bold**   *italic*   __underline__   ==inverted== (white on black)
-At a line start: "# " large, "## " medium, "-# " small,
+At a line start: "[3.5mm] " letters 3.5 mm tall, or "# " large, "## " medium, "-# " small,
                  "<< " left, ">< " centre, ">> " right (otherwise the label's alignment)
 On its own line: "---" starts a new column with a divider line between them
 A backslash keeps a marker as plain text, as in "M3 \\* 8".
 """
 
 import math
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 from PIL import Image, ImageChops, ImageDraw
 
 from core.font_manager import font_manager
+from core.specs import DOT_PITCH_MM as DOT_MM
 
 SIZE_PREFIXES = [("## ", "medium"), ("# ", "large"), ("-# ", "small")]
 SIZE_FACTORS = {"large": 1.6, "medium": 1.3, "normal": 1.0, "small": 0.7}
@@ -25,7 +27,11 @@ COLUMN_BREAK = "---"
 
 # Longest first, so "**" is read as bold and not as two italic markers
 INLINE_MARKERS = [("**", "bold"), ("__", "underline"), ("==", "invert"), ("*", "italic")]
-ESCAPABLE = "\\*_=#<>-"
+ESCAPABLE = "\\*_=#<>-["
+# A size in mm at the start of a line: the height of its capital letters, as the Text size option
+MM_PREFIX = re.compile(r"\[(\d{1,2}(?:[.,]\d{1,2})?) ?mm\] ")
+LINE_MM_MIN, LINE_MM_MAX = 1.0, 30.0
+
 
 ITALIC_SLANT = 0.2  # Horizontal shift per dot of height for fonts without an italic file
 
@@ -44,6 +50,7 @@ class Line:
     runs: List[Run] = field(default_factory=list)
     size: str = "normal"
     align: Optional[str] = None  # None: the label's alignment
+    mm: Optional[float] = None  # Capital letter height in mm; None: follows the label's text size
 
     @property
     def text(self) -> str:
@@ -119,6 +126,8 @@ def parse_inline(text: str) -> List[Run]:
 
 def parse_line(raw: str) -> Line:
     size, align, rest = _split_prefixes(raw)
+    if isinstance(size, float):
+        return Line(parse_inline(rest), "normal", align, size)
     return Line(parse_inline(rest), size, align)
 
 
@@ -168,6 +177,8 @@ class TextLayout:
         self.ref_text = "".join(line.text for line in doc.lines).strip() or "Ag"
 
     def _size(self, line: Line, base: int) -> int:
+        if line.mm:
+            return self.size_for_cap_height(line.mm / DOT_MM)
         return max(int(round(base * line.factor)), 4)
 
     def _line_box(self, line: Line, base: int) -> Tuple[int, int]:
@@ -203,7 +214,9 @@ class TextLayout:
         return max(self.column_height(col, base) for col in self.doc.columns)
 
     def fit_size(self, target_height: int) -> int:
-        """Largest base size whose text fits target_height."""
+        """Largest base size whose text fits target_height. Lines with a size in mm keep it, so the
+        other lines fill what is left. If those lines are too tall on their own, the others get
+        the size they would have without them, rather than shrinking to nothing."""
         low, high, best = 6, max(target_height * 2, 6), 6
         while low <= high:
             mid = (low + high) // 2
@@ -211,7 +224,23 @@ class TextLayout:
                 best, low = mid, mid + 1
             else:
                 high = mid - 1
+        if best == 6 and self.height(6) > target_height and any(line.mm for line in self.doc.lines):
+            loose = RichText([[Line(l.runs, l.size, l.align) for l in col] for col in self.doc.columns])
+            return TextLayout(loose, self.font_name, self.stroke, self.spacing, self.align).fit_size(target_height)
         return best
+
+    def line_max_mm(self, line: Line, target_height: int) -> float:
+        """The tallest letter height in mm this line can have on its own in target_height."""
+        probe = Line(line.runs, "normal", line.align)
+        low, high, best = 4, max(target_height * 2, 4), 4
+        while low <= high:
+            mid = (low + high) // 2
+            top, bottom = self._line_box(probe, mid)
+            if bottom - top <= target_height:
+                best, low = mid, mid + 1
+            else:
+                high = mid - 1
+        return self.cap_height(best) * DOT_MM
 
     def size_for_cap_height(self, dots: float) -> int:
         """Base size whose capital letters are `dots` tall, as a letter height on a label maker."""
@@ -392,12 +421,26 @@ def toggle_style(text: str, start: int, end: int, style: str) -> Tuple[str, int,
     return text[:start] + marker + inner + marker + text[end:], start + m, end + m
 
 
-def _split_prefixes(line: str) -> Tuple[str, Optional[str], str]:
-    """Splits a line into its size, alignment and the rest."""
+def format_mm(mm: float) -> str:
+    """A letter height as the marker writes it: 3, 3.5 or 2.25."""
+    return f"{round(mm, 2):g}"
+
+
+def mm_prefix(mm: float) -> str:
+    return f"[{format_mm(mm)}mm] "
+
+
+def _split_prefixes(line: str):
+    """Splits a line into its size (a name, or a letter height in mm), alignment and the rest."""
     size, align, rest = "normal", None, line
     found = True
     while found:
         found = False
+        if size == "normal":
+            m = MM_PREFIX.match(rest)
+            if m:
+                mm = float(m.group(1).replace(",", "."))
+                size, rest, found = min(max(mm, LINE_MM_MIN), LINE_MM_MAX), rest[m.end():], True
         if size == "normal":
             for prefix, value in SIZE_PREFIXES:
                 if rest.startswith(prefix):
@@ -411,22 +454,25 @@ def _split_prefixes(line: str) -> Tuple[str, Optional[str], str]:
     return size, align, rest
 
 
-def line_style(line: str) -> Tuple[str, Optional[str]]:
-    """The size and alignment a line asks for."""
+def line_style(line: str):
+    """The size (a name, or a letter height in mm) and alignment a line asks for."""
     size, align, _ = _split_prefixes(line)
     return size, align
 
 
 def set_line_style(line: str, size: Optional[str] = None, align: Optional[str] = "") -> str:
     """
-    Rewrites a line's prefixes. size: "large", "medium", "normal", "small", or None to keep it.
+    Rewrites a line's prefixes. size: "large", "medium", "normal", "small", a letter height in mm,
+    or None to keep it.
     align: "left", "center", "right", None for the label's alignment, or "" to keep it.
     """
     old_size, old_align, rest = _split_prefixes(line)
     size = old_size if size is None else size
     align = old_align if align == "" else align
     out = ""
-    if size != "normal":
+    if isinstance(size, (int, float)) and not isinstance(size, bool):
+        out += mm_prefix(min(max(float(size), LINE_MM_MIN), LINE_MM_MAX))
+    elif size != "normal":
         out += next(p for p, v in SIZE_PREFIXES if v == size)
     if align is not None:
         out += next(p for p, v in ALIGN_PREFIXES if v == align)
