@@ -12,6 +12,7 @@ import {
   tapeKey, newRoll, correctRoll, countPrint, rollLeft, formatTape, planParts, partItems,
 } from './tape.js';
 import { outletText, outletParts, nextFirst } from './outlet-code.js';
+import { dateText } from './dates.js';
 
 const RENDER_DELAY_MS = 120;
 const SAVE_DELAY_MS = 400;
@@ -100,6 +101,20 @@ export const DEFAULT_OUTLET = {
 };
 DEFAULT_OUTLET.text = outletText(DEFAULT_OUTLET);
 
+// A date label (freezer, fridge, opened jars) is a text label whose text is worked out from
+// these fields (see dates.js), kept apart from the text label like the port strip
+export const DEFAULT_DATES = {
+  ...DEFAULT_LABEL,
+  layout: 'date',
+  text: '',
+  date_name: '',
+  date_made: 'today',  // 'today', 'yesterday' or a picked day as YYYY-MM-DD
+  date_keeps: '3m',  // an id from KEEPS in dates.js
+  date_portions: '',
+  date_show: 'both',  // 'both', 'use' (use-by only) or 'made'
+  date_style: 'words',  // 'words' (2 Nov 2026), 'dots' (02.11.26) or 'iso' (2026-11-02)
+};
+
 export const DEFAULT_SETTINGS = {
   ai_provider: 'gemini',
   ai_models: {},
@@ -127,10 +142,11 @@ export const BIN_TAPE_MM = 12;
 export const boot = createStore({ phase: 'loading', text: 'Starting...', error: null });
 
 export const app = createStore({
-  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet' or 'flag' (a cable flag of the text label)
+  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet', 'date' or 'flag' (a cable flag of the text label)
   label: DEFAULT_LABEL,
   ports: DEFAULT_PORTS,  // the port strip being edited
   outlet: DEFAULT_OUTLET,  // the network outlet label being edited
+  dates: DEFAULT_DATES,  // the date label being edited
   bin: null,  // {kind: 'fastener' or 'component', fastener: {...}, component: {...}}
   binNames: { fastener: [], component: [] },
   languages: [['en', 'English']],
@@ -189,7 +205,7 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue, device, ports, outlet] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device, ports, outlet, dates] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
@@ -199,6 +215,7 @@ export async function start() {
     storage.load('deviceId', null),
     storage.load('ports', {}),
     storage.load('outlet', {}),
+    storage.load('dates', {}),
   ]);
   // The tape counter counts each device's prints apart, so syncing never counts one twice
   deviceId = device || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -209,6 +226,7 @@ export async function start() {
     label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     ports: { ...DEFAULT_PORTS, ...ports, layout: 'ports' },
     outlet: withOutletText({ ...DEFAULT_OUTLET, ...outlet }),
+    dates: { ...DEFAULT_DATES, ...dates, layout: 'date' },
     mode,
     bin,
     queue: mergeCopies(queue),
@@ -324,6 +342,11 @@ export function updateOutlet(change) {
   changed('outlet');
 }
 
+export function updateDates(change) {
+  app.set({ dates: { ...app.get().dates, ...change } });
+  changed('dates');
+}
+
 // change applies to the bin label being edited (fastener or part); {kind} switches between them
 export function updateBin(change) {
   const bin = app.get().bin;
@@ -359,6 +382,7 @@ export const RESET_NOTES = {
   flag: 'Reset the cable, font, size, QR code, picture and tape settings? Your text is kept.',
   ports: 'Reset ports, spacing, font, size and tape? Your numbers and names are kept.',
   outlet: 'Reset the code style, font, size and tape? The parts of your code are kept.',
+  date: 'Reset the date style, font, size and tape? What is on the label is kept.',
   bin: 'Reset the label length and drive icon? What is on the label is kept.',
 };
 
@@ -367,11 +391,15 @@ const OUTLET_PART_KEYS = ['outlet_building', 'outlet_floor', 'outlet_room', 'out
   'outlet_panel', 'outlet_ports', 'outlet_first', 'outlet_row'];
 
 export function resetSettings() {
-  const { mode, label, ports, outlet, bin, settings } = app.get();
+  const { mode, label, ports, outlet, dates, bin, settings } = app.get();
   if (mode === 'outlet') {
     const keep = Object.fromEntries(OUTLET_PART_KEYS.map((k) => [k, outlet[k]]));
     updateOutlet({ ...DEFAULT_OUTLET, tape_width_mm: labelDefaults().tape_width_mm, ...keep });
     say('Settings reset. The parts of your code are kept.');
+  } else if (mode === 'date') {
+    const kept = ['date_name', 'date_made', 'date_keeps', 'date_portions', 'date_show'];
+    updateDates({ ...DEFAULT_DATES, ...labelDefaults(), ...Object.fromEntries(kept.map((k) => [k, dates[k]])) });
+    say('Settings reset. What is on the label is kept.');
   } else if (mode === 'ports') {
     const { port_use_names, port_names, port_prefix } = ports;
     updatePorts({ ...DEFAULT_PORTS, tape_width_mm: labelDefaults().tape_width_mm, port_use_names, port_names, port_prefix });
@@ -428,10 +456,12 @@ export function itemOptions(item) {
 }
 
 export function currentItem() {
-  const { mode, label, bin, ports, outlet } = app.get();
+  const { mode, label, bin, ports, outlet, dates } = app.get();
   if (mode === 'bin' && bin) return { mode, bin: bin[bin.kind] };
   if (mode === 'ports') return { mode: 'text', label: ports };
   if (mode === 'outlet') return { mode: 'text', label: outlet };
+  // The text is worked out each time, so "Today" is the day the label is printed
+  if (mode === 'date') return { mode: 'text', label: { ...dates, text: dateText(dates) } };
   return { mode: 'text', label: { ...label, layout: mode === 'flag' ? 'flag' : 'text' } };
 }
 
@@ -439,7 +469,7 @@ export function currentItem() {
 export function editorMode(item) {
   if (item.mode === 'bin') return 'bin';
   const { layout } = item.label;
-  return layout === 'ports' || layout === 'outlet' || layout === 'flag' ? layout : 'text';
+  return ['ports', 'outlet', 'flag', 'date'].includes(layout) ? layout : 'text';
 }
 
 // What goes over each port of a port strip, as the Python core draws it
@@ -468,6 +498,9 @@ export function itemTitle(item) {
     return named.length ? `Ports ${named[0]}${named.length > 1 ? ` to ${named[named.length - 1]}` : ''}` : 'Port strip';
   }
   if (item.mode === 'text' && item.label.layout === 'outlet') return outletParts(item.label).code || textLines(item.label)[0] || 'Network outlet';
+  if (item.mode === 'text' && item.label.layout === 'date') {
+    return [item.label.date_name, item.label.date_portions].map((t) => String(t || '').trim()).filter(Boolean).join(' · ') || 'Date label';
+  }
   if (item.mode === 'bin') {
     const b = item.bin;
     return (b.kind === 'component' ? `${b.category_banner} ${b.spec_primary}` : `${b.thread_size} ${b.category}`).trim() || 'Bin label';
@@ -481,9 +514,10 @@ function fitTooTallPreset(item, metrics) {
   if (item.mode !== 'text' || !metrics.text_height_fell_back) return;
   const ports = item.label.layout === 'ports';
   const outlet = item.label.layout === 'outlet';
-  const label = ports ? app.get().ports : outlet ? app.get().outlet : app.get().label;
+  const dates = item.label.layout === 'date';
+  const label = ports ? app.get().ports : outlet ? app.get().outlet : dates ? app.get().dates : app.get().label;
   if (label.text_height_mm !== item.label.text_height_mm) return;
-  (ports ? updatePorts : outlet ? updateOutlet : updateLabel)({ text_height_mm: null });
+  (ports ? updatePorts : outlet ? updateOutlet : dates ? updateDates : updateLabel)({ text_height_mm: null });
   say(`${item.label.text_height_mm} mm is too big for this text ${ports ? 'between the dividers' : 'on the tape'}, so the size is back on Fit.`);
 }
 
@@ -505,7 +539,7 @@ export async function renderNow() {
         // The rulers are only for this preview, so a bin label takes the text label's choice
         // here and not in its queue item
         const options = itemOptions(item);
-        if (item.mode === 'bin' || item.label.layout === 'ports') options.show_rulers = app.get().label.show_rulers;
+        if (item.mode === 'bin' || ['ports', 'date'].includes(item.label.layout)) options.show_rulers = app.get().label.show_rulers;
         // An empty text label shows faded sample text, not a blank piece of tape (it can't print)
         const sample = item.mode === 'text' && item.label.layout !== 'ports' && options.text === ' ';
         if (sample) options.text = SAMPLE_TEXT;
@@ -1000,6 +1034,9 @@ export function openItem(item) {
   } else if (editorMode(item) === 'outlet') {
     app.set({ mode: 'outlet', outlet: withOutletText({ ...DEFAULT_OUTLET, ...item.label }) });
     storage.save('outlet', app.get().outlet);
+  } else if (editorMode(item) === 'date') {
+    app.set({ mode: 'date', dates: { ...DEFAULT_DATES, ...item.label } });
+    storage.save('dates', app.get().dates);
   } else {
     // A cable flag is the text label drawn twice, so it opens as the text label in Cable flag
     app.set({ mode: editorMode(item), label: { ...DEFAULT_LABEL, ...item.label, layout: 'text' } });

@@ -122,7 +122,8 @@ class LabelConfig:
     inventory_config: Optional[object] = None  # FastenerLabelConfig or ComponentLabelConfig
 
     # Kind of text label: "text"; "ports", one strip with a number or name over each port of a
-    # patch panel or switch; or "flag", the text twice with room between to fold round a cable
+    # patch panel or switch; "flag", the text twice with room between to fold round a cable; or
+    # "date", a food label whose text the web app works out from the date_ fields below
     layout: str = "text"
 
     # Port strip: the ports are port_pitch_mm apart, exactly, and numbered from port_first
@@ -139,6 +140,15 @@ class LabelConfig:
     flag_cable_mm: float = 6.0
     flag_side_mm: Optional[float] = None
     flag_fold_marks: bool = True
+
+    # Date label: kept so the web app's Date label editor opens it again; the label draws its
+    # text, which already holds the name and the dates
+    date_name: str = ""
+    date_made: str = "today"  # "today", "yesterday" or a day as YYYY-MM-DD
+    date_keeps: str = "3m"  # 3d, 1w, 2w, 1m, 3m or 6m
+    date_portions: str = ""
+    date_show: str = "both"  # "both", "use" (use-by only) or "made"
+    date_style: str = "words"  # "words" (2 Nov 2026), "dots" (02.11.26) or "iso" (2026-11-02)
 
 
 # Port strip dividers, and the room kept between a port's text and its dividers

@@ -371,6 +371,16 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
         self.assertEqual(back["bin"]["icon_type"], "custom")
         self.assertEqual(back["bin"]["kind"], "component")
 
+    def test_date_label_template_keeps_its_fields(self):
+        # A date label draws its text, and keeps its fields so the Date label editor opens it again
+        label = {"text": "## **Soup**\nMade 2 Nov 2026", "layout": "date", "date_name": "Soup",
+                 "date_made": "2026-10-28", "date_keeps": "1w", "date_portions": "4",
+                 "date_show": "made", "date_style": "dots"}
+        back = cube_web.template_from_desktop(cube_web.template_to_desktop({"mode": "text", "label": label}))
+        for key, value in label.items():
+            self.assertEqual(back["label"][key], value)
+        self.assertGreater(len(cube_web.render_label(label)["preview_png"]), 100)
+
     def test_broken_template_is_refused(self):
         with self.assertRaisesRegex(ValueError, "not a template"):
             cube_web.template_from_desktop("{nope")

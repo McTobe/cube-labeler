@@ -140,7 +140,7 @@ function IconTiles({ cfg, tiles, field }) {
 
 // Chips that fill in a common value; typing still works. On a wide screen they are a grid of
 // cols columns whose rows stretch to fill the column.
-function Chips({ label, values, current, onPick, cols = 4 }) {
+export function Chips({ label, values, current, onPick, cols = 4 }) {
   return html`<div class="quick-chips" role="group" aria-label=${label} style=${`--cols: ${cols}`}>
     ${values.map((v) => {
       const on = Array.isArray(current) ? current.includes(v) : current === v;

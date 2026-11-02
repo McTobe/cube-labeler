@@ -12,6 +12,8 @@ It has everything the desktop app has:
 - **Text labels** with the styling toolbar, fonts, frames, QR codes (with a Wi-Fi helper), a
   picture, tape width, length and the advanced settings, and a tape and print-dot preview.
 - **Bin labels** for fasteners and parts, with their drive and part icons or your own picture.
+- **Date labels** for the freezer, the fridge and opened jars: what is in it, the day it was
+  made and how long it keeps, with the use-by date worked out.
 - **The print queue**: several labels as one strip with cut lines; reorder, edit and remove.
 - **The icon library** (search, categories, favourites, recently used, a print preview) and the
   **icon editor** (crop, drawing, silhouette or outline, darkness, thickness, clean-up, turn and
