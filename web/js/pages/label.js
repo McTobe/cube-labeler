@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { html } from '../html.js';
 import { IconPickerSheet } from './icons.js';
+import { SaveTemplateSheet } from './templates.js';
 import { Icon } from '../icons.js';
 import { Field, Menu, Section, Segmented, Select, Sheet, Slider, Toggle, useWide } from '../ui.js';
 import { useStore } from '../state.js';
@@ -978,6 +979,7 @@ function ActionBar() {
   const p = useStore(printer);
   const { phase } = useStore(boot);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const ready = phase === 'ready';
 
   useEffect(() => {
@@ -1005,11 +1007,13 @@ function ActionBar() {
         <${Menu} open=${menuOpen} onClose=${() => setMenuOpen(false)} items=${[
           queued > 0 && { label: 'Print only this label', icon: 'printer', action: printLabel,
             disabled: !ready || !render || !p.transport || p.busy },
+          { label: 'Save as template', icon: 'templates', action: () => setSaving(true), disabled: !ready },
           { label: 'Save as picture', icon: 'download', action: savePicture, disabled: !render },
           { label: `Feed ${FEED_LENGTH_MM} mm of tape`, icon: 'feed', action: feed, disabled: !p.transport || p.busy || !ready },
         ]} />
       </span>
     </div>
+    <${SaveTemplateSheet} open=${saving} onClose=${() => setSaving(false)} />
   </div>`;
 }
 

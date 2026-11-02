@@ -50,10 +50,16 @@ function MyTemplate({ entry }) {
   </li>`;
 }
 
-function SaveSheet({ open, onClose }) {
+// Also opened from the Label page's action bar, before the Templates page has loaded the list
+export function SaveTemplateSheet({ open, onClose }) {
   const [name, setName] = useState('');
   const { mode, label, bin } = useStore(app);
-  useEffect(() => { if (open) setName(itemTitle(currentItem())); }, [open]);
+  useStore(templates);
+  useEffect(() => {
+    if (!open) return;
+    setName(itemTitle(currentItem()));
+    if (!templates.get().ready) loadTemplates().catch((err) => say(errorMessage(err), true));
+  }, [open]);
   const taken = name.trim() && findTemplate(name);
   const save = (e) => {
     e.preventDefault();
@@ -128,6 +134,6 @@ export function TemplatesPage() {
           </button>
         </li>`)}
       </ul>`}
-    <${SaveSheet} open=${saving} onClose=${() => setSaving(false)} />
+    <${SaveTemplateSheet} open=${saving} onClose=${() => setSaving(false)} />
   </section>`;
 }
