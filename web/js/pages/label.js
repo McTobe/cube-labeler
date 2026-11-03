@@ -14,12 +14,13 @@ import { QR_HELPERS, QR_ROW, helperCode, helperDefaults, looksLikeSite, fitLevel
 import { FontField } from '../font-picker.js';
 import { BinCard, BinOptions } from './bin.js';
 import { OutletCard, OutletHelp, OutletStyleSection } from './outlet.js';
+import { PowerCard, PowerHelp, PowerStyleSection } from './power.js';
 import { KindSheet } from './kinds.js';
 import { DateCard, DateOptions } from './date.js';
 import {
   app, boot, printer, updateLabel, resetSettings, RESET_NOTES, labelDefaults, updateSettings, say, DEFAULT_LABEL, toggleStyle, restyleLines, lineStyleAt,
   setImage, printLabel, connectPrinter, savePicture, feed, FEED_LENGTH_MM, setMode, addToQueue, queueLabelCount, TEXT_SIZES, hasBarcode, hasQr,
-  updatePorts, updateOutlet, updateDates, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
+  updatePorts, updateOutlet, updatePower, updateDates, PORT_COUNTS, PORT_SPACINGS, qrFit, getBorderTiles,
   updateAsset, addAssetRow, assetRow, assetTag, ASSET_CODES,
   updateBreakers, breakerTexts, breakerModules, newBreaker, BREAKER_MODULES, BREAKER_MAX, isStrip,
 } from '../app.js';
@@ -70,6 +71,9 @@ export function LabelPage() {
   } else if (mode === 'outlet') {
     options = html`${wide ? html`<${OutletHelp} />` : html`<${OutletCard} />`}<${OutletStyleSection} />
       <${PortFontSection} id="outlet-font" kind="outlet" update=${updateOutlet} />`;
+  } else if (mode === 'power') {
+    options = html`${wide ? html`<${PowerHelp} />` : html`<${PowerCard} />`}<${PowerStyleSection} />
+      <${PortFontSection} id="power-font" kind="power" update=${updatePower} />`;
   } else if (mode === 'date') {
     options = html`${!wide && html`<${DateCard} />`}<${DateOptions} /><${PortFontSection} id="date-font" kind="dates" update=${updateDates} sizes=${false} />`;
   } else if (mode === 'asset') {
@@ -92,6 +96,7 @@ export function LabelPage() {
       ${mode === 'bin' && wide && html`<${BinCard} />`}
       ${mode === 'ports' && wide && html`<${PortCard} />`}
       ${mode === 'outlet' && wide && html`<${OutletCard} />`}
+      ${mode === 'power' && wide && html`<${PowerCard} />`}
       ${mode === 'date' && wide && html`<${DateCard} />`}
       ${mode === 'asset' && wide && html`<${AssetCard} />`}
       ${mode === 'breakers' && wide && html`<${BreakerCard} />`}
@@ -115,6 +120,7 @@ export const MODES = [
   { id: 'flag', name: 'Cable flag', icon: 'flag' },
   { id: 'ports', name: 'Port strip', icon: 'ports' },
   { id: 'outlet', name: 'Network outlet', icon: 'outlet' },
+  { id: 'power', name: 'Power outlet', icon: 'power' },
   { id: 'breakers', name: 'Breaker strip', icon: 'breaker' },
   { id: 'asset', name: 'Asset tag', icon: 'asset' },
   { id: 'date', name: 'Date label', icon: 'calendar' },
