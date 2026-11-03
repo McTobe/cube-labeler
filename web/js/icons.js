@@ -6,6 +6,7 @@ const PATHS = {
   bin: html`<path d="M3 8h18v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M5 8l1.5-4h11L19 8"/><rect x="8" y="11.5" width="8" height="4" rx="0.8"/>`,
   ports: html`<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7.5 9.5h9v5h-2.5v2h-4v-2H7.5z"/>`,
   flag: html`<path d="M2 12h5"/><rect x="7" y="7.5" width="14" height="9" rx="1.5"/><path d="M11 12h6"/>`,
+  power: html`<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="12" cy="12" r="5.5"/><path d="M9.8 12h.01M14.2 12h.01" stroke-width="2.6"/>`,
   outlet: html`<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M9 6h6v3.5h-1.5V11h-3V9.5H9zM9 13h6v3.5h-1.5V18h-3v-1.5H9z"/>`,
   breaker: html`<rect x="6" y="2.5" width="12" height="19" rx="1.5"/><rect x="10" y="8" width="4" height="8" rx="1"/><path d="M10 12h4M6 5.5h12M6 18.5h12"/>`,
   asset: html`<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 9.5v5M8.5 9.5v5M10.5 9.5v5M14 10h4.5M14 14h3"/>`,

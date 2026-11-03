@@ -6,7 +6,7 @@ import { html } from '../html.js';
 import { Icon } from '../icons.js';
 import { Sheet } from '../ui.js';
 import { useStore } from '../state.js';
-import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS, DEFAULT_OUTLET, DEFAULT_DATES, DEFAULT_ASSET, DEFAULT_BREAKERS } from '../app.js';
+import { app, boot, setMode, DEFAULT_LABEL, DEFAULT_PORTS, DEFAULT_OUTLET, DEFAULT_POWER, DEFAULT_DATES, DEFAULT_ASSET, DEFAULT_BREAKERS } from '../app.js';
 import { dateText } from '../dates.js';
 import { templates, thumbnail } from '../templates.js';
 
@@ -17,6 +17,7 @@ export const KIND_NOTES = {
   flag: 'Wraps round a cable and reads from both sides.',
   ports: 'One strip over a row of switch or panel ports.',
   outlet: 'Codes for wall outlets, like DA01P02 3/4.',
+  power: 'Central and group for sockets, like A1A Gr. 13.',
   breakers: 'Names over the breakers in a fuse box.',
   asset: 'Numbered tags with a barcode or QR code.',
   date: 'Food and leftovers, with made and use-by dates.',
@@ -32,6 +33,7 @@ export const KIND_EXAMPLES = {
   flag: () => ({ mode: 'text', label: { ...DEFAULT_LABEL, layout: 'flag', text: 'NAS', font_name: 'Arimo Bold' } }),
   ports: () => ({ mode: 'text', label: { ...DEFAULT_PORTS, port_count: 6 } }),
   outlet: () => ({ mode: 'text', label: { ...DEFAULT_OUTLET, text: 'DA01P02 3/4' } }),
+  power: () => ({ mode: 'text', label: { ...DEFAULT_POWER, text: 'A1A Gr. 13' } }),
   date: () => {
     const label = { ...DEFAULT_DATES, date_name: 'Chili', date_portions: '2', date_show: 'use' };
     return { mode: 'text', label: { ...label, text: dateText(label) } };

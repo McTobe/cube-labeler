@@ -12,6 +12,7 @@ import {
   tapeKey, newRoll, correctRoll, countPrint, rollLeft, formatTape, planParts, partItems,
 } from './tape.js';
 import { outletText, outletParts, nextFirst } from './outlet-code.js';
+import { powerText, powerParts, nextGroup } from './power-code.js';
 import { dateText } from './dates.js';
 
 const RENDER_DELAY_MS = 120;
@@ -100,6 +101,29 @@ export const DEFAULT_OUTLET = {
   outlet_lines: 1,  // 2 puts building, floor and room small over the code
 };
 DEFAULT_OUTLET.text = outletText(DEFAULT_OUTLET);
+
+// A power outlet label is a text label whose text is made from the central, the group and the
+// other parts of its code (see power-code.js), kept apart like the network outlet's
+export const DEFAULT_POWER = {
+  ...DEFAULT_LABEL,
+  layout: 'power',
+  text: '',
+  font_name: 'Arimo Bold',
+  power_building: '',
+  power_floor: '',
+  power_room: '',
+  power_central: 'A1A',  // the central (distribution board)
+  power_group_kind: 'Gr.',  // how the group is written: 'Gr.' (Gr. 13), 'F' (F13) or '' (13)
+  power_group: '1',  // the group (fuse) feeding the outlet
+  power_phase: '',  // '', 'L1', 'L2', 'L3' or 'L1-L3'
+  power_voltage: '',  // '', '230 V' or '400 V'
+  power_row: 1,  // copies added at once, for the outlets on one group
+  power_sep: ' ',  // between the parts: ' ', ':', '-' or '.'
+  power_digits: 0,  // the group as typed, or padded to 2 or 3 digits
+  power_lines: 1,  // 2 puts building, floor and room small over the code
+  power_extra: 'after',  // phase and voltage 'after' the group, or 'below' on a small line
+};
+DEFAULT_POWER.text = powerText(DEFAULT_POWER);
 
 // A date label (freezer, fridge, opened jars) is a text label whose text is worked out from
 // these fields (see dates.js), kept apart from the text label like the port strip
@@ -198,10 +222,11 @@ export const BIN_TAPE_MM = 12;
 export const boot = createStore({ phase: 'loading', text: 'Starting...', error: null });
 
 export const app = createStore({
-  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet', 'date', 'asset', 'breakers' or 'flag' (a cable flag of the text label)
+  mode: 'text',  // what the Label page edits: 'text', 'bin', 'ports', 'outlet', 'power', 'date', 'asset', 'breakers' or 'flag' (a cable flag of the text label)
   label: DEFAULT_LABEL,
   ports: DEFAULT_PORTS,  // the port strip being edited
   outlet: DEFAULT_OUTLET,  // the network outlet label being edited
+  power: DEFAULT_POWER,  // the power outlet label being edited
   dates: DEFAULT_DATES,  // the date label being edited
   asset: DEFAULT_ASSET,  // the asset tag being edited
   breakers: DEFAULT_BREAKERS,  // the breaker strip being edited
@@ -263,7 +288,7 @@ export function pageChanged() {
 // --- Start ---------------------------------------------------------------------------------
 
 export async function start() {
-  const [settings, label, fonts, mode, bin, queue, device, ports, outlet, dates, asset, breakers] = await Promise.all([
+  const [settings, label, fonts, mode, bin, queue, device, ports, outlet, dates, asset, breakers, power] = await Promise.all([
     storage.load('settings', {}),
     storage.load('label', {}),
     storage.load('fonts', []),
@@ -276,6 +301,7 @@ export async function start() {
     storage.load('dates', {}),
     storage.load('asset', {}),
     storage.load('breakers', {}),
+    storage.load('power', {}),
   ]);
   // The tape counter counts each device's prints apart, so syncing never counts one twice
   deviceId = device || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -286,6 +312,7 @@ export async function start() {
     label: { ...DEFAULT_LABEL, ...label, show_guides: false },
     ports: { ...DEFAULT_PORTS, ...ports, layout: 'ports' },
     outlet: withOutletText({ ...DEFAULT_OUTLET, ...outlet }),
+    power: withPowerText({ ...DEFAULT_POWER, ...power }),
     dates: { ...DEFAULT_DATES, ...dates, layout: 'date' },
     asset: { ...DEFAULT_ASSET, ...asset, layout: 'asset' },
     breakers: { ...DEFAULT_BREAKERS, ...breakers, layout: 'breakers' },
@@ -404,6 +431,13 @@ export function updateOutlet(change) {
   changed('outlet');
 }
 
+const withPowerText = (power) => ({ ...power, layout: 'power', text: powerText(power) });
+
+export function updatePower(change) {
+  app.set({ power: withPowerText({ ...app.get().power, ...change }) });
+  changed('power');
+}
+
 export function updateDates(change) {
   app.set({ dates: { ...app.get().dates, ...change } });
   changed('dates');
@@ -454,6 +488,7 @@ export const RESET_NOTES = {
   flag: 'Reset the cable, font, size, QR code, picture and tape settings? Your text is kept.',
   ports: 'Reset ports, spacing, font, size and tape? Your numbers and names are kept.',
   outlet: 'Reset the code style, font, size and tape? The parts of your code are kept.',
+  power: 'Reset the code style, font, size and tape? The parts of your code are kept.',
   date: 'Reset the date style, font, size and tape? What is on the label is kept.',
   asset: 'Reset the code, tag style, font and tape? The owner, numbers and link are kept.',
   breakers: 'Reset module width, font, size and tape? Your breakers, numbers and names are kept.',
@@ -463,12 +498,18 @@ export const RESET_NOTES = {
 // What Reset keeps on an outlet label: the code itself
 const OUTLET_PART_KEYS = ['outlet_building', 'outlet_floor', 'outlet_room', 'outlet_rack', 'outlet_panel_kind',
   'outlet_panel', 'outlet_ports', 'outlet_first', 'outlet_row'];
+const POWER_PART_KEYS = ['power_building', 'power_floor', 'power_room', 'power_central', 'power_group_kind',
+  'power_group', 'power_phase', 'power_voltage', 'power_row'];
 
 export function resetSettings() {
-  const { mode, label, ports, outlet, dates, asset, breakers, bin, settings } = app.get();
+  const { mode, label, ports, outlet, power, dates, asset, breakers, bin, settings } = app.get();
   if (mode === 'outlet') {
     const keep = Object.fromEntries(OUTLET_PART_KEYS.map((k) => [k, outlet[k]]));
     updateOutlet({ ...DEFAULT_OUTLET, tape_width_mm: labelDefaults().tape_width_mm, ...keep });
+    say('Settings reset. The parts of your code are kept.');
+  } else if (mode === 'power') {
+    const keep = Object.fromEntries(POWER_PART_KEYS.map((k) => [k, power[k]]));
+    updatePower({ ...DEFAULT_POWER, tape_width_mm: labelDefaults().tape_width_mm, ...keep });
     say('Settings reset. The parts of your code are kept.');
   } else if (mode === 'date') {
     const kept = ['date_name', 'date_made', 'date_keeps', 'date_portions', 'date_show'];
@@ -538,10 +579,11 @@ export function itemOptions(item) {
 }
 
 export function currentItem() {
-  const { mode, label, bin, ports, outlet, dates, asset, breakers } = app.get();
+  const { mode, label, bin, ports, outlet, power, dates, asset, breakers } = app.get();
   if (mode === 'bin' && bin) return { mode, bin: bin[bin.kind] };
   if (mode === 'ports') return { mode: 'text', label: ports };
   if (mode === 'outlet') return { mode: 'text', label: outlet };
+  if (mode === 'power') return { mode: 'text', label: power };
   // The text is worked out each time, so "Today" is the day the label is printed
   if (mode === 'date') return { mode: 'text', label: { ...dates, text: dateText(dates) } };
   if (mode === 'asset') return { mode: 'text', label: asset };
@@ -553,7 +595,7 @@ export function currentItem() {
 export function editorMode(item) {
   if (item.mode === 'bin') return 'bin';
   const { layout } = item.label;
-  return ['ports', 'outlet', 'flag', 'date', 'asset', 'breakers'].includes(layout) ? layout : 'text';
+  return ['ports', 'outlet', 'power', 'flag', 'date', 'asset', 'breakers'].includes(layout) ? layout : 'text';
 }
 
 // What goes on each breaker of a breaker strip, as the Python core draws it: [{number, name}],
@@ -601,6 +643,7 @@ export function itemTitle(item) {
     return named.length ? `Ports ${named[0]}${named.length > 1 ? ` to ${named[named.length - 1]}` : ''}` : 'Port strip';
   }
   if (item.mode === 'text' && item.label.layout === 'outlet') return outletParts(item.label).code || textLines(item.label)[0] || 'Network outlet';
+  if (item.mode === 'text' && item.label.layout === 'power') return powerParts(item.label).code || textLines(item.label)[0] || 'Power outlet';
   if (item.mode === 'text' && item.label.layout === 'date') {
     return [item.label.date_name, item.label.date_portions].map((t) => String(t || '').trim()).filter(Boolean).join(' · ') || 'Date label';
   }
@@ -617,7 +660,7 @@ function fitTooTallPreset(item, metrics) {
   if (item.mode !== 'text' || !metrics.text_height_fell_back) return;
   const strip = isStrip(item.label);
   const { layout } = item.label;
-  const own = { ports: ['ports', updatePorts], outlet: ['outlet', updateOutlet], date: ['dates', updateDates], breakers: ['breakers', updateBreakers] }[layout];
+  const own = { ports: ['ports', updatePorts], outlet: ['outlet', updateOutlet], power: ['power', updatePower], date: ['dates', updateDates], breakers: ['breakers', updateBreakers] }[layout];
   const label = own ? app.get()[own[0]] : app.get().label;
   if (label.text_height_mm !== item.label.text_height_mm) return;
   (own ? own[1] : updateLabel)({ text_height_mm: null });
@@ -1021,6 +1064,7 @@ async function makeThumb(item) {
 
 export function addToQueue() {
   if (app.get().mode === 'outlet') return addOutlets();
+  if (app.get().mode === 'power') return addPowers();
   const item = currentItem();
   return queueItem(item.mode === 'bin' ? { ...item, font: binFont() } : item);
 }
@@ -1045,6 +1089,21 @@ export function addOutlets(next = false) {
   return true;
 }
 
+export const MAX_POWER_ROW = 48;
+
+// Adds the power outlet label, as many copies as the row asks for, since one group usually feeds
+// several outlets. next moves the group on by one, ready for the outlets of the next group.
+export function addPowers(next = false) {
+  const { power } = app.get();
+  const rows = Math.min(MAX_POWER_ROW, Math.max(1, parseInt(power.power_row, 10) || 1));
+  for (let i = 0; i < rows; i++) {
+    if (!queueItem({ mode: 'text', label: withPowerText(power) })) return false;
+  }
+  if (rows > 1) say(`Added ${rows} labels to the queue, all ${powerParts(power).code}.`);
+  if (next) updatePower({ power_group: nextGroup(power) });
+  return true;
+}
+
 // Adds a label ({mode, label} or {mode, bin, font}) to the queue, like one from the history
 export function queueItem(label) {
   const item = { id: nextQueueId++, ...structuredClone({ mode: label.mode, label: label.label, bin: label.bin, font: label.font }) };
@@ -1060,7 +1119,7 @@ export function queueItem(label) {
       say('Give at least one breaker a name first.', true);
       return false;
     }
-  } else if (item.mode === 'text' && item.label.layout === 'outlet' && !item.label.text.trim()) {
+  } else if (item.mode === 'text' && ['outlet', 'power'].includes(item.label.layout) && !item.label.text.trim()) {
     say('Fill in at least one part of the code first.', true);
     return false;
   } else if (item.mode === 'text' && item.label.layout === 'asset') {
@@ -1148,6 +1207,9 @@ export function openItem(item) {
   } else if (editorMode(item) === 'outlet') {
     app.set({ mode: 'outlet', outlet: withOutletText({ ...DEFAULT_OUTLET, ...item.label }) });
     storage.save('outlet', app.get().outlet);
+  } else if (editorMode(item) === 'power') {
+    app.set({ mode: 'power', power: withPowerText({ ...DEFAULT_POWER, ...item.label }) });
+    storage.save('power', app.get().power);
   } else if (editorMode(item) === 'date') {
     app.set({ mode: 'date', dates: { ...DEFAULT_DATES, ...item.label } });
     storage.save('dates', app.get().dates);
