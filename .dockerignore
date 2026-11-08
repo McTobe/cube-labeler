@@ -6,9 +6,5 @@ build
 dist
 docs
 tests
-ui
-# The web build packs these two for templates (see UI_MODULES in web/build.py)
-!ui/__init__.py
-!ui/templates.py
 web/dist
 web/node_modules

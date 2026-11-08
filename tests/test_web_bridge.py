@@ -19,8 +19,7 @@ from PIL import Image
 
 import cube_web
 from core.label_renderer import LabelConfig, LabelRenderer
-from core.printer import BrotherPrinter
-from test_audit_fixes import FakeSerial, _status_bytes
+from test_audit_fixes import _status_bytes
 
 
 class TestWebBuild(unittest.TestCase):
@@ -29,7 +28,6 @@ class TestWebBuild(unittest.TestCase):
         import build
         core_dir = os.path.join(BASE_DIR, "core")
         shipped = [os.path.join(core_dir, n) for n in build.CORE_MODULES]
-        shipped += [os.path.join(BASE_DIR, "ui", n) for n in build.UI_MODULES]
         for path in shipped:
             name = os.path.basename(path)
             with open(path, encoding="utf-8") as f:
@@ -37,8 +35,8 @@ class TestWebBuild(unittest.TestCase):
             imported = set(re.findall(r"^\s*from core\.(\w+) import", source, re.M))
             for names in re.findall(r"^\s*from core import ([\w, ]+)", source, re.M):
                 imported.update(n.strip() for n in names.split(","))
-            # Desktop-only imports inside functions are fine as long as the web path never reaches them
-            imported -= {"config", "printer", "icon_manager", "secret_store"}
+            # Imports inside functions are fine as long as the web path never reaches them
+            imported -= {"config", "icon_manager", "secret_store"}
             for module in imported:
                 with self.subTest(file=name, module=module):
                     self.assertIn(f"{module}.py", build.CORE_MODULES)
@@ -270,7 +268,7 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
 
     def test_desktop_template_opens_in_the_web_version(self):
         import json
-        from ui.templates import BUILTIN_PRESETS
+        from core.templates import BUILTIN_PRESETS
         item = cube_web.template_from_desktop(json.dumps(BUILTIN_PRESETS["Storage Box"]["config"]))
         self.assertEqual(item["mode"], "text")
         self.assertEqual(item["label"]["text"], "ELECTRONICS & CORDS\nShelf 2 - Row B")
@@ -279,7 +277,7 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
     def test_starting_points_and_bin_labels_use_shipped_fonts(self):
         from unittest import mock
         from core.font_manager import FontManager
-        from ui.templates import BUILTIN_PRESETS, WEB_PRESETS
+        from core.templates import BUILTIN_PRESETS, WEB_PRESETS
         with mock.patch("core.font_manager.system_font_dirs", return_value=[]), \
                 mock.patch("core.font_manager.sys.platform", "linux"):
             shipped = FontManager()
@@ -355,7 +353,7 @@ class TestWebTemplatesAndBackups(unittest.TestCase):
 
     def test_web_template_opens_on_the_desktop(self):
         import json
-        from ui.templates import config_from_dict
+        from core.templates import config_from_dict
         text = {"mode": "text", "label": {"text": "Box 4", "qr_enabled": True, "qr_data": "x",
                                          "image": {"name": "a.png", "data": self._png()}}}
         saved = cube_web.template_to_desktop(text)
@@ -625,13 +623,6 @@ class TestWebTextEditing(unittest.TestCase):
 class TestWebPrintJob(unittest.TestCase):
     RASTER = bytes([0xFF] * 16) + bytes(16) + bytes(range(16))
 
-    def _desktop_bytes(self, **kwargs):
-        fake = FakeSerial([_status_bytes(), _status_bytes(status_type=0x01)])
-        printer = BrotherPrinter("COM_TEST_WEB")
-        printer.connect = lambda: setattr(printer, "_ser", fake)
-        printer.print_raster_data(self.RASTER, **kwargs)
-        return bytes(fake.written)
-
     def _web_bytes(self, options):
         # The same sequence printer.js sends: status query, job, print, then a reset on close
         return (
@@ -641,17 +632,23 @@ class TestWebPrintJob(unittest.TestCase):
             + cube_web.reset_sequence()
         )
 
+    # What the desktop driver (core/printer.py, retired after 2.4.0) sent for the same jobs, recorded
+    # before it was removed. Those bytes were tested on the printer, so the web version must match them.
+    _RESET = "00" * 64 + "1b40" + "1b696101"
+    _ROWS = "470200f1ff5a4711000f000102030405060708090a0b0c0d0e0f1a"
+    _ROWS_RAW = "471000ffffffffffffffffffffffffffffffff5a471000000102030405060708090a0b0c0d0e0f1a"
+    _HEAD = _RESET + "1b69531b697ac4010c000300000000001b694b"
+
     def test_job_bytes_match_desktop_driver(self):
         cases = [
-            ({}, {}),
-            ({"auto_cut": True}, {"auto_cut": True}),
-            ({"auto_cut": False, "compress": False}, {"auto_cut": False, "nocomp": True}),
-            ({"auto_cut": True, "end_margin": 14, "chaining": True},
-             {"auto_cut": True, "end_margin": 14, "no_feed": True}),
+            ({}, "081b694d001b696400004d02" + self._ROWS),
+            ({"auto_cut": True}, "081b694d401b696400004d02" + self._ROWS),
+            ({"auto_cut": False, "compress": False}, "081b694d001b696400004d00" + self._ROWS_RAW),
+            ({"auto_cut": True, "end_margin": 14, "chaining": True}, "001b694d401b69640e004d02" + self._ROWS),
         ]
-        for web_opts, desktop_kwargs in cases:
+        for web_opts, job in cases:
             with self.subTest(web_opts):
-                self.assertEqual(self._web_bytes(web_opts), self._desktop_bytes(**desktop_kwargs))
+                self.assertEqual(self._web_bytes(web_opts).hex(), self._HEAD + job + self._RESET)
 
     def test_wrong_tape_width_is_refused(self):
         with self.assertRaisesRegex(RuntimeError, "needs 12mm tape; 9mm is loaded"):

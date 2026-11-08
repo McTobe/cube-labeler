@@ -616,7 +616,7 @@ def template_from_desktop(data: Any) -> Dict[str, Any]:
     Raises ValueError with a readable message for anything that is not a template.
     """
     import json
-    from ui.templates import config_from_dict
+    from core.templates import config_from_dict
     if isinstance(data, (str, bytes, bytearray)) or hasattr(data, "to_bytes"):
         text = _to_bytes(data).decode("utf-8-sig") if not isinstance(data, str) else data
         try:
@@ -660,7 +660,7 @@ def template_to_desktop(item: Any) -> str:
     desktop app ignores them.
     """
     import json
-    from ui.templates import config_to_dict
+    from core.templates import config_to_dict
     item = _to_dict(item)
     if item.get("mode") == "bin":
         bin_data = _to_dict(item.get("bin"))
@@ -690,7 +690,7 @@ def template_to_desktop(item: Any) -> str:
 
 def template_presets() -> List[Dict[str, Any]]:
     """The starting points: [{"key", "name", "description", "mode", "label"}]."""
-    from ui.templates import BUILTIN_PRESETS, WEB_PRESETS
+    from core.templates import BUILTIN_PRESETS, WEB_PRESETS
     out = []
     for key, preset in {**BUILTIN_PRESETS, **WEB_PRESETS}.items():
         item = template_from_desktop(preset["config"])
@@ -746,8 +746,8 @@ def _is_png(data: bytes) -> bool:
 
 
 def template_file_name(name: str) -> str:
-    """The file a template called `name` is kept in on the desktop (as ui/templates.py names it)."""
-    from ui.templates import template_file_name as desktop_name
+    """The file a template called `name` is kept in on the desktop (as core/templates.py names it)."""
+    from core.templates import template_file_name as desktop_name
     return desktop_name(name)
 
 

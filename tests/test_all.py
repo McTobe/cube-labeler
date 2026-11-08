@@ -30,8 +30,7 @@ from core.ptstatus import (
 )
 from core.font_manager import FontManager, font_manager
 from core.label_renderer import LabelRenderer, LabelConfig
-from core.printer import MockBrotherPrinter, list_serial_ports
-from ui.templates import (
+from core.templates import (
     BUILTIN_PRESETS,
     load_preset,
     export_config_to_json,
@@ -268,32 +267,6 @@ class TestLabelRenderer(unittest.TestCase):
         prev1, rast1, rbytes1, metrics1 = self.renderer.render_batch([c1])
         self.assertEqual(metrics1.label_count, 1)
         self.assertEqual(metrics1.tape_saved_mm, 0.0)
-
-
-class TestMockPrinter(unittest.TestCase):
-    def test_mock_flow(self):
-        mock = MockBrotherPrinter()
-        status = mock.get_status()
-        self.assertEqual(status.model_name, "PT-P300BT")
-        self.assertTrue(status.is_ready)
-
-        dummy_raster = bytes([0x00] * 16 * 20)  # 20 lines
-        progress_calls = []
-
-        final_status = mock.print_raster_data(
-            dummy_raster,
-            progress_callback=lambda c, t: progress_calls.append((c, t)),
-        )
-        self.assertTrue(final_status.is_ready)
-        self.assertGreater(len(progress_calls), 0)
-
-    def test_mock_feed_tape(self):
-        mock = MockBrotherPrinter()
-        status_msgs = []
-        status = mock.feed_tape(25.0, status_callback=lambda m: status_msgs.append(m))
-        self.assertTrue(status.is_ready)
-        self.assertGreater(len(status_msgs), 0)
-        self.assertTrue(any("25.0mm" in m for m in status_msgs))
 
 
 class TestQueueLogic(unittest.TestCase):

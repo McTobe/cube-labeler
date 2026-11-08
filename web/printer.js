@@ -1,7 +1,7 @@
 // Web Serial transport and print flow for the Brother PT-P300BT.
 //
 // The bytes come from the Python core (cube_web.py, running in Pyodide); this file only moves
-// them over Web Serial and follows the same steps as core/printer.py on the desktop.
+// them over Web Serial and follows the same steps as the desktop app's driver did.
 //
 // `py` is the cube_web module: the app passes its worker bridge, where every call returns a
 // promise; the tests pass Pyodide's module directly. Every call is awaited, so both work.

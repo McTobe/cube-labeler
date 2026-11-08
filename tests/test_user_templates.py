@@ -4,20 +4,18 @@ Tests for the user's own templates: saving into the app's data folder, safe file
 listing and deleting, and the My templates list on the Templates page.
 """
 
-import importlib.util
 import os
 import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from core.label_renderer import LabelConfig
-from ui import templates as tp
+from core import templates as tp
 
 
 class TestUserTemplates(unittest.TestCase):
@@ -47,47 +45,6 @@ class TestUserTemplates(unittest.TestCase):
         self.assertEqual(tp.template_file_name('M3: 10/20 "bolts"?'), "M3_ 10_20 _bolts__.json")
         self.assertEqual(tp.template_file_name("  ...  "), "My template.json")
         self.assertEqual(tp.template_file_name("a" * 200), "a" * 80 + ".json")
-
-
-@unittest.skipIf(importlib.util.find_spec("tkinter") is None, "tkinter is not installed")
-class TestTemplatesView(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        import customtkinter as ctk
-
-        try:
-            cls.root = ctk.CTk()
-        except Exception as e:
-            raise unittest.SkipTest(f"no display: {e}")
-        cls.root.withdraw()
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.root.destroy()
-
-    def test_my_templates_list(self):
-        from ui.templates_view import TemplatesView
-
-        folder = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, folder, True)
-        opened = []
-        view = TemplatesView(self.root, on_apply=lambda k: None, on_save=lambda: None, on_open=lambda: None,
-                             on_open_user=opened.append, templates_folder=folder)
-        self.addCleanup(view.destroy)
-        self.assertEqual(view.user_rows, {})
-        path = tp.save_user_template(LabelConfig(text="x"), "Drawer", folder)
-        view.refresh_user_templates()
-        self.assertEqual(list(view.user_rows), ["Drawer"])
-        card = view.user_rows["Drawer"]
-        widgets = card.winfo_children() + [w for c in card.winfo_children() for w in c.winfo_children()]
-        buttons = {w.cget("text"): w for w in widgets if hasattr(w, "invoke")}
-        self.assertIsNotNone(buttons[""].cget("image"), "the card shows a picture of the label")
-        buttons[""].invoke()
-        self.assertEqual(opened, [path])
-        with patch("tkinter.messagebox.askyesno", return_value=True):
-            buttons["Delete"].invoke()
-        self.assertEqual(view.user_rows, {})
-        self.assertFalse(os.path.exists(path))
 
 
 if __name__ == "__main__":

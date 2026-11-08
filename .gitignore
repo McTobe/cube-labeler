@@ -12,7 +12,6 @@ env/
 dist/
 build/
 *.spec
-!printlabel.spec
 
 # Test files
 tests/test_template.json

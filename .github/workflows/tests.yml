@@ -37,14 +37,6 @@ jobs:
         run: |
           python -m unittest discover tests
 
-      # The GUI tests open real windows, so they only run where there is a desktop
-      - name: Run Headless GUI Integration Tests
-        if: runner.os == 'Windows'
-        run: |
-          python tests/test_gui_inventory.py
-          python tests/test_gui_queue.py
-          python tests/test_gui_text_editor.py
-
   web:
     name: Web app tests
     runs-on: ubuntu-latest

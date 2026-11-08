@@ -22,7 +22,7 @@ DIST_DIR = os.path.join(WEB_DIR, "dist")
 PAGE_FILES = ["index.html", "printer.js", "style.css", "about.html", "privacy.html"]
 PAGE_DIRS = ["js", "vendor"]
 
-# The parts of core/ the web app runs; the rest needs the desktop (tkinter, pyserial, registry)
+# The parts of core/ the web app runs (backup.py and icon_manager.py keep the file formats on the Python side)
 CORE_MODULES = [
     "__init__.py",
     "ai_generator.py",
@@ -42,9 +42,8 @@ CORE_MODULES = [
     "borders.py",
     "secret_store.py",
     "specs.py",
+    "templates.py",
 ]
-
-UI_MODULES = ["__init__.py", "templates.py"]
 
 # Every font in web/fonts and its licence, all under the SIL Open Font License
 FONTS = sorted(name for name in os.listdir(os.path.join(WEB_DIR, "fonts")) if name.endswith((".ttf", ".txt")))
@@ -73,9 +72,6 @@ def build_core_zip(path: str) -> None:
         for name in CORE_MODULES:
             zf.write(os.path.join(PROJECT_ROOT, "core", name), f"core/{name}")
         zf.write(os.path.join(WEB_DIR, "cube_web.py"), "cube_web.py")
-        # Template files are read and written the desktop app's way
-        for name in UI_MODULES:
-            zf.write(os.path.join(PROJECT_ROOT, "ui", name), f"ui/{name}")
         for name in FONTS:
             zf.write(os.path.join(WEB_DIR, "fonts", name), f".fonts/{name}")
         # The icon library: bin labels draw their drive and part icons from it
