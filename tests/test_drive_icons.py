@@ -18,7 +18,7 @@ from core.inventory_renderer import (
     drive_library_icon,
     resolve_icon_path,
 )
-from ui.templates import config_from_dict, config_to_dict
+from core.templates import config_from_dict, config_to_dict
 from core.label_renderer import LabelConfig
 
 

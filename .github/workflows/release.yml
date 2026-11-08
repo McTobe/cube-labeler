@@ -1,5 +1,7 @@
-name: Build & Release Standalone Executable
+name: Release
 
+# A pushed vX.Y.Z tag runs the tests and publishes the GitHub release. The web image for the tag
+# is built by web-image.yml. The Windows desktop app ended with v2.4.0, so no .exe is built.
 on:
   push:
     tags:
@@ -7,9 +9,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build Windows Executable
-    runs-on: windows-latest
+  release:
+    name: Test and publish the release
+    runs-on: ubuntu-latest
     permissions:
       contents: write
 
@@ -27,26 +29,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -c constraints.txt
-          pip install pyinstaller -c constraints.txt
 
       - name: Run Automated Test Suite
         run: |
           python -m unittest discover tests
-
-      - name: Run Headless GUI Integration Tests
-        run: |
-          python tests/test_gui_inventory.py
-          python tests/test_gui_queue.py
-
-      - name: Compile Standalone Executable
-        run: |
-          python build.py
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: CubeLabeler-Windows-x64
-          path: dist/CubeLabeler.exe
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
@@ -54,7 +40,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: dist/CubeLabeler.exe
           name: Cube Labeler ${{ github.ref_name }}
           draft: false
           # v2.0.0-rc.1 and the like are marked as pre-releases

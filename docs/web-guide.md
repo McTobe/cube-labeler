@@ -1,6 +1,6 @@
 # Using Cube Labeler
 
-This guide covers the web version at **<https://print.tobezone.com>**. The Windows desktop app has the same pages in its own window.
+This guide covers the web version at **<https://print.tobezone.com>**.
 
 ![The Label page with a two-line label in the preview](images/guide/label.png)
 

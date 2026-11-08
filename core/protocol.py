@@ -2,8 +2,8 @@
 """
 Byte-level print job builder for the Brother PT-P300BT.
 
-Everything here only builds or reads bytes, with no serial port involved, so the same code
-drives the desktop app (pyserial) and the web app (Pyodide + Web Serial).
+Everything here only builds or reads bytes, with no serial port involved. The web app runs it in
+Pyodide and sends the bytes over Web Serial (web/printer.js).
 """
 
 from typing import Optional, Tuple

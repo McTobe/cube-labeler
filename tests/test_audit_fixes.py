@@ -10,7 +10,6 @@ import sys
 import tempfile
 import unittest
 import urllib.request
-from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -19,18 +18,14 @@ if BASE_DIR not in sys.path:
 
 from PIL import Image
 
-from core import printer as printer_mod
 from core import secret_store
 from core.ai_generator import GeminiProvider, ModelNotFoundError
-from core.cli import cli_main
 from core.config import ConfigManager, DEFAULT_GEMINI_IMAGE_MODEL
 from core.inventory_renderer import ComponentLabelConfig, FastenerLabelConfig
 from core.label_renderer import LabelConfig, LabelRenderer
-from core.printer import BrotherPrinter, PrinterBusyError, _get_port_lock
-from core.ptcbp import serialize_control
 from core.ptstatus import StatusRegister, unpack_status
 from core.specs import get_tape_spec, tape_width_from_status
-from ui.templates import export_config_to_json, load_config_from_json
+from core.templates import export_config_to_json, load_config_from_json
 
 
 def _status_bytes(status_type=0x00, err=0, tape_width=12, phase_type=0x00):
@@ -45,56 +40,6 @@ def _status_bytes(status_type=0x00, err=0, tape_width=12, phase_type=0x00):
     reg.tape_bgcolor = 0x01
     reg.tape_fgcolor = 0x08
     return bytes(reg)
-
-
-class FakeSerial:
-    """Records everything written and replays scripted 32-byte reads."""
-
-    def __init__(self, reads):
-        self.written = bytearray()
-        self._reads = list(reads)
-        self.is_open = True
-
-    def write(self, data):
-        self.written.extend(data)
-
-    def flush(self):
-        pass
-
-    def read(self, size):
-        return self._reads.pop(0) if self._reads else b""
-
-    def close(self):
-        self.is_open = False
-
-
-def _run_cli(args):
-    out, err = io.StringIO(), io.StringIO()
-    with redirect_stdout(out), redirect_stderr(err):
-        code = cli_main(args)
-    return code, out.getvalue(), err.getvalue()
-
-
-class TestCli(unittest.TestCase):
-    def test_feed_virtual(self):
-        code, out, err = _run_cli(["COM9", "--feed", "10", "-v"])
-        self.assertEqual(code, 0, err)
-        self.assertIn("Tape fed successfully", out)
-
-    def test_virtual_text_without_port(self):
-        code, out, err = _run_cli(["-v", "Hello", "--preview"])
-        self.assertEqual(code, 0, err)
-        self.assertIn("Hello", out)
-
-    def test_port_option(self):
-        code, out, err = _run_cli(["--port", "COM4", "Hello", "--preview"])
-        self.assertEqual(code, 0, err)
-        self.assertIn("Hello", out)
-
-    def test_text_without_port_errors(self):
-        code, _, err = _run_cli(["Hello"])
-        self.assertEqual(code, 1)
-        self.assertIn("COM port required", err)
 
 
 class TestTapeWidths(unittest.TestCase):
@@ -167,58 +112,7 @@ class TestTemplates(unittest.TestCase):
             load_config_from_json(path)
 
 
-class TestPrinterProtocol(unittest.TestCase):
-    RASTER = bytes([0xFF] * 16) + bytes(16)
-
-    def _printer(self, reads):
-        fake = FakeSerial(reads)
-        p = BrotherPrinter("COM_TEST_PROTOCOL")
-        p.connect = lambda: setattr(p, "_ser", fake)
-        return p, fake
-
-    def test_waits_for_completion_and_skips_phase_changes(self):
-        p, fake = self._printer([
-            _status_bytes(),                                # initial query
-            _status_bytes(status_type=0x06, phase_type=1),  # phase change: printing
-            _status_bytes(status_type=0x01),                # printing completed
-        ])
-        status = p.print_raster_data(self.RASTER)
-        self.assertTrue(status.completion_confirmed)
-        self.assertEqual(status.raw_status.status_type, 0x01)
-        self.assertIn(serialize_control("print"), bytes(fake.written))
-        self.assertIn(serialize_control("zerofill"), bytes(fake.written))
-
-    def test_error_status_raises(self):
-        p, _ = self._printer([_status_bytes(), _status_bytes(status_type=0x02, err=1 << 4)])
-        with self.assertRaisesRegex(RuntimeError, "Cover opened"):
-            p.print_raster_data(self.RASTER)
-
-    def test_missing_confirmation_is_reported(self):
-        p, _ = self._printer([_status_bytes()])
-        with mock.patch.object(BrotherPrinter, "_completion_timeout", return_value=0.05):
-            status = p.print_raster_data(self.RASTER)
-        self.assertFalse(status.completion_confirmed)
-
-    def test_wrong_tape_width_is_refused(self):
-        p, fake = self._printer([_status_bytes(tape_width=9)])
-        with self.assertRaisesRegex(RuntimeError, "needs 12mm tape; 9mm is loaded"):
-            p.print_raster_data(self.RASTER, required_tape_width_mm=12)
-        self.assertNotIn(serialize_control("print"), bytes(fake.written))
-
-    def test_bad_raster_length_is_refused(self):
-        p, _ = self._printer([])
-        with self.assertRaises(ValueError):
-            p.print_raster_data(b"\x00" * 10)
-
-    def test_status_query_reports_busy_during_print(self):
-        lock = _get_port_lock("COM_TEST_BUSY")
-        lock.acquire()
-        try:
-            with self.assertRaises(PrinterBusyError):
-                BrotherPrinter("COM_TEST_BUSY").get_status()
-        finally:
-            lock.release()
-
+class TestStatusPacket(unittest.TestCase):
     def test_non_brother_packet_is_rejected(self):
         with self.assertRaises(ValueError):
             unpack_status(b"\x00" * 32)

@@ -4,7 +4,7 @@ Thanks for helping out. Bug reports, ideas and pull requests are all welcome.
 
 ## Reporting bugs and ideas
 
-Open an [issue](https://github.com/McTobe/cube-labeler/issues/new/choose) and pick the bug or idea form. For bugs, the version, whether you use the web or desktop app, and your browser or Windows version help a lot. Security problems go through [SECURITY.md](SECURITY.md), not public issues.
+Open an [issue](https://github.com/McTobe/cube-labeler/issues/new/choose) and pick the bug or idea form. For bugs, the version and your browser and system help a lot. Security problems go through [SECURITY.md](SECURITY.md), not public issues.
 
 ## Setting up
 
@@ -12,13 +12,14 @@ Open an [issue](https://github.com/McTobe/cube-labeler/issues/new/choose) and pi
 git clone https://github.com/McTobe/cube-labeler.git
 cd cube-labeler
 pip install -r requirements.txt -c constraints.txt
-python main.py              # desktop app
 python web/serve.py         # web app on http://localhost:8000
 ```
 
-The web app runs the Python code in `core/` in the browser through Pyodide, so a change to the label code affects both apps. See [web/README.md](web/README.md) for how the web side is put together.
+The web app runs the Python code in `core/` in the browser through Pyodide. See [web/README.md](web/README.md) for how the web side is put together.
 
 ## Before you open a pull request
+
+The Windows desktop app ended with 2.4.0 (see [docs/desktop.md](docs/desktop.md)), so changes go into the web version.
 
 - Keep it focused on one change.
 - Add or update tests where it makes sense, and check that they pass:

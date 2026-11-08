@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir pillow -c constraints.txt
 COPY assets/icon.png assets/icon.png
 COPY assets/icons/ assets/icons/
 COPY core/ core/
-COPY ui/__init__.py ui/templates.py ui/
 COPY web/ web/
 # web-image.yml sets these for images built from main, so the app shows a "next" badge
 ARG CUBE_BUILD_CHANNEL=""

@@ -1,13 +1,14 @@
 # Cube Labeler web app
 
-The browser version of Cube Labeler, and since 2.0 the main way to use it. It prints to the
+The browser version of Cube Labeler, and since 2.4.0 the only one (the Windows desktop app is
+[retired](../docs/desktop.md)). It prints to the
 PT-P300BT over Bluetooth with the
 [Web Serial API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API) and runs
-the same Python core as the desktop app inside the browser with [Pyodide](https://pyodide.org),
-so labels and printer bytes come out exactly the same. The hosted version is at
+the Python core in `core/` inside the browser with [Pyodide](https://pyodide.org),
+so labels and printer bytes come out exactly as the desktop app made them. The hosted version is at
 <https://print.tobezone.com>.
 
-It has everything the desktop app has:
+It has:
 
 - **Text labels** with the styling toolbar, fonts, frames, QR codes (with a Wi-Fi helper), a
   picture, tape width, length and the advanced settings, and a tape and print-dot preview.
@@ -20,8 +21,8 @@ It has everything the desktop app has:
   mirror, pencil and eraser touch-ups, kept with the icon so it can be changed again). It can
   also have Gemini, OpenAI or OpenRouter redraw a photo as an icon, with your own API key, which
   stays in the browser and is sent only to that service.
-- **Templates**, your own and the starting points, as the desktop app's `.json` files.
-- **Backups** as `.cubebackup` files that restore here or in the desktop app, and **Google Drive
+- **Templates**, your own and the starting points, as `.json` files (the same as the desktop app's).
+- **Backups** as `.cubebackup` files that restore here or in the legacy desktop app, and **Google Drive
   sync** to your own Drive. Sync merges each device's changes one by one, and keeps the newest
   10 backups and one a day for two weeks (older ones go to Drive's bin).
 - **The printer panel**: connect, status, battery and tape, feed tape. Labels can also be saved
@@ -166,13 +167,13 @@ To build the image yourself from a checkout instead: `docker compose up -d --bui
 | `build.py` | Packs the page, the needed `core/` modules, `cube_web.py`, the fonts and the icons into `web/dist/`; the app icons are made from `assets/icon.png`. |
 | `fonts/` | Fonts under the SIL Open Font License: Arimo (Arial-compatible; SemiBold is the standard bin label font, set in Settings) plus everyday (Atkinson Hyperlegible, Barlow Condensed, Bebas Neue, Inter, JetBrains Mono, Lexend, Montserrat, Nunito, Open Sans, Oswald, Roboto), playful (Caveat, Comic Neue, Fredoka, Pacifico, Patrick Hand) and classic (Cinzel, EB Garamond, Great Vibes, Zilla Slab) fonts, each with its licence file. Browsers can't hand system fonts to Python, so the app ships its own; **Add font** loads more. |
 
-The printer bytes come from `core/protocol.py`, which the desktop driver (`core/printer.py`)
-uses too.
+The printer bytes come from `core/protocol.py`.
 
 ## Tests
 
 - `python -m unittest tests.test_web_bridge` (from the repository root) checks `cube_web.py`
-  on CPython, including that a web print job is byte-for-byte the same as the desktop driver's.
+  on CPython, including that a web print job is byte-for-byte the same as the retired desktop driver's,
+  which was tested on the printer.
 - `python -m unittest tests.test_drive_auth` checks the sign-in helper against a pretend Google.
 - `npm install && npm test` (from `web/`) checks the tape counter's sums in `js/tape.js`, then
   runs `printer.js` against the real Python core in Pyodide under Node, with a fake serial port

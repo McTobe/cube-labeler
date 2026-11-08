@@ -14,9 +14,8 @@ body:
     attributes:
       label: Which app?
       options:
-        - Web app
-        - Desktop app (Windows .exe)
-        - Command line
+        - Web app (print.tobezone.com)
+        - Self-hosted web app (Docker image)
     validations:
       required: true
   - type: input
