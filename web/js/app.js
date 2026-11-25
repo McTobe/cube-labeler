@@ -11,7 +11,7 @@ import { SerialTransport, queryStatus, printRaster, feedTape, errorMessage } fro
 import {
   tapeKey, newRoll, correctRoll, countPrint, rollLeft, formatTape, planParts, partItems,
 } from './tape.js';
-import { outletText, outletParts, nextStep, hasPole } from './outlet-code.js';
+import { outletText, outletParts, nextFirst } from './outlet-code.js';
 import { powerText, powerParts, nextGroup } from './power-code.js';
 import { dateText } from './dates.js';
 
@@ -97,7 +97,6 @@ export const DEFAULT_OUTLET = {
   outlet_cab: '01',
   outlet_place: '',
   outlet_place_kind: 'height',  // the panel place counted by height (31C) or in order (04C)
-  outlet_pole: '',  // standards only: the outlet on an outlet pole (uttagsstav) fed from the port, 1:2
   outlet_building: '',
   outlet_floor: '',
   outlet_room: '',
@@ -509,7 +508,7 @@ export const RESET_NOTES = {
 
 // What Reset keeps on an outlet label: the code itself
 const OUTLET_PART_KEYS = ['outlet_standard', 'outlet_c', 'outlet_b', 'outlet_d', 'outlet_s', 'outlet_m', 'outlet_house',
-  'outlet_storey', 'outlet_cab', 'outlet_place', 'outlet_place_kind', 'outlet_pole', 'outlet_building', 'outlet_floor', 'outlet_room', 'outlet_rack', 'outlet_panel_kind',
+  'outlet_storey', 'outlet_cab', 'outlet_place', 'outlet_place_kind', 'outlet_building', 'outlet_floor', 'outlet_room', 'outlet_rack', 'outlet_panel_kind',
   'outlet_panel', 'outlet_ports', 'outlet_first', 'outlet_row'];
 const POWER_PART_KEYS = ['power_building', 'power_floor', 'power_room', 'power_central', 'power_group_kind',
   'power_group', 'power_phase', 'power_voltage', 'power_row'];
@@ -1084,21 +1083,21 @@ export function addToQueue() {
 
 export const MAX_OUTLET_ROW = 48;
 
-// Adds the network outlet labels: one, or a row of them for the next ports (3/4, 5/6, 7/8), or
-// for the next outlets on a pole (1:1, 1:2, 1:3). next moves on past them, ready for the next.
+// Adds the network outlet labels: one, or a row of them for the next ports (3/4, 5/6, 7/8).
+// next moves the first port on past them, ready for the next outlet.
 export function addOutlets(next = false) {
   const { outlet } = app.get();
-  const numbered = Number.isFinite(parseInt(outlet.outlet_first, 10)) || hasPole(outlet);
+  const numbered = Number.isFinite(parseInt(outlet.outlet_first, 10));
   const rows = numbered ? Math.min(MAX_OUTLET_ROW, Math.max(1, parseInt(outlet.outlet_row, 10) || 1)) : 1;
   for (let i = 0; i < rows; i++) {
-    const label = withOutletText({ ...outlet, ...(numbered && i ? nextStep(outlet, i) : {}) });
+    const label = withOutletText({ ...outlet, outlet_first: numbered ? nextFirst(outlet, i) : outlet.outlet_first });
     if (!queueItem({ mode: 'text', label })) return false;
   }
   if (rows > 1) {
-    const last = outletParts({ ...outlet, ...nextStep(outlet, rows - 1) }).code;
+    const last = outletParts(outlet, nextFirst(outlet, rows - 1)).code;
     say(`Added ${rows} labels to the queue, ${outletParts(outlet).code} to ${last}.`);
   }
-  if (next && numbered) updateOutlet(nextStep(outlet, rows));
+  if (next && numbered) updateOutlet({ outlet_first: nextFirst(outlet, rows) });
   return true;
 }
 

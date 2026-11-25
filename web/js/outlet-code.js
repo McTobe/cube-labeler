@@ -32,19 +32,12 @@ export function padNumber(value, digits) {
   return digits && /^\d+$/.test(v) ? v.padStart(digits, '0') : v;
 }
 
-// An outlet pole (uttagsstav) fed from one fixed port numbers its own outlets after a colon:
-// port 1 gives 1:1, 1:2 and so on. Only the standards have it.
-export function hasPole(label) {
-  return (label.outlet_standard || 'own') !== 'own' && Number.isFinite(parseInt(label.outlet_pole, 10));
-}
-
-// The ports part: 3, 3/4 (as the pair style says), 1-4 for four ports, or 3:2 on a pole
+// The ports part: 3, 3/4 (as the pair style says) or 1-4 for four ports
 export function outletPorts(label, first = label.outlet_first) {
   const start = parseInt(first, 10);
   if (!Number.isFinite(start)) return '';
   const count = Number(label.outlet_ports) || 1;
   const n = (v) => padNumber(String(v), label.outlet_digits);
-  if (hasPole(label)) return `${n(start)}:${n(parseInt(label.outlet_pole, 10))}`;
   if (count === 1) return n(start);
   if (count === 2) return `${n(start)}${label.outlet_pair || '/'}${n(start + 1)}`;
   return `${n(start)}-${n(start + count - 1)}`;
@@ -108,12 +101,6 @@ export function outletStyleSummary(label) {
   const example = outletParts({ ...label, outlet_lines: 1, outlet_building: '', outlet_floor: '', outlet_room: '',
     outlet_rack: 'DA01', outlet_panel: '02', outlet_first: 3 }).code;
   return `${example}, ${lines}`;
-}
-
-// The change that moves on `rows` labels: the next pole outlet on a pole, else the next ports
-export function nextStep(label, rows = 1) {
-  if (hasPole(label)) return { outlet_pole: parseInt(label.outlet_pole, 10) + rows };
-  return { outlet_first: nextFirst(label, rows) };
 }
 
 // The first port of the next outlet after `rows` labels of this one

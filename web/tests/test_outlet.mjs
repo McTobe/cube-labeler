@@ -1,7 +1,7 @@
 // Tests the network outlet codes in js/outlet-code.js. Run: npm test (from web/).
 
 import assert from 'node:assert/strict';
-import { outletParts, outletText, outletPorts, outletStyleSummary, nextFirst, nextStep, padNumber } from '../js/outlet-code.js';
+import { outletParts, outletText, outletPorts, outletStyleSummary, nextFirst, padNumber } from '../js/outlet-code.js';
 
 const tests = [];
 const test = (name, fn) => tests.push([name, fn]);
@@ -65,15 +65,6 @@ test('SS 455 12 00: AC 01 31C 20', () => {
   assert.equal(code({ ...ss, outlet_house: '', outlet_storey: '' }), '01 31C 20');
   assert.equal(code({ ...ss, outlet_ports: 2, outlet_first: 19 }), 'AC 01 31C 19/20');
   assert.equal(code({ ...ss, outlet_lines: 2 }), '-# AC\n01 31C 20');
-});
-test('outlet pole: 1:1, 1:2 after the port', () => {
-  const ss = { outlet_standard: 'ss01', outlet_d: '1', outlet_s: '1', outlet_m: '30', outlet_ports: 2, outlet_first: 1, outlet_pole: 2 };
-  assert.equal(code(ss), '+D1S1M30:1:2');
-  assert.equal(code({ ...ss, outlet_standard: 'ss00', outlet_cab: '01', outlet_place: '31C' }), '01 31C 1:2');
-  assert.deepEqual(nextStep(ss, 2), { outlet_pole: 4 });
-  // Own style has no pole, so a pole left from a standard is ignored
-  assert.equal(code({ ...ss, outlet_standard: 'own' }), 'DA01P02 1/2');
-  assert.deepEqual(nextStep({ ...ss, outlet_pole: '' }), { outlet_first: 3 });
 });
 test('counts on to the next outlet', () => {
   assert.equal(nextFirst(BASE), 5);

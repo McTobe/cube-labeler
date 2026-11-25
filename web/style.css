@@ -1738,6 +1738,14 @@ input.tape-number { width: 160px; }
   .bin-grid.three.outlet-grid > .bin-col + .bin-col { border-left: 1px solid var(--border); }
 }
 .outlet-card .card-head { align-items: center; }
+/* The standards' parts: two rows of four columns, read left to right in the order of the code */
+@media (min-width: 900px) {
+  .bin-grid.outlet-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; }
+  .bin-grid.outlet-grid.four > .bin-col { padding: 2px 14px; min-width: 0; gap: 0; }
+  .bin-grid.outlet-grid.four > .bin-col:first-child { padding-left: 0; }
+  .bin-grid.outlet-grid.four > .bin-col:last-child { padding-right: 0; }
+  .bin-grid.outlet-grid.four > .bin-col + .bin-col { border-left: 1px solid var(--border); }
+}
 /* A field with the standard's letter fixed in front of what is typed */
 .letter-input { position: relative; display: flex; align-items: center; }
 .letter-input > span { position: absolute; left: 12px; font-weight: 600; color: var(--muted); pointer-events: none; }
