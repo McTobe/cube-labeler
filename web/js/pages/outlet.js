@@ -8,7 +8,7 @@ import { useStore } from '../state.js';
 import { app, boot, updateOutlet, addOutlets, say, MAX_OUTLET_ROW } from '../app.js';
 import {
   OUTLET_STANDARDS, OUTLET_PLACE_KINDS, OUTLET_PANEL_KINDS, OUTLET_PORTS, OUTLET_SEPARATORS, OUTLET_PAIRS, OUTLET_DIGITS, OUTLET_LINES,
-  outletPorts, outletStyleSummary,
+  outletPorts, outletStyleSummary, hasPole,
 } from '../outlet-code.js';
 
 const SKIP = 'Leave empty to skip';
@@ -51,27 +51,32 @@ function addAndNext() {
   say(`${app.get().status.text} Next up: ${outletPorts(outlet) || 'the next outlet'}.`);
 }
 
+// The ports column of a standard: how many, the outlet on a pole and labels in a row
+function StandardPorts({ jack }) {
+  const { outlet } = useStore(app);
+  const pole = hasPole(outlet);
+  return html`<div class="bin-col">
+    <${Segmented} label=${jack ? 'Jacks on the outlet' : 'Ports on the outlet'} options=${OUTLET_PORTS.map(([v, n]) => [String(v), n])}
+      value=${pole ? '1' : String(outlet.outlet_ports)} disabled=${pole} onChange=${(v) => updateOutlet({ outlet_ports: Number(v) })} />
+    <${Part} label="Outlet on a pole (uttagsstav)" field="outlet_pole" letter=":" placeholder=${SKIP} inputmode="numeric" />
+    <${Count} label="Labels in a row" field="outlet_row" min=${1} max=${MAX_OUTLET_ROW} placeholder="1" />
+  </div>`;
+}
+
 // SS 455 12 01: the parts in the order they are written, +C B D S M : port
 function Ss01Grid() {
-  const { outlet } = useStore(app);
-  return html`<div class="bin-grid outlet-grid four">
+  return html`<div class="bin-grid three outlet-grid">
     <div class="bin-col">
       <${Part} label="Area" field="outlet_c" letter="+C" placeholder="1" inputmode="numeric" />
       <${Part} label="Building" field="outlet_b" letter="B" placeholder="1" inputmode="numeric" />
-    </div>
-    <div class="bin-col">
       <${Part} label="Distributor (room)" field="outlet_d" letter="D" placeholder="1" inputmode="numeric" />
-      <${Part} label="Rack" field="outlet_s" letter="S" placeholder="1" inputmode="numeric" />
     </div>
     <div class="bin-col">
-      <${Part} label="Module (cm)" field="outlet_m" letter="M" placeholder="30" inputmode="numeric" />
+      <${Part} label="Rack" field="outlet_s" letter="S" placeholder="1" inputmode="numeric" />
+      <${Part} label="Module, cm from the top" field="outlet_m" letter="M" placeholder="30" inputmode="numeric" />
       <${Part} label="First port" field="outlet_first" letter=":" placeholder=${SKIP} inputmode="numeric" />
     </div>
-    <div class="bin-col">
-      <${Segmented} label="Ports on the outlet" options=${OUTLET_PORTS.map(([v, n]) => [String(v), n])}
-        value=${String(outlet.outlet_ports)} onChange=${(v) => updateOutlet({ outlet_ports: Number(v) })} />
-      <${Count} label="Labels in a row" field="outlet_row" min=${1} max=${MAX_OUTLET_ROW} placeholder="1" />
-    </div>
+    <${StandardPorts} />
   </div>`;
 }
 
@@ -79,25 +84,19 @@ function Ss01Grid() {
 function Ss00Grid() {
   const { outlet } = useStore(app);
   const byHeight = outlet.outlet_place_kind !== 'order';
-  return html`<div class="bin-grid outlet-grid four">
+  return html`<div class="bin-grid three outlet-grid">
     <div class="bin-col">
       <${Part} label="House" field="outlet_house" placeholder="A" />
       <${Part} label="Floor" field="outlet_storey" placeholder="C" />
-    </div>
-    <div class="bin-col">
       <${Part} label="Rack" field="outlet_cab" placeholder="01" inputmode="numeric" />
-      <${Segmented} label="Panel counted by" options=${OUTLET_PLACE_KINDS} value=${byHeight ? 'height' : 'order'}
-        onChange=${(outlet_place_kind) => updateOutlet({ outlet_place_kind })} />
     </div>
     <div class="bin-col">
+      <${Segmented} label="Panel place counted by" options=${OUTLET_PLACE_KINDS} value=${byHeight ? 'height' : 'order'}
+        onChange=${(outlet_place_kind) => updateOutlet({ outlet_place_kind })} />
       <${Part} label="Panel place" field="outlet_place" placeholder=${byHeight ? '31C' : '04C'} />
       <${Part} label="First jack" field="outlet_first" placeholder=${SKIP} inputmode="numeric" />
     </div>
-    <div class="bin-col">
-      <${Segmented} label="Jacks on the outlet" options=${OUTLET_PORTS.map(([v, n]) => [String(v), n])}
-        value=${String(outlet.outlet_ports)} onChange=${(v) => updateOutlet({ outlet_ports: Number(v) })} />
-      <${Count} label="Labels in a row" field="outlet_row" min=${1} max=${MAX_OUTLET_ROW} placeholder="1" />
-    </div>
+    <${StandardPorts} jack=${true} />
   </div>`;
 }
 
@@ -149,7 +148,7 @@ export function OutletHelp() {
       <li>Pick One, Two or Four ports on the outlet and the first port.</li>
       <li>Add the label to the queue.</li>
     </ol>
-    <p class="hint">"Add to queue and start the next" counts the ports on, so 3/4 becomes 5/6. Labels in a row adds several at once: 3/4, 5/6, 7/8.</p>
+    <p class="hint">"Add to queue and start the next" counts the ports on, so 3/4 becomes 5/6. Labels in a row adds several at once: 3/4, 5/6, 7/8.${outlet.outlet_standard && outlet.outlet_standard !== 'own' ? ' With an outlet pole (uttagsstav) they count the pole\'s outlets on instead: 1:1, 1:2, 1:3.' : ''}</p>
   </section>`;
 }
 
