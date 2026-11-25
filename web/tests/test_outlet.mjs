@@ -48,6 +48,24 @@ test('numbers padded', () => {
   assert.equal(code({ outlet_panel: '2', outlet_digits: 3, outlet_ports: 1 }), 'DA01P002 003');
   assert.equal(padNumber('A2', 3), 'A2');
 });
+test('SS 455 12 01: +C1B1D1S1M30:24', () => {
+  const ss = { outlet_standard: 'ss01', outlet_c: '1', outlet_b: '1', outlet_d: '1', outlet_s: '1', outlet_m: '30', outlet_ports: 1, outlet_first: 24 };
+  assert.equal(code(ss), '+C1B1D1S1M30:24');
+  assert.equal(code({ ...ss, outlet_c: '', outlet_b: '' }), '+D1S1M30:24');
+  assert.equal(code({ ...ss, outlet_ports: 2, outlet_first: 23 }), '+C1B1D1S1M30:23/24');
+  assert.equal(code({ ...ss, outlet_first: '' }), '+C1B1D1S1M30');
+  assert.equal(code({ ...ss, outlet_m: '10', outlet_digits: 3, outlet_first: 4 }), '+C1B1D1S1M010:004');
+  assert.equal(code({ ...ss, outlet_lines: 2 }), '-# +C1B1D1\nS1M30:24');
+  assert.equal(outletStyleSummary(ss), 'SS 455 12 01, one line');
+});
+test('SS 455 12 00: AC 01 31C 20', () => {
+  const ss = { outlet_standard: 'ss00', outlet_house: 'A', outlet_storey: 'C', outlet_cab: '01', outlet_place: '31C', outlet_ports: 1, outlet_first: 20 };
+  assert.equal(code(ss), 'AC 01 31C 20');
+  assert.equal(code({ ...ss, outlet_place: '04C' }), 'AC 01 04C 20');
+  assert.equal(code({ ...ss, outlet_house: '', outlet_storey: '' }), '01 31C 20');
+  assert.equal(code({ ...ss, outlet_ports: 2, outlet_first: 19 }), 'AC 01 31C 19/20');
+  assert.equal(code({ ...ss, outlet_lines: 2 }), '-# AC\n01 31C 20');
+});
 test('counts on to the next outlet', () => {
   assert.equal(nextFirst(BASE), 5);
   assert.equal(nextFirst({ ...BASE, outlet_ports: 4 }, 3), 15);

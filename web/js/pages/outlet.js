@@ -7,21 +7,23 @@ import { Field, Section, Segmented } from '../ui.js';
 import { useStore } from '../state.js';
 import { app, boot, updateOutlet, addOutlets, say, MAX_OUTLET_ROW } from '../app.js';
 import {
-  OUTLET_PANEL_KINDS, OUTLET_PORTS, OUTLET_SEPARATORS, OUTLET_PAIRS, OUTLET_DIGITS, OUTLET_LINES,
+  OUTLET_STANDARDS, OUTLET_PLACE_KINDS, OUTLET_PANEL_KINDS, OUTLET_PORTS, OUTLET_SEPARATORS, OUTLET_PAIRS, OUTLET_DIGITS, OUTLET_LINES,
   outletPorts, outletStyleSummary,
 } from '../outlet-code.js';
 
 const SKIP = 'Leave empty to skip';
 
 // A text field for one part of the code; what is typed shows as typed, spaces included
-function Part({ label, field, placeholder = SKIP, inputmode = 'text' }) {
+function Part({ label, field, placeholder = SKIP, inputmode = 'text', letter = '' }) {
   const { outlet } = useStore(app);
   const value = outlet[field] ?? '';
   const [text, setText] = useState(String(value));
   useEffect(() => { if (String(value) !== text.trim() && String(value) !== text) setText(String(value)); }, [value]);
+  const input = html`<input type="text" inputmode=${inputmode} value=${text} placeholder=${placeholder} autocomplete="off" spellcheck="false"
+    onInput=${(e) => { setText(e.currentTarget.value); updateOutlet({ [field]: e.currentTarget.value.trim() }); }} />`;
+  // A standard's letter sits fixed in front, so only the number is typed
   return html`<${Field} label=${label}>
-    <input type="text" inputmode=${inputmode} value=${text} placeholder=${placeholder} autocomplete="off" spellcheck="false"
-      onInput=${(e) => { setText(e.currentTarget.value); updateOutlet({ [field]: e.currentTarget.value.trim() }); }} />
+    ${letter ? html`<div class="letter-input" style=${`--letters: ${letter.length}`}><span aria-hidden="true">${letter}</span>${input}</div>` : input}
   <//>`;
 }
 
@@ -49,10 +51,61 @@ function addAndNext() {
   say(`${app.get().status.text} Next up: ${outletPorts(outlet) || 'the next outlet'}.`);
 }
 
+// SS 455 12 01: the parts in the order they are written, +C B D S M : port
+function Ss01Grid() {
+  const { outlet } = useStore(app);
+  return html`<div class="bin-grid outlet-grid four">
+    <div class="bin-col">
+      <${Part} label="Area" field="outlet_c" letter="+C" placeholder="1" inputmode="numeric" />
+      <${Part} label="Building" field="outlet_b" letter="B" placeholder="1" inputmode="numeric" />
+    </div>
+    <div class="bin-col">
+      <${Part} label="Distributor (room)" field="outlet_d" letter="D" placeholder="1" inputmode="numeric" />
+      <${Part} label="Rack" field="outlet_s" letter="S" placeholder="1" inputmode="numeric" />
+    </div>
+    <div class="bin-col">
+      <${Part} label="Module (cm)" field="outlet_m" letter="M" placeholder="30" inputmode="numeric" />
+      <${Part} label="First port" field="outlet_first" letter=":" placeholder=${SKIP} inputmode="numeric" />
+    </div>
+    <div class="bin-col">
+      <${Segmented} label="Ports on the outlet" options=${OUTLET_PORTS.map(([v, n]) => [String(v), n])}
+        value=${String(outlet.outlet_ports)} onChange=${(v) => updateOutlet({ outlet_ports: Number(v) })} />
+      <${Count} label="Labels in a row" field="outlet_row" min=${1} max=${MAX_OUTLET_ROW} placeholder="1" />
+    </div>
+  </div>`;
+}
+
+// SS 455 12 00: house and floor letters, rack, panel place and jack
+function Ss00Grid() {
+  const { outlet } = useStore(app);
+  const byHeight = outlet.outlet_place_kind !== 'order';
+  return html`<div class="bin-grid outlet-grid four">
+    <div class="bin-col">
+      <${Part} label="House" field="outlet_house" placeholder="A" />
+      <${Part} label="Floor" field="outlet_storey" placeholder="C" />
+    </div>
+    <div class="bin-col">
+      <${Part} label="Rack" field="outlet_cab" placeholder="01" inputmode="numeric" />
+      <${Segmented} label="Panel counted by" options=${OUTLET_PLACE_KINDS} value=${byHeight ? 'height' : 'order'}
+        onChange=${(outlet_place_kind) => updateOutlet({ outlet_place_kind })} />
+    </div>
+    <div class="bin-col">
+      <${Part} label="Panel place" field="outlet_place" placeholder=${byHeight ? '31C' : '04C'} />
+      <${Part} label="First jack" field="outlet_first" placeholder=${SKIP} inputmode="numeric" />
+    </div>
+    <div class="bin-col">
+      <${Segmented} label="Jacks on the outlet" options=${OUTLET_PORTS.map(([v, n]) => [String(v), n])}
+        value=${String(outlet.outlet_ports)} onChange=${(v) => updateOutlet({ outlet_ports: Number(v) })} />
+      <${Count} label="Labels in a row" field="outlet_row" min=${1} max=${MAX_OUTLET_ROW} placeholder="1" />
+    </div>
+  </div>`;
+}
+
 // The parts of the code: under the preview on a wide screen, first on a phone
 export function OutletCard() {
   const { outlet } = useStore(app);
   const { phase } = useStore(boot);
+  const standard = outlet.outlet_standard || 'own';
   const kind = OUTLET_PANEL_KINDS.find(([v]) => v === outlet.outlet_panel_kind) || OUTLET_PANEL_KINDS[0];
   return html`<section class="card bin-card outlet-card">
     <div class="card-head">
@@ -60,7 +113,7 @@ export function OutletCard() {
       <button class="secondary" disabled=${phase !== 'ready'} title="Add to the queue and count the ports on for the next outlet"
         onClick=${addAndNext}>Add to queue and start the next</button>
     </div>
-    <div class="bin-grid three outlet-grid">
+    ${standard === 'ss01' ? html`<${Ss01Grid} />` : standard === 'ss00' ? html`<${Ss00Grid} />` : html`<div class="bin-grid three outlet-grid">
       <div class="bin-col">
         <${Part} label="Building" field="outlet_building" />
         <${Part} label="Floor" field="outlet_floor" />
@@ -79,15 +132,18 @@ export function OutletCard() {
         <${Part} label="First port" field="outlet_first" placeholder=${SKIP} inputmode="numeric" />
         <${Count} label="Labels in a row" field="outlet_row" min=${1} max=${MAX_OUTLET_ROW} placeholder="1" />
       </div>
-    </div>
+    </div>`}
   </section>`;
 }
 
 // The side panel: what the mode is for, then how the code is written
+const EXAMPLES = { ss01: '+C1B1D1S1M30:24', ss00: 'AC 01 31C 20', own: 'DA01P02 3/4' };
+
 export function OutletHelp() {
+  const { outlet } = useStore(app);
   return html`<section class="card drawer-card">
     <h2 class="card-title">Network outlet labels</h2>
-    <p class="hint">Labels for wall outlets and patch panel ports, with a code that says where the cable goes, like DA01P02 3/4.</p>
+    <p class="hint">Labels for wall outlets and patch panel ports, with a code that says where the cable goes, like ${EXAMPLES[outlet.outlet_standard] || EXAMPLES.own}.</p>
     <ol class="how-to">
       <li>Fill in the parts of the code you use. Empty parts are left out.</li>
       <li>Pick One, Two or Four ports on the outlet and the first port.</li>
@@ -97,17 +153,26 @@ export function OutletHelp() {
   </section>`;
 }
 
+const STYLE_HINTS = {
+  ss01: 'SS 455 12 01 is the current Swedish standard: +C1B1D1S1M30:24. Two lines puts the area, building and distributor small on top.',
+  ss00: 'SS 455 12 00 is the older standard that is still the most used: AC 01 31C 20. Two lines puts the house and floor small on top.',
+  own: 'Two lines puts the building, floor and room small on top and the rack, panel and ports big under them.',
+};
+
 export function OutletStyleSection() {
   const { outlet } = useStore(app);
+  const own = (outlet.outlet_standard || 'own') === 'own';
   return html`<${Section} id="outlet-style" title="Code style" summary=${outletStyleSummary(outlet)}>
-    <${Segmented} label="Between the parts" options=${OUTLET_SEPARATORS} value=${outlet.outlet_sep}
-      onChange=${(outlet_sep) => updateOutlet({ outlet_sep })} />
+    <${Segmented} label="Standard, SS 455" options=${OUTLET_STANDARDS} value=${outlet.outlet_standard || 'own'}
+      onChange=${(outlet_standard) => updateOutlet({ outlet_standard })} />
+    ${own && html`<${Segmented} label="Between the parts" options=${OUTLET_SEPARATORS} value=${outlet.outlet_sep}
+      onChange=${(outlet_sep) => updateOutlet({ outlet_sep })} />`}
     <${Segmented} label="Two ports shown as" options=${OUTLET_PAIRS} value=${outlet.outlet_pair}
       onChange=${(outlet_pair) => updateOutlet({ outlet_pair })} />
     <${Segmented} label="Numbers" options=${OUTLET_DIGITS.map(([v, n]) => [String(v), n])} value=${String(outlet.outlet_digits)}
       onChange=${(v) => updateOutlet({ outlet_digits: Number(v) })} />
     <${Segmented} label="Lines" options=${OUTLET_LINES.map(([v, n]) => [String(v), n])} value=${String(outlet.outlet_lines)}
       onChange=${(v) => updateOutlet({ outlet_lines: Number(v) })} />
-    <p class="hint">Two lines puts the building, floor and room small on top and the rack, panel and ports big under them. Numbers pads the panel and port numbers with zeros, so 2 becomes 02 or 002.</p>
+    <p class="hint">${STYLE_HINTS[outlet.outlet_standard] || STYLE_HINTS.own} Numbers pads the numbers with zeros, so 2 becomes 02 or 002.</p>
   <//>`;
 }
