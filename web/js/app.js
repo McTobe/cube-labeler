@@ -86,6 +86,17 @@ export const DEFAULT_OUTLET = {
   layout: 'outlet',
   text: '',
   font_name: 'Arimo Bold',
+  outlet_standard: 'own',  // 'ss01' (SS 455 12 01), 'ss00' (SS 455 12 00) or 'own' (the parts below)
+  outlet_c: '',  // SS 455 12 01: area (+C), building (B), distributor (D), rack (S) and module (M)
+  outlet_b: '',
+  outlet_d: '',
+  outlet_s: '1',
+  outlet_m: '',
+  outlet_house: '',  // SS 455 12 00: house and floor letters, rack (skåp/stativ) and panel place
+  outlet_storey: '',
+  outlet_cab: '01',
+  outlet_place: '',
+  outlet_place_kind: 'height',  // the panel place counted by height (31C) or in order (04C)
   outlet_building: '',
   outlet_floor: '',
   outlet_room: '',
@@ -496,7 +507,8 @@ export const RESET_NOTES = {
 };
 
 // What Reset keeps on an outlet label: the code itself
-const OUTLET_PART_KEYS = ['outlet_building', 'outlet_floor', 'outlet_room', 'outlet_rack', 'outlet_panel_kind',
+const OUTLET_PART_KEYS = ['outlet_standard', 'outlet_c', 'outlet_b', 'outlet_d', 'outlet_s', 'outlet_m', 'outlet_house',
+  'outlet_storey', 'outlet_cab', 'outlet_place', 'outlet_place_kind', 'outlet_building', 'outlet_floor', 'outlet_room', 'outlet_rack', 'outlet_panel_kind',
   'outlet_panel', 'outlet_ports', 'outlet_first', 'outlet_row'];
 const POWER_PART_KEYS = ['power_building', 'power_floor', 'power_room', 'power_central', 'power_group_kind',
   'power_group', 'power_phase', 'power_voltage', 'power_row'];
